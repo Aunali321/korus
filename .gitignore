@@ -1,0 +1,32 @@
+# Binaries for programs and plugins
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Test binary, built with `go test -c`
+*.test
+
+# Output of the go coverage tool, specifically when used with LiteIDE
+*.out
+
+# Dependency directories (uncomment to ignore vendor directory)
+# vendor/
+
+# IDE-specific files (e.g., VS Code)
+.vscode/
+
+# Editor-specific files (e.g., Vim swap files)
+*~
+*.swp
+.DS_Store # macOS specific
+
+# Log files
+*.log
+
+# Temporary files
+tmp/
+
+.env
+output

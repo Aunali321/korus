@@ -1,0 +1,61 @@
+services:
+  postgres:
+    image: pgvector/pgvector:pg17
+    container_name: korus-postgres
+    environment:
+      POSTGRES_DB: korus
+      POSTGRES_USER: korus
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-koruspassword}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5433:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U korus -d korus"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  korus:
+    build: .
+    container_name: korus-server
+    environment:
+      DATABASE_URL: postgres://korus:${POSTGRES_PASSWORD:-koruspassword}@postgres:5432/korus?sslmode=disable
+      JWT_SECRET: ${JWT_SECRET:-generate-a-secure-jwt-secret-key}
+      ADMIN_USERNAME: ${ADMIN_USERNAME:-admin}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}
+      MUSIC_DIR: /home/aun/Programming/Projects/Scripts/ytm-exporter/music_downloads
+      CACHE_DIR: /cache
+      ENVIRONMENT: ${ENVIRONMENT:-production}
+      SERVER_HOST: 0.0.0.0
+      SERVER_PORT: 3000
+    volumes:
+      - ${MUSIC_PATH:-./music}:/music:ro
+      - cache_data:/cache
+    ports:
+      - "${PORT:-3000}:3000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "wget",
+          "--no-verbose",
+          "--tries=1",
+          "--spider",
+          "http://localhost:3000/api/ping",
+        ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+    driver: local
+  cache_data:
+    driver: local
