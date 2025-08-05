@@ -200,7 +200,7 @@ func (bms *BatchMetadataService) batchUpsertArtists(ctx context.Context, tx pgx.
 		insertQuery := fmt.Sprintf(`
 			INSERT INTO artists (name, sort_name)
 			VALUES %s
-			ON CONFLICT ON CONSTRAINT idx_artists_name_unique
+			ON CONFLICT ((LOWER(name)))
 			DO UPDATE SET sort_name = EXCLUDED.sort_name
 			RETURNING id, LOWER(name) as name_lower
 		`, strings.Join(valueStrings, ","))
@@ -241,7 +241,7 @@ func (bms *BatchMetadataService) batchUpsertAlbums(ctx context.Context, tx pgx.T
 		query := `
 			INSERT INTO albums (name, artist_id, album_artist_id, date_added)
 			VALUES ($1, $2, $2, NOW())
-			ON CONFLICT ON CONSTRAINT idx_albums_name_artist_unique
+			ON CONFLICT ((LOWER(name)), artist_id)
 			DO UPDATE SET artist_id = EXCLUDED.artist_id
 			RETURNING id
 		`
