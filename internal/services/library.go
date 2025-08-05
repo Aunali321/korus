@@ -113,6 +113,20 @@ func (ls *LibraryService) GetArtist(ctx context.Context, id int) (*models.Artist
 		return nil, fmt.Errorf("failed to get artist: %w", err)
 	}
 
+	// Get artist albums
+	albums, err := ls.GetArtistAlbums(ctx, id)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get artist albums: %w", err)
+	}
+	artist.Albums = albums
+
+	// Get top tracks
+	topTracks, err := ls.GetArtistTopTracks(ctx, id)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get artist top tracks: %w", err)
+	}
+	artist.TopTracks = topTracks
+
 	return &artist, nil
 }
 
@@ -234,6 +248,13 @@ func (ls *LibraryService) GetAlbum(ctx context.Context, id int) (*models.Album, 
 		}
 	}
 
+	// Get album songs
+	songs, err := ls.GetAlbumSongs(ctx, id)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get album songs: %w", err)
+	}
+	album.Songs = songs
+
 	return &album, nil
 }
 
@@ -340,4 +361,116 @@ func (ls *LibraryService) querySongs(ctx context.Context, query string, args ...
 	}
 
 	return songs, rows.Err()
+}
+
+func (ls *LibraryService) GetArtistAlbums(ctx context.Context, artistID int) ([]models.Album, error) {
+	query := `
+		SELECT a.id, a.name, a.year, a.cover_path,
+			   COUNT(DISTINCT s.id) as song_count,
+			   COALESCE(SUM(s.duration), 0) as duration
+		FROM albums a
+		LEFT JOIN songs s ON a.id = s.album_id
+		WHERE a.artist_id = $1 OR a.album_artist_id = $1
+		GROUP BY a.id, a.name, a.year, a.cover_path
+		ORDER BY a.year, a.name
+	`
+
+	rows, err := ls.db.QueryContext(ctx, query, artistID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query artist albums: %w", err)
+	}
+	defer rows.Close()
+
+	albums := make([]models.Album, 0)
+	for rows.Next() {
+		var album models.Album
+		err := rows.Scan(&album.ID, &album.Name, &album.Year, &album.CoverPath,
+			&album.SongCount, &album.Duration)
+		if err != nil {
+			return nil, fmt.Errorf("failed to scan album: %w", err)
+		}
+		albums = append(albums, album)
+	}
+
+	return albums, rows.Err()
+}
+
+func (ls *LibraryService) GetArtistTopTracks(ctx context.Context, artistID int) ([]models.Song, error) {
+	// For now, just return the first 10 songs by the artist ordered by track number
+	// In the future, this could be based on play count or other metrics
+	query := `
+		SELECT s.id, s.title, s.duration,
+			   a.id as album_id, a.name as album_name
+		FROM songs s
+		LEFT JOIN albums a ON s.album_id = a.id
+		WHERE s.artist_id = $1
+		ORDER BY s.track_number, s.title
+		LIMIT 10
+	`
+
+	rows, err := ls.db.QueryContext(ctx, query, artistID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query artist top tracks: %w", err)
+	}
+	defer rows.Close()
+
+	songs := make([]models.Song, 0)
+	for rows.Next() {
+		var song models.Song
+		var albumID *int
+		var albumName *string
+		err := rows.Scan(&song.ID, &song.Title, &song.Duration, &albumID, &albumName)
+		if err != nil {
+			return nil, fmt.Errorf("failed to scan song: %w", err)
+		}
+
+		// Set album info if available
+		if albumID != nil && albumName != nil {
+			song.Album = &models.Album{
+				ID:   *albumID,
+				Name: *albumName,
+			}
+		}
+
+		songs = append(songs, song)
+	}
+
+	return songs, rows.Err()
+}
+
+func (ls *LibraryService) GetAllSongs(ctx context.Context, limit, offset int, sort string) ([]models.Song, error) {
+	query := `
+		SELECT s.id, s.title, s.album_id, s.artist_id, s.track_number, s.disc_number,
+			   s.duration, s.file_path, s.file_size, s.file_modified, 
+			   s.bitrate, s.format, s.date_added,
+			   ar.name as artist_name,
+			   a.name as album_name
+		FROM songs s
+		LEFT JOIN artists ar ON s.artist_id = ar.id
+		LEFT JOIN albums a ON s.album_id = a.id
+	`
+
+	// Add sorting
+	switch sort {
+	case "title":
+		query += " ORDER BY s.title"
+	case "title_desc":
+		query += " ORDER BY s.title DESC"
+	case "artist":
+		query += " ORDER BY ar.name, s.title"
+	case "album":
+		query += " ORDER BY a.name, s.track_number, s.title"
+	case "duration":
+		query += " ORDER BY s.duration"
+	case "duration_desc":
+		query += " ORDER BY s.duration DESC"
+	case "date_added":
+		query += " ORDER BY s.date_added DESC"
+	default:
+		query += " ORDER BY s.title"
+	}
+
+	query += " LIMIT $1 OFFSET $2"
+
+	return ls.querySongs(ctx, query, limit, offset)
 }

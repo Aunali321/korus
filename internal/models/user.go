@@ -29,6 +29,8 @@ type Artist struct {
 	MusicBrainzID *string `json:"musicbrainz_id,omitempty" db:"musicbrainz_id"`
 	AlbumCount    int     `json:"album_count,omitempty"`
 	SongCount     int     `json:"song_count,omitempty"`
+	Albums        []Album `json:"albums,omitempty"`
+	TopTracks     []Song  `json:"topTracks,omitempty"`
 }
 
 type Album struct {
@@ -44,6 +46,7 @@ type Album struct {
 	AlbumArtist   *Artist   `json:"album_artist,omitempty"`
 	SongCount     int       `json:"song_count,omitempty"`
 	Duration      int       `json:"duration,omitempty"`
+	Songs         []Song    `json:"songs,omitempty"`
 }
 
 type Song struct {

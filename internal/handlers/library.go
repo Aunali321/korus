@@ -122,80 +122,62 @@ func (h *LibraryHandler) GetAlbum(c *gin.Context) {
 	c.JSON(http.StatusOK, album)
 }
 
-func (h *LibraryHandler) GetAlbumSongs(c *gin.Context) {
-	id, err := strconv.Atoi(c.Param("id"))
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"error":   "invalid_id",
-			"message": "Invalid album ID",
-		})
-		return
-	}
-
-	// First check if album exists
-	_, err = h.libraryService.GetAlbum(c.Request.Context(), id)
-	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{
-			"error":   "not_found",
-			"message": "Album not found",
-		})
-		return
-	}
-
-	songs, err := h.libraryService.GetAlbumSongs(c.Request.Context(), id)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"error":   "internal_error",
-			"message": "Failed to get album songs",
-		})
-		return
-	}
-
-	c.JSON(http.StatusOK, songs)
-}
 
 func (h *LibraryHandler) GetSongs(c *gin.Context) {
 	idsParam := c.Query("ids")
-	if idsParam == "" {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"error":   "missing_ids",
-			"message": "Song IDs are required",
-		})
-		return
-	}
-
-	// Parse comma-separated IDs
-	idStrings := strings.Split(idsParam, ",")
-	ids := make([]int, 0, len(idStrings))
 	
-	for _, idStr := range idStrings {
-		if id, err := strconv.Atoi(strings.TrimSpace(idStr)); err == nil {
-			ids = append(ids, id)
+	// If ids parameter is provided, do batch fetch
+	if idsParam != "" {
+		// Parse comma-separated IDs
+		idStrings := strings.Split(idsParam, ",")
+		ids := make([]int, 0, len(idStrings))
+		
+		for _, idStr := range idStrings {
+			if id, err := strconv.Atoi(strings.TrimSpace(idStr)); err == nil {
+				ids = append(ids, id)
+			}
 		}
-	}
 
-	if len(ids) == 0 {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"error":   "invalid_ids",
-			"message": "No valid song IDs provided",
-		})
+		if len(ids) == 0 {
+			c.JSON(http.StatusBadRequest, gin.H{
+				"error":   "invalid_ids",
+				"message": "No valid song IDs provided",
+			})
+			return
+		}
+
+		songs, err := h.libraryService.GetSongs(c.Request.Context(), ids)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"error":   "internal_error",
+				"message": "Failed to get songs",
+			})
+			return
+		}
+
+		// Return 404 if no songs were found for any of the requested IDs
+		if len(songs) == 0 {
+			c.JSON(http.StatusNotFound, gin.H{
+				"error":   "not_found",
+				"message": "No songs found for the requested IDs",
+			})
+			return
+		}
+
+		c.JSON(http.StatusOK, songs)
 		return
 	}
 
-	songs, err := h.libraryService.GetSongs(c.Request.Context(), ids)
+	// Otherwise, list all songs with pagination and sorting
+	limit := parseIntParam(c, "limit", 50)
+	offset := parseIntParam(c, "offset", 0)
+	sort := c.DefaultQuery("sort", "title")
+
+	songs, err := h.libraryService.GetAllSongs(c.Request.Context(), limit, offset, sort)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"error":   "internal_error",
 			"message": "Failed to get songs",
-		})
-		return
-	}
-
-	// Return 404 if no songs were found for any of the requested IDs
-	if len(songs) == 0 {
-		c.JSON(http.StatusNotFound, gin.H{
-			"error":   "not_found",
-			"message": "No songs found for the requested IDs",
 		})
 		return
 	}

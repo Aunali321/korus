@@ -324,3 +324,85 @@ func (ps *PlaylistService) ReorderPlaylistSongs(ctx context.Context, playlistID,
 
 	return nil
 }
+
+// RemovePlaylistSongsByID removes playlist songs by their playlist_song IDs
+func (ps *PlaylistService) RemovePlaylistSongsByID(ctx context.Context, playlistID, userID int, playlistSongIDs []int) error {
+	// Verify playlist ownership
+	ownerQuery := `SELECT user_id FROM playlists WHERE id = $1`
+	var ownerID int
+	err := ps.db.QueryRowContext(ctx, ownerQuery, playlistID).Scan(&ownerID)
+	if err != nil {
+		return fmt.Errorf("failed to verify playlist ownership: %w", err)
+	}
+	if ownerID != userID {
+		return fmt.Errorf("playlist not found or not owned by user")
+	}
+
+	// Remove songs by playlist_song IDs
+	deleteQuery := `DELETE FROM playlist_songs WHERE id = ANY($1) AND playlist_id = $2`
+	_, err = ps.db.ExecContext(ctx, deleteQuery, playlistSongIDs, playlistID)
+	if err != nil {
+		return fmt.Errorf("failed to remove songs from playlist: %w", err)
+	}
+
+	// Update playlist modified time
+	_, err = ps.db.ExecContext(ctx, `UPDATE playlists SET updated_at = NOW() WHERE id = $1`, playlistID)
+	if err != nil {
+		return fmt.Errorf("failed to update playlist timestamp: %w", err)
+	}
+
+	return nil
+}
+
+// ReorderPlaylistSong moves a specific playlist song to a new position
+func (ps *PlaylistService) ReorderPlaylistSong(ctx context.Context, playlistID, userID, playlistSongID, newPosition int) error {
+	// Verify playlist ownership
+	ownerQuery := `SELECT user_id FROM playlists WHERE id = $1`
+	var ownerID int
+	err := ps.db.QueryRowContext(ctx, ownerQuery, playlistID).Scan(&ownerID)
+	if err != nil {
+		return fmt.Errorf("failed to verify playlist ownership: %w", err)
+	}
+	if ownerID != userID {
+		return fmt.Errorf("playlist not found or not owned by user")
+	}
+
+	// Get current position of the song
+	var currentPosition int
+	posQuery := `SELECT position FROM playlist_songs WHERE id = $1 AND playlist_id = $2`
+	err = ps.db.QueryRowContext(ctx, posQuery, playlistSongID, playlistID).Scan(&currentPosition)
+	if err != nil {
+		return fmt.Errorf("failed to get current position: %w", err)
+	}
+
+	// Update positions of other songs
+	if newPosition > currentPosition {
+		// Moving down: shift songs up
+		updateQuery := `UPDATE playlist_songs SET position = position - 1 
+						WHERE playlist_id = $1 AND position > $2 AND position <= $3`
+		_, err = ps.db.ExecContext(ctx, updateQuery, playlistID, currentPosition, newPosition)
+	} else if newPosition < currentPosition {
+		// Moving up: shift songs down
+		updateQuery := `UPDATE playlist_songs SET position = position + 1 
+						WHERE playlist_id = $1 AND position >= $2 AND position < $3`
+		_, err = ps.db.ExecContext(ctx, updateQuery, playlistID, newPosition, currentPosition)
+	}
+	if err != nil {
+		return fmt.Errorf("failed to update other song positions: %w", err)
+	}
+
+	// Update the target song's position
+	updateQuery := `UPDATE playlist_songs SET position = $1 WHERE id = $2`
+	_, err = ps.db.ExecContext(ctx, updateQuery, newPosition, playlistSongID)
+	if err != nil {
+		return fmt.Errorf("failed to update song position: %w", err)
+	}
+
+	// Update playlist modified time
+	_, err = ps.db.ExecContext(ctx, `UPDATE playlists SET updated_at = NOW() WHERE id = $1`, playlistID)
+	if err != nil {
+		return fmt.Errorf("failed to update playlist timestamp: %w", err)
+	}
+
+	return nil
+}

@@ -6,17 +6,20 @@ import (
 	"strings"
 
 	"github.com/gin-gonic/gin"
+	"korus/internal/auth"
 	"korus/internal/middleware"
 	"korus/internal/services"
 )
 
 type PlaylistHandler struct {
 	playlistService *services.PlaylistService
+	authService     *auth.Service
 }
 
-func NewPlaylistHandler(playlistService *services.PlaylistService) *PlaylistHandler {
+func NewPlaylistHandler(playlistService *services.PlaylistService, authService *auth.Service) *PlaylistHandler {
 	return &PlaylistHandler{
 		playlistService: playlistService,
+		authService:     authService,
 	}
 }
 
@@ -38,11 +41,12 @@ type AddSongsRequest struct {
 }
 
 type RemoveSongsRequest struct {
-	SongIDs []int `json:"songIds" binding:"required"`
+	PlaylistSongIDs []int `json:"playlistSongIds" binding:"required"`
 }
 
-type ReorderSongsRequest struct {
-	SongIDs []int `json:"songIds" binding:"required"`
+type ReorderSongRequest struct {
+	PlaylistSongID int `json:"playlistSongId" binding:"required"`
+	NewPosition    int `json:"newPosition" binding:"required"`
 }
 
 // GetUserPlaylists returns all playlists owned by the current user
@@ -143,6 +147,26 @@ func (h *PlaylistHandler) GetPlaylist(c *gin.Context) {
 		return
 	}
 
+	// Get playlist owner information
+	owner, err := h.authService.GetUserByID(c.Request.Context(), playlist.UserID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error":   "internal_error",
+			"message": "Failed to get playlist owner information",
+		})
+		return
+	}
+
+	// Transform songs to match the new API format
+	formattedSongs := make([]gin.H, len(songs))
+	for i, ps := range songs {
+		formattedSongs[i] = gin.H{
+			"playlistSongId": ps.ID,
+			"position":       ps.Position,
+			"song":           ps.Song,
+		}
+	}
+
 	response := gin.H{
 		"id":          playlist.ID,
 		"user_id":     playlist.UserID,
@@ -151,9 +175,12 @@ func (h *PlaylistHandler) GetPlaylist(c *gin.Context) {
 		"visibility":  playlist.Visibility,
 		"created_at":  playlist.CreatedAt,
 		"updated_at":  playlist.UpdatedAt,
-		"song_count":  playlist.SongCount,
 		"duration":    playlist.Duration,
-		"songs":       songs,
+		"owner": gin.H{
+			"id":       owner.ID,
+			"username": owner.Username,
+		},
+		"songs": formattedSongs,
 	}
 
 	c.JSON(http.StatusOK, response)
@@ -345,15 +372,15 @@ func (h *PlaylistHandler) RemoveSongsFromPlaylist(c *gin.Context) {
 		return
 	}
 
-	if len(req.SongIDs) == 0 {
+	if len(req.PlaylistSongIDs) == 0 {
 		c.JSON(http.StatusBadRequest, gin.H{
 			"error":   "empty_request",
-			"message": "No songs provided",
+			"message": "No playlist songs provided",
 		})
 		return
 	}
 
-	err = h.playlistService.RemoveSongsFromPlaylist(c.Request.Context(), id, user.ID, req.SongIDs)
+	err = h.playlistService.RemovePlaylistSongsByID(c.Request.Context(), id, user.ID, req.PlaylistSongIDs)
 	if err != nil {
 		if strings.Contains(err.Error(), "not found") {
 			c.JSON(http.StatusNotFound, gin.H{
@@ -392,7 +419,7 @@ func (h *PlaylistHandler) ReorderPlaylistSongs(c *gin.Context) {
 		return
 	}
 
-	var req ReorderSongsRequest
+	var req ReorderSongRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
 			"error":   "invalid_request",
@@ -401,15 +428,7 @@ func (h *PlaylistHandler) ReorderPlaylistSongs(c *gin.Context) {
 		return
 	}
 
-	if len(req.SongIDs) == 0 {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"error":   "empty_request",
-			"message": "No songs provided",
-		})
-		return
-	}
-
-	err = h.playlistService.ReorderPlaylistSongs(c.Request.Context(), id, user.ID, req.SongIDs)
+	err = h.playlistService.ReorderPlaylistSong(c.Request.Context(), id, user.ID, req.PlaylistSongID, req.NewPosition)
 	if err != nil {
 		if strings.Contains(err.Error(), "not found") {
 			c.JSON(http.StatusNotFound, gin.H{

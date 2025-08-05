@@ -6,6 +6,16 @@ The Korus API is a RESTful web service that provides access to a self-hosted mus
 
 **Base URL**: `http://localhost:3000/api`
 
+### Contextual Wrapper Pattern
+
+The API follows a consistent "Contextual Wrapper" pattern for primary resource endpoints:
+
+- `GET /albums/{id}` returns album details **with** nested songs array
+- `GET /artists/{id}` returns artist details **with** nested albums and top tracks
+- `GET /playlists/{id}` returns playlist details **with** nested songs array
+
+This design eliminates the need for multiple API calls when building complete views (Album Page, Artist Page, Playlist View), resulting in better performance and simpler client code.
+
 ## Authentication
 
 Korus uses JWT (JSON Web Tokens) for authentication with access and refresh token pairs.
@@ -168,7 +178,7 @@ List artists with pagination and sorting.
 ```
 
 #### GET /artists/{id}
-Get artist details by ID.
+Get artist details by ID, including all albums and top tracks.
 
 **Headers:** `Authorization: Bearer <token>`
 
@@ -180,7 +190,68 @@ Get artist details by ID.
   "sort_name": "Beatles, The",
   "musicbrainz_id": "b10bbbfc-cf9e-42e0-be17-e2c3e1d2600d",
   "album_count": 12,
-  "song_count": 147
+  "song_count": 147,
+  "albums": [
+    {
+      "id": 1,
+      "name": "Abbey Road",
+      "year": 1969,
+      "cover_path": "/covers/abbey_road.jpg",
+      "song_count": 17,
+      "duration": 2854
+    },
+    {
+      "id": 2,
+      "name": "Let It Be",
+      "year": 1970,
+      "cover_path": "/covers/let_it_be.jpg",
+      "song_count": 12,
+      "duration": 2156
+    },
+    {
+      "id": 3,
+      "name": "Sgt. Pepper's Lonely Hearts Club Band",
+      "year": 1967,
+      "cover_path": "/covers/sgt_peppers.jpg",
+      "song_count": 13,
+      "duration": 2387
+    }
+  ],
+  "topTracks": [
+    {
+      "id": 1,
+      "title": "Come Together",
+      "duration": 259,
+      "album": {
+        "id": 1,
+        "name": "Abbey Road"
+      }
+    },
+    {
+      "id": 15,
+      "title": "Hey Jude",
+      "duration": 431,
+      "album": null
+    },
+    {
+      "id": 8,
+      "title": "Let It Be",
+      "duration": 243,
+      "album": {
+        "id": 2,
+        "name": "Let It Be"
+      }
+    },
+    {
+      "id": 22,
+      "title": "Yesterday",
+      "duration": 125,
+      "album": {
+        "id": 4,
+        "name": "Help!"
+      }
+    }
+  ]
 }
 ```
 
@@ -227,7 +298,7 @@ List albums with pagination, sorting, and filtering.
 ```
 
 #### GET /albums/{id}
-Get album details by ID.
+Get album details by ID, including all songs in the album.
 
 **Headers:** `Authorization: Bearer <token>`
 
@@ -237,7 +308,7 @@ Get album details by ID.
   "id": 1,
   "name": "Abbey Road",
   "artist_id": 1,
-  "album_artist_id": 1,
+  "album_artist_id": 1,  
   "year": 1969,
   "musicbrainz_id": "7add7441-8f2c-4fbb-828d-0db9c0c2d43b",
   "cover_path": "/covers/abbey_road.jpg",
@@ -251,63 +322,68 @@ Get album details by ID.
     "name": "The Beatles"
   },
   "song_count": 17,
-  "duration": 2854
-}
-```
-
-#### GET /albums/{id}/songs
-Get all songs in an album.
-
-**Headers:** `Authorization: Bearer <token>`
-
-**Success Response (200):**
-```json
-[
-  {
-    "id": 1,
-    "title": "Come Together",
-    "album_id": 1,
-    "artist_id": 1,
-    "track_number": 1,
-    "disc_number": 1,
-    "duration": 259,
-    "file_path": "/music/The Beatles/Abbey Road/01 Come Together.mp3",
-    "file_size": 6234567,
-    "file_modified": "2025-07-15T14:30:00Z",
-    "bitrate": 320,
-    "format": "mp3",
-    "date_added": "2025-08-01T10:00:00Z",
-    "artist": {
+  "duration": 2854,
+  "songs": [
+    {
       "id": 1,
-      "name": "The Beatles"
+      "title": "Come Together",
+      "album_id": 1,
+      "artist_id": 1,
+      "track_number": 1,
+      "disc_number": 1,
+      "duration": 259,
+      "file_path": "/music/The Beatles/Abbey Road/01 Come Together.mp3",
+      "file_size": 6234567,
+      "file_modified": "2025-07-15T14:30:00Z",
+      "bitrate": 320,
+      "format": "mp3",
+      "date_added": "2025-08-01T10:00:00Z",
+      "artist": {
+        "id": 1,
+        "name": "The Beatles"
+      }
     },
-    "album": {
-      "id": 1,
-      "name": "Abbey Road"
+    {
+      "id": 2,
+      "title": "Something",
+      "album_id": 1,
+      "artist_id": 1,
+      "track_number": 2,
+      "disc_number": 1,
+      "duration": 182,
+      "file_path": "/music/The Beatles/Abbey Road/02 Something.mp3",
+      "file_size": 4567890,
+      "file_modified": "2025-07-15T14:30:00Z",
+      "bitrate": 320,
+      "format": "mp3",
+      "date_added": "2025-08-01T10:00:00Z",
+      "artist": {
+        "id": 1,
+        "name": "The Beatles"
+      }
     }
-  }
-]
-```
-
-**Error Response (404):**
-```json
-{
-  "error": "not_found",
-  "message": "Album not found"
+  ]
 }
 ```
+
 
 ### 🎵 Songs
 
 #### GET /songs
-Batch fetch songs by IDs.
+List all songs with pagination and sorting, or batch fetch songs by IDs.
 
 **Headers:** `Authorization: Bearer <token>`
 
 **Query Parameters:**
-- `ids` (required) - Comma-separated list of song IDs
+- `ids` (optional) - Comma-separated list of song IDs for batch fetch
+- `limit` (default: 50) - Number of results per page (when not using ids)
+- `offset` (default: 0) - Number of results to skip (when not using ids)
+- `sort` - Sorting method: `title`, `title_desc`, `artist`, `album`, `duration`, `duration_desc`, `date_added`
 
-**Example:** `GET /songs?ids=1,2,3,4,5`
+**Examples:** 
+- `GET /songs` - List all songs with default pagination
+- `GET /songs?limit=20&sort=artist` - List songs sorted by artist
+- `GET /songs?ids=1,2,3,4,5` - Batch fetch specific songs
 
 **Success Response (200):**
 ```json
@@ -679,7 +755,7 @@ Create a new playlist.
 ```
 
 #### GET /playlists/{id}
-Get playlist details.
+Get playlist details with full, ordered tracklist.
 
 **Headers:** `Authorization: Bearer <token>`
 
@@ -690,25 +766,48 @@ Get playlist details.
   "name": "My Favorites",
   "description": "Songs I love",
   "user_id": 1,
-  "is_public": true,
+  "visibility": "public",
   "created_at": "2025-08-01T10:00:00Z",
   "updated_at": "2025-08-01T15:30:00Z",
+  "duration": 5400,
+  "owner": {
+    "id": 1,
+    "username": "admin"
+  },
   "songs": [
     {
-      "id": 1,
-      "title": "Come Together",
-      "album_id": 1,
-      "artist_id": 1,
-      "duration": 259,
-      "artist": {
+      "playlistSongId": 101,
+      "position": 0,
+      "song": {
         "id": 1,
-        "name": "The Beatles"
-      },
-      "album": {
-        "id": 1,
-        "name": "Abbey Road"
-      },
-      "playlist_position": 1
+        "title": "Come Together",
+        "duration": 259,
+        "artist": {
+          "id": 1,
+          "name": "The Beatles"
+        },
+        "album": {
+          "id": 1,
+          "name": "Abbey Road"
+        }
+      }
+    },
+    {
+      "playlistSongId": 102,
+      "position": 1,
+      "song": {
+        "id": 8,
+        "title": "Let It Be",
+        "duration": 243,
+        "artist": {
+          "id": 1,
+          "name": "The Beatles"
+        },
+        "album": {
+          "id": 2,
+          "name": "Let It Be"
+        }
+      }
     }
   ]
 }
@@ -759,7 +858,7 @@ Remove songs from playlist.
 **Request Body:**
 ```json
 {
-  "song_ids": [1, 2]
+  "playlistSongIds": [101, 102]
 }
 ```
 
@@ -773,8 +872,8 @@ Reorder songs in playlist.
 **Request Body:**
 ```json
 {
-  "song_id": 1,
-  "new_position": 3
+  "playlistSongId": 101,
+  "newPosition": 3
 }
 ```
 
