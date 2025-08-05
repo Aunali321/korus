@@ -716,7 +716,7 @@ List user's playlists.
     "name": "My Favorites",
     "description": "Songs I love",
     "user_id": 1,
-    "is_public": true,
+    "visibility": "public",
     "created_at": "2025-08-01T10:00:00Z",
     "updated_at": "2025-08-01T15:30:00Z",
     "song_count": 25,
@@ -735,7 +735,7 @@ Create a new playlist.
 {
   "name": "My New Playlist",
   "description": "Optional description",
-  "is_public": false
+  "visibility": "private"
 }
 ```
 
@@ -746,7 +746,7 @@ Create a new playlist.
   "name": "My New Playlist",
   "description": "Optional description",
   "user_id": 1,
-  "is_public": false,
+  "visibility": "private",
   "created_at": "2025-08-01T16:00:00Z",
   "updated_at": "2025-08-01T16:00:00Z",
   "song_count": 0,
@@ -823,7 +823,7 @@ Update playlist details.
 {
   "name": "Updated Playlist Name",
   "description": "New description",
-  "is_public": true
+  "visibility": "public"
 }
 ```
 
@@ -844,7 +844,7 @@ Add songs to playlist.
 **Request Body:**
 ```json
 {
-  "song_ids": [1, 2, 3]
+  "songIds": [1, 2, 3]
 }
 ```
 
@@ -938,7 +938,7 @@ Like songs.
 **Request Body:**
 ```json
 {
-  "song_ids": [1, 2, 3]
+  "songIds": [1, 2, 3]
 }
 ```
 
@@ -952,7 +952,7 @@ Unlike songs.
 **Request Body:**
 ```json
 {
-  "song_ids": [1, 2]
+  "songIds": [1, 2]
 }
 ```
 
