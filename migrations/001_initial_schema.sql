@@ -49,6 +49,7 @@ CREATE TABLE songs (
     file_modified TIMESTAMPTZ NOT NULL,
     bitrate INTEGER,
     format VARCHAR(10),
+    cover_path VARCHAR(255),
     date_added TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
@@ -141,6 +142,7 @@ CREATE TABLE job_queue (
 CREATE INDEX idx_songs_album_id ON songs(album_id);
 CREATE INDEX idx_songs_artist_id ON songs(artist_id);
 CREATE INDEX idx_songs_file_path ON songs(file_path);
+CREATE INDEX idx_songs_cover_path ON songs(cover_path) WHERE cover_path IS NOT NULL;
 CREATE INDEX idx_liked_songs_user_id ON liked_songs(user_id);
 CREATE INDEX idx_liked_songs_liked_at ON liked_songs(liked_at);
 CREATE INDEX idx_play_history_user_id ON play_history(user_id);

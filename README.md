@@ -6,6 +6,8 @@ A high-performance, self-hosted music streaming server built with Go, PostgreSQL
 
 - **RESTful API** with JWT authentication
 - **Real-time file scanning** with automatic metadata extraction
+- **Comprehensive cover art extraction** from embedded metadata and external files
+- **WebP, JPEG, PNG, GIF format support** for cover images
 - **Full-text search** powered by Bleve
 - **Audio streaming** with range request support
 - **PostgreSQL-based job queue** for background processing
@@ -80,7 +82,13 @@ The server will be available at `http://localhost:3000`.
 ### Streaming
 
 - `GET /api/songs/{id}/stream` - Stream audio file
-- `GET /api/albums/{id}/cover` - Get album artwork
+
+### Cover Art
+
+Cover art is automatically extracted and included in API responses as `cover_path` URLs. Images are served as static files:
+- Cover URLs: `/covers/{hash}.{ext}`
+- Supported formats: JPEG, PNG, WebP, GIF
+- Sources: Song-specific files, embedded metadata, album folder covers
 
 ### Health
 
@@ -102,13 +110,20 @@ The server will be available at `http://localhost:3000`.
 | `SERVER_PORT` | HTTP server port | `3000` |
 | `ENVIRONMENT` | Environment mode | `development` |
 
-### Supported Audio Formats
+### Supported Formats
 
+**Audio Files:**
 - MP3 (`.mp3`)
-- FLAC (`.flac`)
+- FLAC (`.flac`) 
 - M4A/AAC (`.m4a`, `.aac`)
 - OGG Vorbis (`.ogg`)
 - WAV (`.wav`)
+
+**Cover Art:**
+- JPEG (`.jpg`, `.jpeg`)
+- PNG (`.png`)
+- WebP (`.webp`)
+- GIF (`.gif`)
 
 ## Development
 
@@ -149,6 +164,7 @@ Korus is built with a modular architecture:
 - **Job System**: PostgreSQL-based queue with worker pools
 - **Search**: Bleve full-text search index
 - **Streaming**: HTTP range request support for audio
+- **Cover Art**: Automatic extraction and static file serving
 
 ## License
 

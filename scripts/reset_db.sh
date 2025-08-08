@@ -78,11 +78,20 @@ EOF
 echo "✅ ALL TABLES DROPPED"
 
 echo ""
+echo "🧹 Cleaning up static files..."
+
+# Clean up cover images directory
+if [ -d "static/covers" ]; then
+    rm -rf static/covers/*
+    echo "   - Cleared cover images"
+fi
+
+echo ""
 echo "🎉 Database reset complete!"
 echo ""
 echo "Next steps:"
-echo "1. Restart the Korus server"
+echo "1. Restart the Korus server" 
 echo "2. Login with your existing admin credentials"
-echo "3. Trigger a library scan to re-import your music"
+echo "3. Trigger a library scan to re-import your music (covers will be extracted automatically)"
 echo ""
-echo "🚀 Ready to test batch processing!"
+echo "🚀 Ready to test cover extraction functionality!"

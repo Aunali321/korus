@@ -40,7 +40,7 @@ type Album struct {
 	AlbumArtistID *int      `json:"album_artist_id,omitempty" db:"album_artist_id"`
 	Year          *int      `json:"year,omitempty" db:"year"`
 	MusicBrainzID *string   `json:"musicbrainz_id,omitempty" db:"musicbrainz_id"`
-	CoverPath     *string   `json:"cover_path,omitempty" db:"cover_path"`
+	CoverPath     *string   `json:"cover_path" db:"cover_path"`
 	DateAdded     time.Time `json:"date_added" db:"date_added"`
 	Artist        *Artist   `json:"artist,omitempty"`
 	AlbumArtist   *Artist   `json:"album_artist,omitempty"`
@@ -62,6 +62,7 @@ type Song struct {
 	FileModified time.Time `json:"file_modified" db:"file_modified"`
 	Bitrate      *int      `json:"bitrate,omitempty" db:"bitrate"`
 	Format       *string   `json:"format,omitempty" db:"format"`
+	CoverPath    *string   `json:"cover_path" db:"cover_path"`
 	DateAdded    time.Time `json:"date_added" db:"date_added"`
 	Artist       *Artist   `json:"artist,omitempty"`
 	Album        *Album    `json:"album,omitempty"`

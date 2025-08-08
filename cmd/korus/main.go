@@ -206,7 +206,6 @@ func setupRouter(cfg *config.Config, authService *auth.Service, healthHandler *h
 			
 			// Streaming endpoints
 			protected.GET("/songs/:id/stream", streamingService.StreamSong)
-			protected.GET("/albums/:id/cover", streamingService.StreamAlbumCover)
 			
 			// Playlist endpoints
 			protected.GET("/playlists", playlistHandler.GetUserPlaylists)
@@ -249,10 +248,11 @@ func setupRouter(cfg *config.Config, authService *auth.Service, healthHandler *h
 		}
 	}
 
-	// Serve static files if in development mode
-	if cfg.IsDevelopment() {
-		router.Static("/static", "./static")
-	}
+	// Serve static files (covers are always available)
+	router.Static("/static", "./static")
+	
+	// Serve cover images specifically
+	router.Static("/covers", "./static/covers")
 
 	return router
 }

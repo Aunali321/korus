@@ -91,9 +91,25 @@ func (bms *BatchMetadataService) storeBatchMetadata(ctx context.Context, metadat
 			if metadata.AlbumArtist != "" && metadata.AlbumArtist != metadata.Artist {
 				artistMap[strings.ToLower(metadata.AlbumArtist)] = true
 			}
-			albumMap[strings.ToLower(metadata.Album)] = albumKey{
-				name:   metadata.Album,
-				artist: metadata.Artist,
+			
+			albumKeyName := strings.ToLower(metadata.Album)
+			if existingAlbum, exists := albumMap[albumKeyName]; exists {
+				// Keep existing cover if it exists, otherwise use this song's cover
+				coverURL := existingAlbum.coverURL
+				if coverURL == "" && metadata.CoverURL != "" {
+					coverURL = metadata.CoverURL
+				}
+				albumMap[albumKeyName] = albumKey{
+					name:     metadata.Album,
+					artist:   metadata.Artist,
+					coverURL: coverURL,
+				}
+			} else {
+				albumMap[albumKeyName] = albumKey{
+					name:     metadata.Album,
+					artist:   metadata.Artist,
+					coverURL: metadata.CoverURL,
+				}
 			}
 		}
 
@@ -137,8 +153,9 @@ func (bms *BatchMetadataService) storeBatchMetadata(ctx context.Context, metadat
 }
 
 type albumKey struct {
-	name   string
-	artist string
+	name     string
+	artist   string
+	coverURL string
 }
 
 func (bms *BatchMetadataService) batchUpsertArtists(ctx context.Context, tx pgx.Tx, artistMap map[string]bool, metadataList []*ExtractedMetadata) (map[string]int, error) {
@@ -239,15 +256,17 @@ func (bms *BatchMetadataService) batchUpsertAlbums(ctx context.Context, tx pgx.T
 		}
 
 		query := `
-			INSERT INTO albums (name, artist_id, album_artist_id, date_added)
-			VALUES ($1, $2, $2, NOW())
+			INSERT INTO albums (name, artist_id, album_artist_id, cover_path, date_added)
+			VALUES ($1, $2, $2, $3, NOW())
 			ON CONFLICT ((LOWER(name)), artist_id)
-			DO UPDATE SET artist_id = EXCLUDED.artist_id
+			DO UPDATE SET 
+				artist_id = EXCLUDED.artist_id,
+				cover_path = COALESCE(EXCLUDED.cover_path, albums.cover_path)
 			RETURNING id
 		`
 
 		var albumID int
-		err := tx.QueryRow(ctx, query, albumInfo.name, artistID).Scan(&albumID)
+		err := tx.QueryRow(ctx, query, albumInfo.name, artistID, nullString(albumInfo.coverURL)).Scan(&albumID)
 		if err != nil {
 			continue // Skip failed albums
 		}
@@ -273,8 +292,8 @@ func (bms *BatchMetadataService) insertSong(ctx context.Context, tx pgx.Tx, meta
 		INSERT INTO songs (
 			title, album_id, artist_id, track_number, disc_number,
 			duration, file_path, file_size, file_modified, bitrate,
-			format, date_added
-		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, NOW())
+			format, cover_path, date_added
+		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, NOW())
 		ON CONFLICT (file_path)
 		DO UPDATE SET
 			title = EXCLUDED.title,
@@ -286,13 +305,14 @@ func (bms *BatchMetadataService) insertSong(ctx context.Context, tx pgx.Tx, meta
 			file_size = EXCLUDED.file_size,
 			file_modified = EXCLUDED.file_modified,
 			bitrate = EXCLUDED.bitrate,
-			format = EXCLUDED.format
+			format = EXCLUDED.format,
+			cover_path = EXCLUDED.cover_path
 	`
 
 	_, err := tx.Exec(ctx, query,
 		metadata.Title, albumID, artistID, metadata.TrackNumber, metadata.DiscNumber,
 		metadata.Duration, metadata.FilePath, metadata.FileSize, metadata.FileModified,
-		metadata.Bitrate, metadata.Format,
+		metadata.Bitrate, metadata.Format, nullString(metadata.CoverURL),
 	)
 
 	return err

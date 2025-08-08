@@ -38,7 +38,7 @@ func (hs *HistoryService) GetRecentHistory(ctx context.Context, userID int, limi
 		SELECT ph.id, ph.user_id, ph.song_id, ph.played_at, ph.play_duration, ph.ip_address,
 			   s.id, s.title, s.album_id, s.artist_id, s.track_number, s.disc_number,
 			   s.duration, s.file_path, s.file_size, s.file_modified, 
-			   s.bitrate, s.format, s.date_added,
+			   s.bitrate, s.format, s.cover_path, s.date_added,
 			   ar.name as artist_name,
 			   a.name as album_name
 		FROM play_history ph
@@ -65,7 +65,7 @@ func (hs *HistoryService) GetRecentHistory(ctx context.Context, userID int, limi
 		err := rows.Scan(&play.ID, &play.UserID, &play.SongID, &play.PlayedAt, &play.PlayDuration, &play.IPAddress,
 			&song.ID, &song.Title, &song.AlbumID, &song.ArtistID, &song.TrackNumber, &song.DiscNumber,
 			&song.Duration, &song.FilePath, &song.FileSize, &song.FileModified,
-			&song.Bitrate, &song.Format, &song.DateAdded,
+			&song.Bitrate, &song.Format, &song.CoverPath, &song.DateAdded,
 			&artistName, &albumName)
 		if err != nil {
 			return nil, fmt.Errorf("failed to scan play history: %w", err)
@@ -132,7 +132,7 @@ func (hs *HistoryService) GetUserStats(ctx context.Context, userID int) (*models
 	songQuery := `
 		SELECT s.id, s.title, s.album_id, s.artist_id, s.track_number, s.disc_number,
 			   s.duration, s.file_path, s.file_size, s.file_modified, 
-			   s.bitrate, s.format, s.date_added,
+			   s.bitrate, s.format, s.cover_path, s.date_added,
 			   ar.name as artist_name,
 			   a.name as album_name,
 			   COUNT(*) as play_count
@@ -143,7 +143,7 @@ func (hs *HistoryService) GetUserStats(ctx context.Context, userID int) (*models
 		WHERE ph.user_id = $1
 		GROUP BY s.id, s.title, s.album_id, s.artist_id, s.track_number, s.disc_number,
 				 s.duration, s.file_path, s.file_size, s.file_modified, 
-				 s.bitrate, s.format, s.date_added, ar.name, a.name
+				 s.bitrate, s.format, s.cover_path, s.date_added, ar.name, a.name
 		ORDER BY play_count DESC
 		LIMIT 1
 	`
@@ -158,7 +158,7 @@ func (hs *HistoryService) GetUserStats(ctx context.Context, userID int) (*models
 			err := rows.Scan(&song.ID, &song.Title, &song.AlbumID, &song.ArtistID,
 				&song.TrackNumber, &song.DiscNumber, &song.Duration,
 				&song.FilePath, &song.FileSize, &song.FileModified,
-				&song.Bitrate, &song.Format, &song.DateAdded,
+				&song.Bitrate, &song.Format, &song.CoverPath, &song.DateAdded,
 				&artistName, &albumName, &songPlayCount)
 			if err == nil {
 				// Set artist info
@@ -257,7 +257,7 @@ func (hs *HistoryService) GetHomeData(ctx context.Context, userID int, limit int
 		WHERE ph.user_id = $1
 		GROUP BY s.id, s.title, s.album_id, s.artist_id, s.track_number, s.disc_number,
 				 s.duration, s.file_path, s.file_size, s.file_modified, 
-				 s.bitrate, s.format, s.date_added, ar.name, a.name
+				 s.bitrate, s.format, s.cover_path, s.date_added, ar.name, a.name
 		ORDER BY s.id, last_played DESC
 		LIMIT $2
 	`
@@ -276,7 +276,7 @@ func (hs *HistoryService) GetHomeData(ctx context.Context, userID int, limit int
 		err := rows2.Scan(&song.ID, &song.Title, &song.AlbumID, &song.ArtistID,
 			&song.TrackNumber, &song.DiscNumber, &song.Duration,
 			&song.FilePath, &song.FileSize, &song.FileModified,
-			&song.Bitrate, &song.Format, &song.DateAdded,
+			&song.Bitrate, &song.Format, &song.CoverPath, &song.DateAdded,
 			&artistName, &albumName, &lastPlayed)
 		if err != nil {
 			return nil, fmt.Errorf("failed to scan recent song: %w", err)
@@ -305,7 +305,7 @@ func (hs *HistoryService) GetHomeData(ctx context.Context, userID int, limit int
 	mostPlayedQuery := `
 		SELECT s.id, s.title, s.album_id, s.artist_id, s.track_number, s.disc_number,
 			   s.duration, s.file_path, s.file_size, s.file_modified, 
-			   s.bitrate, s.format, s.date_added,
+			   s.bitrate, s.format, s.cover_path, s.date_added,
 			   ar.name as artist_name,
 			   a.name as album_name,
 			   COUNT(*) as play_count
@@ -316,7 +316,7 @@ func (hs *HistoryService) GetHomeData(ctx context.Context, userID int, limit int
 		WHERE ph.user_id = $1
 		GROUP BY s.id, s.title, s.album_id, s.artist_id, s.track_number, s.disc_number,
 				 s.duration, s.file_path, s.file_size, s.file_modified, 
-				 s.bitrate, s.format, s.date_added, ar.name, a.name
+				 s.bitrate, s.format, s.cover_path, s.date_added, ar.name, a.name
 		ORDER BY play_count DESC
 		LIMIT $2
 	`
@@ -335,7 +335,7 @@ func (hs *HistoryService) GetHomeData(ctx context.Context, userID int, limit int
 		err := rows3.Scan(&song.ID, &song.Title, &song.AlbumID, &song.ArtistID,
 			&song.TrackNumber, &song.DiscNumber, &song.Duration,
 			&song.FilePath, &song.FileSize, &song.FileModified,
-			&song.Bitrate, &song.Format, &song.DateAdded,
+			&song.Bitrate, &song.Format, &song.CoverPath, &song.DateAdded,
 			&artistName, &albumName, &playCount)
 		if err != nil {
 			return nil, fmt.Errorf("failed to scan most played song: %w", err)

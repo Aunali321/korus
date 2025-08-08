@@ -103,7 +103,7 @@ func (ps *PlaylistService) GetPlaylist(ctx context.Context, playlistID, userID i
 		SELECT ps.id, ps.playlist_id, ps.song_id, ps.position, ps.added_at,
 			   s.id, s.title, s.album_id, s.artist_id, s.track_number, s.disc_number,
 			   s.duration, s.file_path, s.file_size, s.file_modified,
-			   s.bitrate, s.format, s.date_added,
+			   s.bitrate, s.format, s.cover_path, s.date_added,
 			   ar.name as artist_name,
 			   a.name as album_name
 		FROM playlist_songs ps
@@ -129,7 +129,7 @@ func (ps *PlaylistService) GetPlaylist(ctx context.Context, playlistID, userID i
 		err := rows.Scan(&ps.ID, &ps.PlaylistID, &ps.SongID, &ps.Position, &ps.AddedAt,
 			&song.ID, &song.Title, &song.AlbumID, &song.ArtistID, &song.TrackNumber, &song.DiscNumber,
 			&song.Duration, &song.FilePath, &song.FileSize, &song.FileModified,
-			&song.Bitrate, &song.Format, &song.DateAdded,
+			&song.Bitrate, &song.Format, &song.CoverPath, &song.DateAdded,
 			&artistName, &albumName)
 		if err != nil {
 			return nil, nil, fmt.Errorf("failed to scan playlist song: %w", err)

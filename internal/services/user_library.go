@@ -21,7 +21,7 @@ func (uls *UserLibraryService) GetLikedSongs(ctx context.Context, userID int, li
 	query := `
 		SELECT s.id, s.title, s.album_id, s.artist_id, s.track_number, s.disc_number,
 			   s.duration, s.file_path, s.file_size, s.file_modified, 
-			   s.bitrate, s.format, s.date_added,
+			   s.bitrate, s.format, s.cover_path, s.date_added,
 			   ar.name as artist_name,
 			   a.name as album_name,
 			   ls.liked_at
@@ -67,7 +67,7 @@ func (uls *UserLibraryService) GetLikedSongs(ctx context.Context, userID int, li
 		err := rows.Scan(&song.ID, &song.Title, &song.AlbumID, &song.ArtistID,
 			&song.TrackNumber, &song.DiscNumber, &song.Duration,
 			&song.FilePath, &song.FileSize, &song.FileModified,
-			&song.Bitrate, &song.Format, &song.DateAdded,
+			&song.Bitrate, &song.Format, &song.CoverPath, &song.DateAdded,
 			&artistName, &albumName, &likedAt)
 		if err != nil {
 			return nil, fmt.Errorf("failed to scan liked song: %w", err)

@@ -3,6 +3,7 @@ package services
 import (
 	"context"
 	"fmt"
+	"log"
 	"os"
 	"path/filepath"
 	"strings"
@@ -15,7 +16,8 @@ import (
 )
 
 type MetadataService struct {
-	db *database.DB
+	db             *database.DB
+	coverExtractor *CoverExtractor
 }
 
 type ExtractedMetadata struct {
@@ -32,10 +34,15 @@ type ExtractedMetadata struct {
 	FilePath     string
 	FileSize     int64
 	FileModified time.Time
+	CoverURL     string // URL for cover image
 }
 
 func NewMetadataService(db *database.DB) *MetadataService {
-	return &MetadataService{db: db}
+	coverExtractor := NewCoverExtractor("./static/covers")
+	return &MetadataService{
+		db:             db,
+		coverExtractor: coverExtractor,
+	}
 }
 
 func (ms *MetadataService) ExtractAndStoreMetadata(ctx context.Context, filePath string) (*models.Song, error) {
@@ -112,6 +119,9 @@ func (ms *MetadataService) extractMetadata(filePath string) (*ExtractedMetadata,
 		result.DiscNumber = 1
 	}
 
+	// Extract cover art (try multiple methods in order of preference)
+	result.CoverURL = ms.extractCoverArt(filePath)
+
 	return result, nil
 }
 
@@ -137,7 +147,7 @@ func (ms *MetadataService) storeMetadata(ctx context.Context, metadata *Extracte
 		}
 
 		// Find or create album
-		albumID, err := ms.findOrCreateAlbum(ctx, tx, metadata.Album, artistID, albumArtistID, metadata.Year)
+		albumID, err := ms.findOrCreateAlbum(ctx, tx, metadata.Album, artistID, albumArtistID, metadata.Year, metadata.FilePath, metadata.CoverURL)
 		if err != nil {
 			return fmt.Errorf("failed to find/create album: %w", err)
 		}
@@ -175,25 +185,35 @@ func (ms *MetadataService) findOrCreateArtist(ctx context.Context, tx pgx.Tx, na
 	return artistID, nil
 }
 
-func (ms *MetadataService) findOrCreateAlbum(ctx context.Context, tx pgx.Tx, name string, artistID int, albumArtistID *int, year int) (int, error) {
+func (ms *MetadataService) findOrCreateAlbum(ctx context.Context, tx pgx.Tx, name string, artistID int, albumArtistID *int, year int, songFilePath string, songCoverURL string) (int, error) {
 	// Atomic upsert for albums - handles concurrent inserts properly
 	var yearPtr *int
 	if year > 0 {
 		yearPtr = &year
 	}
 	
+	// Extract album cover (prefer external covers, fallback to song's embedded cover)
+	albumCoverURL := ""
+	if coverURL, err := ms.coverExtractor.ScanForExternalCover(songFilePath); err == nil {
+		albumCoverURL = coverURL
+	} else if songCoverURL != "" {
+		// Fallback: use the song's cover for the album if no external cover found
+		albumCoverURL = songCoverURL
+	}
+	
 	query := `
-		INSERT INTO albums (name, artist_id, album_artist_id, year, date_added) 
-		VALUES ($1, $2, $3, $4, NOW()) 
+		INSERT INTO albums (name, artist_id, album_artist_id, year, cover_path, date_added) 
+		VALUES ($1, $2, $3, $4, $5, NOW()) 
 		ON CONFLICT (LOWER(name), artist_id)
 		DO UPDATE SET 
 			album_artist_id = EXCLUDED.album_artist_id, 
-			year = EXCLUDED.year
+			year = EXCLUDED.year,
+			cover_path = COALESCE(EXCLUDED.cover_path, albums.cover_path)
 		RETURNING id
 	`
 	
 	var albumID int
-	err := tx.QueryRow(ctx, query, name, artistID, albumArtistID, yearPtr).Scan(&albumID)
+	err := tx.QueryRow(ctx, query, name, artistID, albumArtistID, yearPtr, nullString(albumCoverURL)).Scan(&albumID)
 	if err != nil {
 		return 0, fmt.Errorf("failed to find/create album: %w", err)
 	}
@@ -213,42 +233,42 @@ func (ms *MetadataService) insertOrUpdateSong(ctx context.Context, tx pgx.Tx, me
 		// Insert new song
 		insertQuery := `
 			INSERT INTO songs (title, album_id, artist_id, track_number, disc_number, duration, 
-							 file_path, file_size, file_modified, bitrate, format, date_added) 
-			VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, NOW()) 
+							 file_path, file_size, file_modified, bitrate, format, cover_path, date_added) 
+			VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, NOW()) 
 			RETURNING id, title, album_id, artist_id, track_number, disc_number, duration, 
-					  file_path, file_size, file_modified, bitrate, format, date_added
+					  file_path, file_size, file_modified, bitrate, format, cover_path, date_added
 		`
 		
 		err = tx.QueryRow(ctx, insertQuery,
 			metadata.Title, albumID, artistID, 
 			nullInt(metadata.TrackNumber), metadata.DiscNumber, metadata.Duration,
 			metadata.FilePath, metadata.FileSize, metadata.FileModified,
-			nullInt(metadata.Bitrate), nullString(metadata.Format)).
+			nullInt(metadata.Bitrate), nullString(metadata.Format), nullString(metadata.CoverURL)).
 			Scan(&song.ID, &song.Title, &song.AlbumID, &song.ArtistID,
 				 &song.TrackNumber, &song.DiscNumber, &song.Duration,
 				 &song.FilePath, &song.FileSize, &song.FileModified,
-				 &song.Bitrate, &song.Format, &song.DateAdded)
+				 &song.Bitrate, &song.Format, &song.CoverPath, &song.DateAdded)
 	} else if err == nil {
 		// Update existing song
 		updateQuery := `
 			UPDATE songs 
 			SET title = $2, album_id = $3, artist_id = $4, track_number = $5, 
 				disc_number = $6, duration = $7, file_size = $8, file_modified = $9, 
-				bitrate = $10, format = $11
+				bitrate = $10, format = $11, cover_path = $12
 			WHERE id = $1 
 			RETURNING id, title, album_id, artist_id, track_number, disc_number, duration, 
-					  file_path, file_size, file_modified, bitrate, format, date_added
+					  file_path, file_size, file_modified, bitrate, format, cover_path, date_added
 		`
 		
 		err = tx.QueryRow(ctx, updateQuery, existingID,
 			metadata.Title, albumID, artistID,
 			nullInt(metadata.TrackNumber), metadata.DiscNumber, metadata.Duration,
 			metadata.FileSize, metadata.FileModified,
-			nullInt(metadata.Bitrate), nullString(metadata.Format)).
+			nullInt(metadata.Bitrate), nullString(metadata.Format), nullString(metadata.CoverURL)).
 			Scan(&song.ID, &song.Title, &song.AlbumID, &song.ArtistID,
 				 &song.TrackNumber, &song.DiscNumber, &song.Duration,
 				 &song.FilePath, &song.FileSize, &song.FileModified,
-				 &song.Bitrate, &song.Format, &song.DateAdded)
+				 &song.Bitrate, &song.Format, &song.CoverPath, &song.DateAdded)
 	} else {
 		return nil, err
 	}
@@ -349,4 +369,37 @@ func nullString(value string) *string {
 		return nil
 	}
 	return &value
+}
+
+// extractCoverArt tries multiple methods to find cover art for a song
+func (ms *MetadataService) extractCoverArt(filePath string) string {
+	log.Printf("🖼️  Extracting cover art for: %s", filePath)
+	
+	// Try 1: Song-specific cover (highest priority)
+	if coverURL, err := ms.coverExtractor.ScanForSongSpecificCover(filePath); err == nil {
+		log.Printf("✅ Found song-specific cover: %s", coverURL)
+		return coverURL
+	} else {
+		log.Printf("❌ No song-specific cover found: %v", err)
+	}
+
+	// Try 2: Embedded cover art
+	if coverURL, err := ms.coverExtractor.ExtractEmbeddedCover(filePath); err == nil {
+		log.Printf("✅ Found embedded cover: %s", coverURL)
+		return coverURL
+	} else {
+		log.Printf("❌ No embedded cover found: %v", err)
+	}
+
+	// Try 3: External cover in same directory (folder.jpg, cover.png, etc.)
+	if coverURL, err := ms.coverExtractor.ScanForExternalCover(filePath); err == nil {
+		log.Printf("✅ Found external cover: %s", coverURL)
+		return coverURL
+	} else {
+		log.Printf("❌ No external cover found: %v", err)
+	}
+
+	log.Printf("❌ No cover art found for: %s", filePath)
+	// No cover found
+	return ""
 }

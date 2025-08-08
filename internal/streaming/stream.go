@@ -144,56 +144,6 @@ func (s *StreamingService) StreamSong(c *gin.Context) {
 	io.CopyN(c.Writer, file, contentLength)
 }
 
-func (s *StreamingService) StreamAlbumCover(c *gin.Context) {
-	albumID, err := strconv.Atoi(c.Param("id"))
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"error":   "invalid_id",
-			"message": "Invalid album ID",
-		})
-		return
-	}
-
-	// Get album from database
-	album, err := s.libraryService.GetAlbum(c.Request.Context(), albumID)
-	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{
-			"error":   "not_found",
-			"message": "Album not found",
-		})
-		return
-	}
-
-	// Check if album has cover art
-	if album.CoverPath == nil || *album.CoverPath == "" {
-		c.JSON(http.StatusNotFound, gin.H{
-			"error":   "no_cover",
-			"message": "No cover art available for this album",
-		})
-		return
-	}
-
-	coverPath := *album.CoverPath
-
-	// Check if cover file exists
-	if _, err := os.Stat(coverPath); os.IsNotExist(err) {
-		c.JSON(http.StatusNotFound, gin.H{
-			"error":   "cover_not_found",
-			"message": "Cover art file not found on disk",
-		})
-		return
-	}
-
-	// Handle size parameter for thumbnail generation
-	sizeParam := c.Query("size")
-	if sizeParam != "" {
-		// For now, just serve the original image
-		// In a full implementation, you'd resize the image here
-	}
-
-	// Serve the cover image file
-	c.File(coverPath)
-}
 
 func getContentType(filePath string) string {
 	ext := strings.ToLower(filepath.Ext(filePath))

@@ -196,7 +196,7 @@ Get artist details by ID, including all albums and top tracks.
       "id": 1,
       "name": "Abbey Road",
       "year": 1969,
-      "cover_path": "/covers/abbey_road.jpg",
+      "cover_path": "/covers/f1e2d3c4b5a6.jpg",
       "song_count": 17,
       "duration": 2854
     },
@@ -204,7 +204,7 @@ Get artist details by ID, including all albums and top tracks.
       "id": 2,
       "name": "Let It Be",
       "year": 1970,
-      "cover_path": "/covers/let_it_be.jpg",
+      "cover_path": "/covers/a6b5c4d3e2f1.jpg",
       "song_count": 12,
       "duration": 2156
     },
@@ -212,7 +212,7 @@ Get artist details by ID, including all albums and top tracks.
       "id": 3,
       "name": "Sgt. Pepper's Lonely Hearts Club Band",
       "year": 1967,
-      "cover_path": "/covers/sgt_peppers.jpg",
+      "cover_path": "/covers/b1c2d3e4f5a6.webp",
       "song_count": 13,
       "duration": 2387
     }
@@ -280,7 +280,7 @@ List albums with pagination, sorting, and filtering.
     "album_artist_id": 1,
     "year": 1969,
     "musicbrainz_id": "7add7441-8f2c-4fbb-828d-0db9c0c2d43b",
-    "cover_path": "/covers/abbey_road.jpg",
+    "cover_path": "/covers/f1e2d3c4b5a6.jpg",
     "date_added": "2025-08-01T10:00:00Z",
     "artist": {
       "id": 1,
@@ -311,7 +311,7 @@ Get album details by ID, including all songs in the album.
   "album_artist_id": 1,  
   "year": 1969,
   "musicbrainz_id": "7add7441-8f2c-4fbb-828d-0db9c0c2d43b",
-  "cover_path": "/covers/abbey_road.jpg",
+  "cover_path": "/covers/f1e2d3c4b5a6.jpg",
   "date_added": "2025-08-01T10:00:00Z",
   "artist": {
     "id": 1,
@@ -337,6 +337,7 @@ Get album details by ID, including all songs in the album.
       "file_modified": "2025-07-15T14:30:00Z",
       "bitrate": 320,
       "format": "mp3",
+      "cover_path": "/covers/d4e5f6a1b2c3.jpg",
       "date_added": "2025-08-01T10:00:00Z",
       "artist": {
         "id": 1,
@@ -356,6 +357,7 @@ Get album details by ID, including all songs in the album.
       "file_modified": "2025-07-15T14:30:00Z",
       "bitrate": 320,
       "format": "mp3",
+      "cover_path": null,
       "date_added": "2025-08-01T10:00:00Z",
       "artist": {
         "id": 1,
@@ -401,6 +403,7 @@ List all songs with pagination and sorting, or batch fetch songs by IDs.
     "file_modified": "2025-07-15T14:30:00Z",
     "bitrate": 320,
     "format": "mp3",
+    "cover_path": "/covers/d4e5f6a1b2c3.jpg",
     "date_added": "2025-08-01T10:00:00Z",
     "artist": {
       "id": 1,
@@ -457,6 +460,7 @@ Search across songs, albums, and artists.
       "disc_number": 1,
       "duration": 259,
       "file_path": "/music/The Beatles/Abbey Road/01 Come Together.mp3",
+      "cover_path": "/covers/d4e5f6a1b2c3.jpg",
       "artist": {
         "id": 1,
         "name": "The Beatles"
@@ -507,18 +511,28 @@ Content-Range: bytes 0-1023/6234567
 Content-Length: 1024
 ```
 
-#### GET /albums/{id}/cover
-Get album artwork.
+## 🖼️ Cover Art System
 
-**Headers:** `Authorization: Bearer <token>`
+Korus automatically extracts and serves cover art for both songs and albums. Cover images are included directly in API responses as URLs, eliminating the need for separate cover endpoints.
 
-**Query Parameters:**
-- `size` (optional) - Thumbnail size (future feature)
+### Cover Art Sources (in priority order)
+1. **Song-specific covers**: `songname.jpg`, `songname.webp`, etc.
+2. **Embedded cover art**: Extracted from audio file metadata
+3. **Album folder covers**: `cover.jpg`, `folder.webp`, `albumart.png`, etc.
 
-**Success Response (200):**
-- Returns image file (JPEG, PNG, etc.)
-- Sets appropriate `Content-Type` header
-- Includes caching headers
+### Supported Formats
+- **JPEG** (`.jpg`, `.jpeg`)
+- **PNG** (`.png`) 
+- **WebP** (`.webp`)
+- **GIF** (`.gif`)
+
+### Cover URL Structure
+Cover images are served as static files:
+```
+/covers/{hash}.{ext}
+```
+
+Example: `/covers/a1b2c3d4e5f6.webp`
 
 ### ❤️ Health & Monitoring
 

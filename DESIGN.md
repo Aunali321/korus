@@ -40,8 +40,17 @@
 ┌─────────────────────────────────────────────────────────────┐
 │                 Audio Streaming Engine                       │
 │  ┌───────────────┐ ┌───────────────┐ ┌───────────────────┐   │
-│  │ Range Request │ │ Transcoder    │ │   Artwork Server  │   │
-│  │   Handler     │ │   (Future)    │ │                   │   │
+│  │ Range Request │ │ Transcoder    │ │   Static Files    │   │
+│  │   Handler     │ │   (Future)    │ │     (Covers)      │   │
+│  └───────────────┘ └───────────────┘ └───────────────────┘   │
+└─────────────────────────────────────────────────────────────┘
+                                 │
+                                 ▼
+┌─────────────────────────────────────────────────────────────┐
+│                  Cover Art Extraction System                │
+│  ┌───────────────┐ ┌───────────────┐ ┌───────────────────┐   │
+│  │ Embedded Art  │ │ External Files│ │ Song-Specific     │   │
+│  │   Extractor   │ │   Scanner     │ │   Cover Scanner   │   │
 │  └───────────────┘ └───────────────┘ └───────────────────┘   │
 └─────────────────────────────────────────────────────────────┘
 ```
@@ -53,6 +62,7 @@
 4. **User-Scoped Logic** enforces data isolation → interacts with the database.
 5. **Streaming Engine** serves audio/artwork → supports range requests.
 6. **Job Queue (PostgreSQL-native)** processes async tasks (scans, transcoding, cleanup) with full transactional integrity. Workers listen for new jobs via `NOTIFY`.
+7. **Cover Art System** extracts artwork during metadata processing → stores as static files → includes URLs in API responses.
 
 ## 2. The "Korus" API Design (Stateless and RESTful)
 
@@ -99,12 +109,11 @@ sequenceDiagram
 | GET | `/api/library/stats` | Library statistics | None | `{totalSongs, totalArtists, totalAlbums, totalDuration}` |
 | GET | `/api/artists` | List artists | `limit, offset, sort` | `[{id, name, albumCount, songCount}]` |
 | GET | `/api/artists/{id}` | Artist details | None | `{id, name, albums, topTracks}` |
-| GET | `/api/albums` | List albums | `limit, offset, sort, year` | `[{id, name, artist, year, coverUrl}]` |
-| GET | `/api/albums/{id}` | Album details | None | `{id, name, artist, songs, coverUrl}` |
-| GET | `/api/songs/{id}` | Song details | None | `{id, title, album, artist, duration, url}` |
-| GET | `/api/songs` | Batch fetch songs | `ids` | `[{id, title, album, artist, duration}]` |
+| GET | `/api/albums` | List albums | `limit, offset, sort, year` | `[{id, name, artist, year, cover_path}]` |
+| GET | `/api/albums/{id}` | Album details | None | `{id, name, artist, songs, cover_path}` |
+| GET | `/api/songs/{id}` | Song details | None | `{id, title, album, artist, duration, cover_path, url}` |
+| GET | `/api/songs` | Batch fetch songs | `ids` | `[{id, title, album, artist, duration, cover_path}]` |
 | GET | `/api/songs/{id}/stream` | Stream audio | Range header | Audio stream |
-| GET | `/api/albums/{id}/cover` | Album artwork | `size` | Image file |
 | GET | `/api/search` | Search library | `q, type, limit, offset` | `{songs, albums, artists}` |
 
 ## 3. Feature-Driven API Endpoints (User-Scoped)
@@ -192,6 +201,7 @@ CREATE TABLE songs (
     file_modified TIMESTAMPTZ NOT NULL,
     bitrate INTEGER,
     format VARCHAR(10),
+    cover_path VARCHAR(255),
     date_added TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 ```
@@ -289,9 +299,110 @@ CREATE INDEX idx_play_history_user_id ON play_history(user_id);
 CREATE INDEX idx_play_history_played_at ON play_history(played_at);
 CREATE INDEX idx_playlist_songs_playlist_position ON playlist_songs(playlist_id, position);
 CREATE INDEX idx_job_queue_status_created ON job_queue(status, created_at) WHERE status = 'pending';
+CREATE INDEX idx_songs_cover_path ON songs(cover_path) WHERE cover_path IS NOT NULL;
 ```
 
-## 5. User Experience
+## 5. Cover Art System
+
+### Architecture Overview
+
+Korus implements a comprehensive cover art extraction and serving system that automatically discovers, processes, and serves album and song artwork without requiring separate API endpoints.
+
+### Cover Art Sources (Priority Order)
+
+1. **Song-Specific Covers**
+   - Files matching audio filename: `song.jpg`, `track01.webp`
+   - Highest priority for individual songs
+   - Allows different artwork per track
+
+2. **Embedded Cover Art**
+   - Extracted from audio file metadata using `dhowden/tag`
+   - Supports JPEG, PNG, WebP formats
+   - Automatically extracted during metadata scanning
+
+3. **Album Folder Covers**
+   - Common filenames: `cover.jpg`, `folder.webp`, `albumart.png`
+   - Shared across all songs in the album
+   - Fallback for songs without specific covers
+
+### File Format Support
+
+- **JPEG** (`.jpg`, `.jpeg`) - Most common format
+- **PNG** (`.png`) - High quality, transparency support
+- **WebP** (`.webp`) - Modern format, excellent compression
+- **GIF** (`.gif`) - Legacy support
+
+### Storage and Serving
+
+```
+static/covers/
+├── a1b2c3d4e5f6.jpg    # Content-based hash naming
+├── f1e2d3c4b5a6.webp   # Prevents duplicates
+└── b5c4d3e2f1a6.png    # Multiple formats supported
+```
+
+**Static File Serving:**
+- **Endpoint**: `/covers/{hash}.{ext}`
+- **Caching**: Browser-friendly caching headers
+- **Performance**: Direct file serving via Gin static middleware
+
+### Database Schema
+
+**Songs Table:**
+```sql
+ALTER TABLE songs ADD COLUMN cover_path VARCHAR(255);
+CREATE INDEX idx_songs_cover_path ON songs(cover_path) WHERE cover_path IS NOT NULL;
+```
+
+**Albums Table:**
+```sql
+-- Already exists
+cover_path VARCHAR(255)
+```
+
+### API Integration
+
+Cover URLs are embedded directly in JSON responses:
+
+```json
+{
+  "id": 1,
+  "title": "Come Together",
+  "cover_path": "/covers/d4e5f6a1b2c3.jpg",
+  "album": {
+    "id": 1,
+    "name": "Abbey Road",
+    "cover_path": "/covers/f1e2d3c4b5a6.jpg"
+  }
+}
+```
+
+### Extraction Process
+
+1. **During File Scan**: Audio files trigger metadata extraction jobs
+2. **Cover Detection**: System tries all sources in priority order
+3. **Deduplication**: Content hashing prevents duplicate storage
+4. **URL Generation**: Relative URLs stored in database
+5. **Static Serving**: Files served directly via `/covers/` endpoint
+
+### Performance Optimizations
+
+- **Content-Based Hashing**: Eliminates duplicate cover storage
+- **Conditional Indexing**: Only indexes rows with covers
+- **Static File Serving**: No database queries for cover requests
+- **Browser Caching**: Long-term caching headers for covers
+
+### Fallback Strategy
+
+```
+Song Cover Flow:
+1. Check for song-specific cover file
+2. Extract from embedded metadata
+3. Use album folder cover
+4. Return null (no cover)
+```
+
+## 6. User Experience
 
 ### Initial Setup
 1.  **Environment Preparation**:

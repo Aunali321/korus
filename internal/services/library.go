@@ -262,7 +262,7 @@ func (ls *LibraryService) GetAlbumSongs(ctx context.Context, albumID int) ([]mod
 	query := `
 		SELECT s.id, s.title, s.album_id, s.artist_id, s.track_number, s.disc_number,
 			   s.duration, s.file_path, s.file_size, s.file_modified, 
-			   s.bitrate, s.format, s.date_added,
+			   s.bitrate, s.format, s.cover_path, s.date_added,
 			   ar.name as artist_name,
 			   a.name as album_name
 		FROM songs s
@@ -283,7 +283,7 @@ func (ls *LibraryService) GetSongs(ctx context.Context, ids []int) ([]models.Son
 	query := `
 		SELECT s.id, s.title, s.album_id, s.artist_id, s.track_number, s.disc_number,
 			   s.duration, s.file_path, s.file_size, s.file_modified, 
-			   s.bitrate, s.format, s.date_added,
+			   s.bitrate, s.format, s.cover_path, s.date_added,
 			   ar.name as artist_name,
 			   a.name as album_name
 		FROM songs s
@@ -300,7 +300,7 @@ func (ls *LibraryService) GetSong(ctx context.Context, id int) (*models.Song, er
 	query := `
 		SELECT s.id, s.title, s.album_id, s.artist_id, s.track_number, s.disc_number,
 			   s.duration, s.file_path, s.file_size, s.file_modified, 
-			   s.bitrate, s.format, s.date_added,
+			   s.bitrate, s.format, s.cover_path, s.date_added,
 			   ar.name as artist_name,
 			   a.name as album_name
 		FROM songs s
@@ -335,7 +335,7 @@ func (ls *LibraryService) querySongs(ctx context.Context, query string, args ...
 		err := rows.Scan(&song.ID, &song.Title, &song.AlbumID, &song.ArtistID,
 			&song.TrackNumber, &song.DiscNumber, &song.Duration,
 			&song.FilePath, &song.FileSize, &song.FileModified,
-			&song.Bitrate, &song.Format, &song.DateAdded,
+			&song.Bitrate, &song.Format, &song.CoverPath, &song.DateAdded,
 			&artistName, &albumName)
 		if err != nil {
 			return nil, fmt.Errorf("failed to scan song: %w", err)
@@ -442,7 +442,7 @@ func (ls *LibraryService) GetAllSongs(ctx context.Context, limit, offset int, so
 	query := `
 		SELECT s.id, s.title, s.album_id, s.artist_id, s.track_number, s.disc_number,
 			   s.duration, s.file_path, s.file_size, s.file_modified, 
-			   s.bitrate, s.format, s.date_added,
+			   s.bitrate, s.format, s.cover_path, s.date_added,
 			   ar.name as artist_name,
 			   a.name as album_name
 		FROM songs s
