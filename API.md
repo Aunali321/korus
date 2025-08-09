@@ -665,7 +665,7 @@ Korus supports the following audio formats:
 - **Authentication**: JWT tokens
 - **Search**: Bleve full-text search
 - **File Watching**: fsnotify
-- **Audio Metadata**: dhowden/tag library
+- **Audio Metadata**: dhowden/tag library for tags, FFprobe for accurate duration/bitrate
 
 ## Client Examples
 

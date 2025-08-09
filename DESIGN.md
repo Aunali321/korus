@@ -302,7 +302,37 @@ CREATE INDEX idx_job_queue_status_created ON job_queue(status, created_at) WHERE
 CREATE INDEX idx_songs_cover_path ON songs(cover_path) WHERE cover_path IS NOT NULL;
 ```
 
-## 5. Cover Art System
+## 5. Audio Metadata Extraction
+
+### Architecture Overview
+
+Korus uses a two-library approach for comprehensive audio metadata extraction:
+
+1. **dhowden/tag library**: Extracts metadata tags (title, artist, album, year, track numbers, embedded artwork)
+2. **FFprobe (via go-ffprobe)**: Extracts accurate audio properties (duration, bitrate, codec information)
+
+### Metadata Extraction Process
+
+**Tag-based Metadata (dhowden/tag):**
+- ID3v1, ID3v2.2, ID3v2.3, ID3v2.4 (MP3)
+- MP4/M4A metadata atoms
+- FLAC Vorbis comments
+- OGG Vorbis comments
+
+**Audio Properties (FFprobe):**
+- **Duration**: Precise duration in seconds (no estimation)
+- **Bitrate**: Actual bitrate from audio stream analysis
+- **Format/Codec**: Detected codec (mp3, flac, aac, etc.)
+- **Sample Rate**: Audio sample rate
+- **Channels**: Mono/stereo/surround configuration
+
+### Accuracy Requirements
+
+- **No estimation fallbacks**: Files that cannot be accurately analyzed are rejected
+- **Strict duration validation**: Only precise duration data from stream analysis is stored
+- **Error handling**: Files with incomplete audio properties return processing errors
+
+## 6. Cover Art System
 
 ### Architecture Overview
 
@@ -402,7 +432,7 @@ Song Cover Flow:
 4. Return null (no cover)
 ```
 
-## 6. User Experience
+## 7. User Experience
 
 ### Initial Setup
 1.  **Environment Preparation**:
@@ -479,7 +509,7 @@ Song Cover Flow:
 - Configurable debounce period (default: 5s) to handle rapid changes
 - Background processing of new/modified files via the internal job queue
 
-## 6. Operational Features
+## 8. Operational Features
 
 ### Background Jobs
 Background jobs are managed by a robust, transactional job queue built directly into PostgreSQL, eliminating external dependencies and ensuring data integrity.
@@ -506,7 +536,7 @@ Background jobs are managed by a robust, transactional job queue built directly 
 - **HTTP/2 Support**: Multiplexed requests for improved client performance
 - **Artwork Caching**: Disk-based caching of resized images
 
-## 7. Post-MVP Roadmap
+## 9. Post-MVP Roadmap
 
 ### Phase 1: Core Enhancements
 1. **Advanced Permissions**

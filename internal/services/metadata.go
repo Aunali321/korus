@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"math"
 	"os"
 	"path/filepath"
 	"strings"
@@ -11,6 +12,7 @@ import (
 
 	"github.com/dhowden/tag"
 	"github.com/jackc/pgx/v5"
+	"gopkg.in/vansante/go-ffprobe.v2"
 	"korus/internal/database"
 	"korus/internal/models"
 )
@@ -78,12 +80,15 @@ func (ms *MetadataService) extractMetadata(filePath string) (*ExtractedMetadata,
 	// Read metadata tags
 	metadata, err := tag.ReadFrom(file)
 	if err != nil {
-		// If we can't read tags, create basic metadata from filename
-		return ms.fallbackMetadata(filePath, info), nil
+		// If we can't read tags, we still need accurate duration data
+		return ms.fallbackMetadata(filePath, info)
 	}
 
 	// Extract duration and bitrate (format-specific)
-	duration, bitrate, format := ms.extractAudioProperties(filePath, file)
+	duration, bitrate, format, err := ms.extractAudioProperties(filePath, file)
+	if err != nil {
+		return nil, fmt.Errorf("failed to extract audio properties: %w", err)
+	}
 
 	// Build metadata struct
 	result := &ExtractedMetadata{
@@ -161,7 +166,7 @@ func (ms *MetadataService) storeMetadata(ctx context.Context, metadata *Extracte
 		result = song
 		return nil
 	})
-	
+
 	return result, err
 }
 
@@ -175,7 +180,7 @@ func (ms *MetadataService) findOrCreateArtist(ctx context.Context, tx pgx.Tx, na
 		DO UPDATE SET sort_name = EXCLUDED.sort_name
 		RETURNING id
 	`
-	
+
 	var artistID int
 	err := tx.QueryRow(ctx, query, name, sortName).Scan(&artistID)
 	if err != nil {
@@ -191,7 +196,7 @@ func (ms *MetadataService) findOrCreateAlbum(ctx context.Context, tx pgx.Tx, nam
 	if year > 0 {
 		yearPtr = &year
 	}
-	
+
 	// Extract album cover (prefer external covers, fallback to song's embedded cover)
 	albumCoverURL := ""
 	if coverURL, err := ms.coverExtractor.ScanForExternalCover(songFilePath); err == nil {
@@ -200,7 +205,7 @@ func (ms *MetadataService) findOrCreateAlbum(ctx context.Context, tx pgx.Tx, nam
 		// Fallback: use the song's cover for the album if no external cover found
 		albumCoverURL = songCoverURL
 	}
-	
+
 	query := `
 		INSERT INTO albums (name, artist_id, album_artist_id, year, cover_path, date_added) 
 		VALUES ($1, $2, $3, $4, $5, NOW()) 
@@ -211,7 +216,7 @@ func (ms *MetadataService) findOrCreateAlbum(ctx context.Context, tx pgx.Tx, nam
 			cover_path = COALESCE(EXCLUDED.cover_path, albums.cover_path)
 		RETURNING id
 	`
-	
+
 	var albumID int
 	err := tx.QueryRow(ctx, query, name, artistID, albumArtistID, yearPtr, nullString(albumCoverURL)).Scan(&albumID)
 	if err != nil {
@@ -228,7 +233,7 @@ func (ms *MetadataService) insertOrUpdateSong(ctx context.Context, tx pgx.Tx, me
 	err := tx.QueryRow(ctx, checkQuery, metadata.FilePath).Scan(&existingID)
 
 	var song models.Song
-	
+
 	if err == pgx.ErrNoRows {
 		// Insert new song
 		insertQuery := `
@@ -238,16 +243,16 @@ func (ms *MetadataService) insertOrUpdateSong(ctx context.Context, tx pgx.Tx, me
 			RETURNING id, title, album_id, artist_id, track_number, disc_number, duration, 
 					  file_path, file_size, file_modified, bitrate, format, cover_path, date_added
 		`
-		
+
 		err = tx.QueryRow(ctx, insertQuery,
-			metadata.Title, albumID, artistID, 
+			metadata.Title, albumID, artistID,
 			nullInt(metadata.TrackNumber), metadata.DiscNumber, metadata.Duration,
 			metadata.FilePath, metadata.FileSize, metadata.FileModified,
 			nullInt(metadata.Bitrate), nullString(metadata.Format), nullString(metadata.CoverURL)).
 			Scan(&song.ID, &song.Title, &song.AlbumID, &song.ArtistID,
-				 &song.TrackNumber, &song.DiscNumber, &song.Duration,
-				 &song.FilePath, &song.FileSize, &song.FileModified,
-				 &song.Bitrate, &song.Format, &song.CoverPath, &song.DateAdded)
+				&song.TrackNumber, &song.DiscNumber, &song.Duration,
+				&song.FilePath, &song.FileSize, &song.FileModified,
+				&song.Bitrate, &song.Format, &song.CoverPath, &song.DateAdded)
 	} else if err == nil {
 		// Update existing song
 		updateQuery := `
@@ -259,16 +264,16 @@ func (ms *MetadataService) insertOrUpdateSong(ctx context.Context, tx pgx.Tx, me
 			RETURNING id, title, album_id, artist_id, track_number, disc_number, duration, 
 					  file_path, file_size, file_modified, bitrate, format, cover_path, date_added
 		`
-		
+
 		err = tx.QueryRow(ctx, updateQuery, existingID,
 			metadata.Title, albumID, artistID,
 			nullInt(metadata.TrackNumber), metadata.DiscNumber, metadata.Duration,
 			metadata.FileSize, metadata.FileModified,
 			nullInt(metadata.Bitrate), nullString(metadata.Format), nullString(metadata.CoverURL)).
 			Scan(&song.ID, &song.Title, &song.AlbumID, &song.ArtistID,
-				 &song.TrackNumber, &song.DiscNumber, &song.Duration,
-				 &song.FilePath, &song.FileSize, &song.FileModified,
-				 &song.Bitrate, &song.Format, &song.CoverPath, &song.DateAdded)
+				&song.TrackNumber, &song.DiscNumber, &song.Duration,
+				&song.FilePath, &song.FileSize, &song.FileModified,
+				&song.Bitrate, &song.Format, &song.CoverPath, &song.DateAdded)
 	} else {
 		return nil, err
 	}
@@ -280,34 +285,88 @@ func (ms *MetadataService) insertOrUpdateSong(ctx context.Context, tx pgx.Tx, me
 	return &song, nil
 }
 
-func (ms *MetadataService) extractAudioProperties(filePath string, file *os.File) (duration, bitrate int, format string) {
+func (ms *MetadataService) extractAudioProperties(filePath string, file *os.File) (duration, bitrate int, format string, err error) {
 	// Get format from file extension
 	ext := strings.ToLower(filepath.Ext(filePath))
 	if len(ext) > 1 {
 		format = ext[1:] // Remove the dot
 	}
 
-	// For now, we'll return basic info
-	// In a full implementation, you'd use format-specific libraries
-	// to extract duration and bitrate (ffprobe, etc.)
-	
-	// Get file size for basic bitrate estimation
-	if info, err := file.Stat(); err == nil {
-		// Very rough estimation: assume average bitrate based on file size
-		// This is not accurate and should be replaced with proper audio analysis
-		fileSizeMB := float64(info.Size()) / (1024 * 1024)
-		estimatedDurationMinutes := fileSizeMB / 0.125 // Assume 128kbps average
-		duration = int(estimatedDurationMinutes * 60)
-		bitrate = 128 // Default assumption
+	// Use FFprobe to get accurate audio properties
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	probeData, err := ffprobe.ProbeURL(ctx, filePath)
+	if err != nil {
+		return 0, 0, format, fmt.Errorf("failed to probe audio file: %w", err)
 	}
 
-	return duration, bitrate, format
+	// Find the first audio stream
+	audioStream := probeData.FirstAudioStream()
+	if audioStream == nil {
+		return 0, 0, format, fmt.Errorf("no audio stream found in file")
+	}
+
+	// Extract duration (convert from float seconds to int)
+	if probeData.Format.DurationSeconds != 0 {
+		duration = int(math.Round(probeData.Format.DurationSeconds))
+	} else {
+		return 0, 0, format, fmt.Errorf("no duration information available")
+	}
+
+	// Extract bitrate
+	if audioStream.BitRate != "" {
+		if parsedBitrate := parseInt(audioStream.BitRate); parsedBitrate > 0 {
+			bitrate = parsedBitrate / 1000 // Convert from bps to kbps
+		}
+	}
+
+	// Use codec name if available, otherwise fall back to file extension
+	if audioStream.CodecName != "" {
+		format = audioStream.CodecName
+	}
+
+	return duration, bitrate, format, nil
 }
 
-func (ms *MetadataService) fallbackMetadata(filePath string, info os.FileInfo) *ExtractedMetadata {
+func (ms *MetadataService) fallbackMetadata(filePath string, info os.FileInfo) (*ExtractedMetadata, error) {
 	// Create basic metadata from filename and path
 	filename := ms.filenameWithoutExt(filePath)
-	
+
+	// Even for fallback metadata, we require accurate duration data
+	format := strings.ToLower(filepath.Ext(filePath)[1:])
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	probeData, err := ffprobe.ProbeURL(ctx, filePath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to probe audio file for fallback metadata: %w", err)
+	}
+
+	audioStream := probeData.FirstAudioStream()
+	if audioStream == nil {
+		return nil, fmt.Errorf("no audio stream found in file for fallback metadata")
+	}
+
+	var duration, bitrate int
+	if probeData.Format.DurationSeconds != 0 {
+		duration = int(math.Round(probeData.Format.DurationSeconds))
+	} else {
+		return nil, fmt.Errorf("no duration information available for fallback metadata")
+	}
+
+	// Extract bitrate
+	if audioStream.BitRate != "" {
+		if parsedBitrate := parseInt(audioStream.BitRate); parsedBitrate > 0 {
+			bitrate = parsedBitrate / 1000 // Convert from bps to kbps
+		}
+	}
+
+	// Use codec name if available, otherwise fall back to file extension
+	if audioStream.CodecName != "" {
+		format = audioStream.CodecName
+	}
+
 	return &ExtractedMetadata{
 		Title:        filename,
 		Artist:       "Unknown Artist",
@@ -316,13 +375,13 @@ func (ms *MetadataService) fallbackMetadata(filePath string, info os.FileInfo) *
 		Year:         0,
 		TrackNumber:  0,
 		DiscNumber:   1,
-		Duration:     0,
-		Bitrate:      0,
-		Format:       strings.ToLower(filepath.Ext(filePath)[1:]),
+		Duration:     duration,
+		Bitrate:      bitrate,
+		Format:       format,
 		FilePath:     filePath,
 		FileSize:     info.Size(),
 		FileModified: info.ModTime(),
-	}
+	}, nil
 }
 
 func (ms *MetadataService) filenameWithoutExt(filePath string) string {
@@ -347,13 +406,13 @@ func generateSortName(name string) string {
 	// Remove articles from the beginning for sorting
 	lower := strings.ToLower(strings.TrimSpace(name))
 	articles := []string{"the ", "a ", "an "}
-	
+
 	for _, article := range articles {
 		if strings.HasPrefix(lower, article) {
 			return strings.TrimSpace(name[len(article):]) + ", " + strings.Title(article[:len(article)-1])
 		}
 	}
-	
+
 	return name
 }
 
@@ -371,10 +430,20 @@ func nullString(value string) *string {
 	return &value
 }
 
+func parseInt(s string) int {
+	if s == "" {
+		return 0
+	}
+	// Simple integer parsing - handles basic numeric strings
+	var result int
+	fmt.Sscanf(s, "%d", &result)
+	return result
+}
+
 // extractCoverArt tries multiple methods to find cover art for a song
 func (ms *MetadataService) extractCoverArt(filePath string) string {
 	log.Printf("🖼️  Extracting cover art for: %s", filePath)
-	
+
 	// Try 1: Song-specific cover (highest priority)
 	if coverURL, err := ms.coverExtractor.ScanForSongSpecificCover(filePath); err == nil {
 		log.Printf("✅ Found song-specific cover: %s", coverURL)
