@@ -59,6 +59,10 @@ Korus is a self-hosted music streaming server built with Go, PostgreSQL, and mod
 18. ✅ Admin functions and system monitoring
 19. ✅ Complete API documentation updated
 20. ✅ All 20+ new API endpoints implemented and tested
+21. ✅ Comprehensive lyrics support with custom LRC parser
+22. ✅ Multi-source lyrics extraction (embedded, LRC files, TXT files)
+23. ✅ Synchronized lyrics with precise timing preservation
+24. ✅ Intelligent language detection using lingua-go with support for 13+ languages including Arabic, Urdu, and Hindi
 
 ### 🎯 Potential Future Enhancements
 The music server is feature-complete. Possible future enhancements:

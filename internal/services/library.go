@@ -360,6 +360,11 @@ func (ls *LibraryService) querySongs(ctx context.Context, query string, args ...
 		songs = append(songs, song)
 	}
 
+	// Load lyrics for all songs
+	if err := ls.loadSongsLyrics(ctx, songs); err != nil {
+		return nil, fmt.Errorf("failed to load lyrics: %w", err)
+	}
+
 	return songs, rows.Err()
 }
 
@@ -473,4 +478,59 @@ func (ls *LibraryService) GetAllSongs(ctx context.Context, limit, offset int, so
 	query += " LIMIT $1 OFFSET $2"
 
 	return ls.querySongs(ctx, query, limit, offset)
+}
+
+// loadSongsLyrics loads lyrics for multiple songs in batch
+func (ls *LibraryService) loadSongsLyrics(ctx context.Context, songs []models.Song) error {
+	if len(songs) == 0 {
+		return nil
+	}
+
+	// Collect all song IDs
+	songIDs := make([]interface{}, len(songs))
+	songMap := make(map[int]*models.Song)
+	for i, song := range songs {
+		songIDs[i] = song.ID
+		songMap[song.ID] = &songs[i]
+	}
+
+	// Build IN clause
+	placeholders := ""
+	for i := range songIDs {
+		if i > 0 {
+			placeholders += ", "
+		}
+		placeholders += fmt.Sprintf("$%d", i+1)
+	}
+
+	// Query all lyrics
+	query := fmt.Sprintf(`
+		SELECT song_id, id, content, type, source, language, created_at 
+		FROM lyrics 
+		WHERE song_id IN (%s)
+		ORDER BY song_id, type DESC, source`, placeholders)
+
+	rows, err := ls.db.QueryContext(ctx, query, songIDs...)
+	if err != nil {
+		return fmt.Errorf("failed to query lyrics: %w", err)
+	}
+	defer rows.Close()
+
+	// Group lyrics by song
+	for rows.Next() {
+		var lyrics models.Lyrics
+		var songID int
+		err := rows.Scan(&songID, &lyrics.ID, &lyrics.Content, &lyrics.Type,
+			&lyrics.Source, &lyrics.Language, &lyrics.CreatedAt)
+		if err != nil {
+			return fmt.Errorf("failed to scan lyrics: %w", err)
+		}
+
+		if song, exists := songMap[songID]; exists {
+			lyrics.SongID = songID
+			song.Lyrics = append(song.Lyrics, lyrics)
+		}
+	}
+
+	return rows.Err()
 }

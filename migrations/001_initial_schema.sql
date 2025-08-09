@@ -138,6 +138,18 @@ CREATE TABLE job_queue (
     last_error TEXT
 );
 
+-- Lyrics table
+CREATE TABLE lyrics (
+    id SERIAL PRIMARY KEY,
+    song_id INTEGER NOT NULL REFERENCES songs(id) ON DELETE CASCADE,
+    content TEXT NOT NULL,
+    type VARCHAR(20) NOT NULL DEFAULT 'unsynced', -- 'synced' or 'unsynced'
+    source VARCHAR(50) NOT NULL, -- 'embedded', 'external_lrc', 'external_txt'
+    language VARCHAR(3) DEFAULT 'eng', -- ISO 639-2 language codes
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    UNIQUE(song_id, language, type)
+);
+
 -- Critical indexes for performance
 CREATE INDEX idx_songs_album_id ON songs(album_id);
 CREATE INDEX idx_songs_artist_id ON songs(artist_id);
@@ -149,6 +161,9 @@ CREATE INDEX idx_play_history_user_id ON play_history(user_id);
 CREATE INDEX idx_play_history_played_at ON play_history(played_at);
 CREATE INDEX idx_playlist_songs_playlist_position ON playlist_songs(playlist_id, position);
 CREATE INDEX idx_job_queue_status_created ON job_queue(status, created_at) WHERE status = 'pending';
+CREATE INDEX idx_lyrics_song_id ON lyrics(song_id);
+CREATE INDEX idx_lyrics_type ON lyrics(type);
+CREATE INDEX idx_lyrics_source ON lyrics(source);
 
 -- Add unique constraint for artists by name
 CREATE UNIQUE INDEX idx_artists_name_unique ON artists(LOWER(name));

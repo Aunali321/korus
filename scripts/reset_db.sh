@@ -25,7 +25,7 @@ DB_URL="$DATABASE_URL"
 
 echo ""
 echo "⚠️  WARNING: This will DELETE ALL DATA in the database!"
-echo "   - All songs, artists, albums will be removed"
+echo "   - All songs, artists, albums, lyrics will be removed"
 echo "   - All user data, playlists, history will be removed"
 echo "   - All jobs and sessions will be removed"
 echo ""
@@ -51,6 +51,7 @@ DROP TABLE IF EXISTS playlist_songs CASCADE;
 DROP TABLE IF EXISTS playlists CASCADE;
 DROP TABLE IF EXISTS user_library CASCADE;
 DROP TABLE IF EXISTS play_history CASCADE;
+DROP TABLE IF EXISTS lyrics CASCADE;
 DROP TABLE IF EXISTS songs CASCADE;
 DROP TABLE IF EXISTS albums CASCADE;
 DROP TABLE IF EXISTS artists CASCADE;

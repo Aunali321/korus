@@ -412,7 +412,36 @@ List all songs with pagination and sorting, or batch fetch songs by IDs.
     "album": {
       "id": 1,
       "name": "Abbey Road"
-    }
+    },
+    "lyrics": [
+      {
+        "id": 1,
+        "song_id": 1,
+        "content": "Come together right now over me...",
+        "type": "unsynced",
+        "source": "embedded",
+        "language": "eng",
+        "created_at": "2025-08-01T10:00:00Z"
+      },
+      {
+        "id": 2,
+        "song_id": 1,
+        "content": "{\"metadata\":{\"title\":\"Come Together\",\"artist\":\"The Beatles\",\"album\":\"Abbey Road\",\"language\":\"eng\"},\"lines\":[{\"time\":1234,\"timeStr\":\"[00:01.23]\",\"text\":\"Come together\"},{\"time\":5678,\"timeStr\":\"[00:05.67]\",\"text\":\"Right now over me\"}]}",
+        "type": "synced",
+        "source": "external_lrc",
+        "language": "eng",
+        "created_at": "2025-08-01T10:00:00Z"
+      },
+      {
+        "id": 3,
+        "song_id": 1,
+        "content": "Ven juntos ahora sobre mí...",
+        "type": "unsynced",
+        "source": "external_txt",
+        "language": "spa",
+        "created_at": "2025-08-01T10:00:00Z"
+      }
+    ]
   }
 ]
 ```
@@ -430,7 +459,7 @@ Get song details by ID.
 
 **Headers:** `Authorization: Bearer <token>`
 
-**Success Response (200):** Same as individual song object above.
+**Success Response (200):** Same as individual song object above, which automatically includes all lyrics for all languages in the `lyrics` array.
 
 ### 🔍 Search
 
@@ -510,6 +539,32 @@ Cache-Control: public, max-age=31536000
 Content-Range: bytes 0-1023/6234567
 Content-Length: 1024
 ```
+
+## 🎵 Lyrics System
+
+Korus automatically extracts and serves lyrics for songs from multiple sources. Lyrics are included directly in song API responses and available through dedicated endpoints.
+
+### Lyrics Sources (in priority order)
+1. **Embedded lyrics**: Extracted from audio file ID3 tags (USLT frames)
+2. **External .lrc files**: Synchronized lyrics with timestamps (`songname.lrc`)
+3. **External .txt files**: Plain text lyrics (`songname.txt`)
+
+### Lyrics Types
+- **`unsynced`**: Plain text lyrics without timestamps
+- **`synced`**: LRC format lyrics with precise timing information
+
+### Language Detection
+- **LRC files**: Uses `[la:language]` metadata tags when available
+- **Content analysis**: Uses lingua-go library for automatic language detection from lyrics text
+- **Supported languages**: English (`eng`), Arabic (`ara`), Urdu (`urd`), Hindi (`hin`), Spanish (`spa`), French (`fre`), German (`ger`), Japanese (`jpn`), Korean (`kor`), Chinese (`chi`), Portuguese (`por`), Italian (`ita`), Russian (`rus`)
+- **Format**: ISO 639-2 language codes
+
+### LRC Format Support
+Korus includes a custom LRC parser that supports:
+- **Metadata tags**: `[ti:title]`, `[ar:artist]`, `[al:album]`, `[by:creator]`, `[offset:±ms]`, `[length:mm:ss]`, `[la:language]`
+- **Timestamp format**: `[mm:ss.xx]lyrics text`
+- **JSON storage**: LRC data is converted to structured JSON for precise timing preservation
+- **Auto-metadata filling**: Missing metadata (title, artist, album) is automatically populated from song information
 
 ## 🖼️ Cover Art System
 

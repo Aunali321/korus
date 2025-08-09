@@ -36,7 +36,15 @@ type ExtractedMetadata struct {
 	FilePath     string
 	FileSize     int64
 	FileModified time.Time
-	CoverURL     string // URL for cover image
+	CoverURL     string             // URL for cover image
+	Lyrics       []ExtractedLyrics  // Extracted lyrics data
+}
+
+type ExtractedLyrics struct {
+	Content  string
+	Type     string // "synced" or "unsynced"
+	Source   string // "embedded", "external_lrc", "external_txt"
+	Language string // ISO 639-2 language codes
 }
 
 func NewMetadataService(db *database.DB) *MetadataService {
@@ -126,6 +134,9 @@ func (ms *MetadataService) extractMetadata(filePath string) (*ExtractedMetadata,
 
 	// Extract cover art (try multiple methods in order of preference)
 	result.CoverURL = ms.extractCoverArt(filePath)
+
+	// Extract lyrics (try multiple methods in order of preference)
+	result.Lyrics = ms.extractLyrics(filePath, metadata)
 
 	return result, nil
 }
@@ -282,7 +293,44 @@ func (ms *MetadataService) insertOrUpdateSong(ctx context.Context, tx pgx.Tx, me
 		return nil, err
 	}
 
+	// Store lyrics if any were extracted
+	if len(metadata.Lyrics) > 0 {
+		log.Printf("💾 Storing %d lyrics entries for song ID %d", len(metadata.Lyrics), song.ID)
+		err = ms.storeLyrics(ctx, tx, song.ID, metadata.Lyrics)
+		if err != nil {
+			return nil, fmt.Errorf("failed to store lyrics: %w", err)
+		}
+		log.Printf("✅ Successfully stored lyrics for song ID %d", song.ID)
+	} else {
+		log.Printf("❌ No lyrics to store for song ID %d (metadata.Lyrics is empty)", song.ID)
+	}
+
 	return &song, nil
+}
+
+// storeLyrics stores lyrics data for a song
+func (ms *MetadataService) storeLyrics(ctx context.Context, tx pgx.Tx, songID int, lyrics []ExtractedLyrics) error {
+	// First, delete any existing lyrics for this song
+	deleteQuery := "DELETE FROM lyrics WHERE song_id = $1"
+	_, err := tx.Exec(ctx, deleteQuery, songID)
+	if err != nil {
+		return fmt.Errorf("failed to delete existing lyrics: %w", err)
+	}
+
+	// Insert new lyrics
+	for _, lyric := range lyrics {
+		insertQuery := `
+			INSERT INTO lyrics (song_id, content, type, source, language, created_at)
+			VALUES ($1, $2, $3, $4, $5, NOW())
+		`
+		_, err = tx.Exec(ctx, insertQuery,
+			songID, lyric.Content, lyric.Type, lyric.Source, lyric.Language)
+		if err != nil {
+			return fmt.Errorf("failed to insert lyrics: %w", err)
+		}
+	}
+
+	return nil
 }
 
 func (ms *MetadataService) extractAudioProperties(filePath string, file *os.File) (duration, bitrate int, format string, err error) {
@@ -472,3 +520,149 @@ func (ms *MetadataService) extractCoverArt(filePath string) string {
 	// No cover found
 	return ""
 }
+
+// extractLyrics tries multiple methods to find lyrics for a song
+func (ms *MetadataService) extractLyrics(filePath string, metadata tag.Metadata) []ExtractedLyrics {
+	log.Printf("🎵 Extracting lyrics for: %s", filePath)
+	var lyrics []ExtractedLyrics
+
+	// Try 1: Embedded lyrics from metadata tags
+	if embeddedLyrics := ms.extractEmbeddedLyrics(metadata); embeddedLyrics != nil {
+		lyrics = append(lyrics, *embeddedLyrics)
+		log.Printf("✅ Found embedded lyrics")
+	}
+
+	// Try 2: External .lrc file (synchronized lyrics)
+	if lrcLyrics := ms.extractLrcFileWithMetadata(filePath, metadata); lrcLyrics != nil {
+		lyrics = append(lyrics, *lrcLyrics)
+		log.Printf("✅ Found .lrc file")
+	}
+
+	// Try 3: External .txt file (plain text lyrics)
+	if txtLyrics := ms.extractTxtFile(filePath); txtLyrics != nil {
+		lyrics = append(lyrics, *txtLyrics)
+		log.Printf("✅ Found .txt file")
+	}
+
+	if len(lyrics) == 0 {
+		log.Printf("❌ No lyrics found for: %s", filePath)
+	}
+
+	return lyrics
+}
+
+// extractEmbeddedLyrics extracts lyrics from ID3 tags
+func (ms *MetadataService) extractEmbeddedLyrics(metadata tag.Metadata) *ExtractedLyrics {
+	if metadata == nil {
+		return nil
+	}
+
+	// Extract lyrics using the dhowden/tag library
+	lyricsText := metadata.Lyrics()
+	if lyricsText == "" {
+		return nil
+	}
+
+	return &ExtractedLyrics{
+		Content:  lyricsText,
+		Type:     "unsynced", // dhowden/tag extracts unsynchronized lyrics
+		Source:   "embedded",
+		Language: "eng", // Default to English, could be enhanced to detect language
+	}
+}
+
+// extractLrcFileWithMetadata attempts to find and parse a .lrc file, filling in missing metadata from song info
+func (ms *MetadataService) extractLrcFileWithMetadata(audioFilePath string, songMetadata tag.Metadata) *ExtractedLyrics {
+	// Build expected .lrc file path
+	baseName := strings.TrimSuffix(audioFilePath, filepath.Ext(audioFilePath))
+	lrcPath := baseName + ".lrc"
+
+	// Check if .lrc file exists
+	if _, err := os.Stat(lrcPath); os.IsNotExist(err) {
+		return nil
+	}
+
+	// Open and parse .lrc file
+	file, err := os.Open(lrcPath)
+	if err != nil {
+		log.Printf("Failed to open LRC file %s: %v", lrcPath, err)
+		return nil
+	}
+	defer file.Close()
+
+	// Parse LRC content using our custom parser
+	parser := NewLRCParser()
+	lrcDoc, err := parser.Parse(file)
+	if err != nil {
+		log.Printf("Failed to parse LRC file %s: %v", lrcPath, err)
+		return nil
+	}
+
+	// Skip if no lyrics lines found
+	if len(lrcDoc.Lines) == 0 {
+		log.Printf("No lyrics lines found in LRC file %s", lrcPath)
+		return nil
+	}
+
+	// Fill in missing metadata from song information
+	if lrcDoc.Metadata.Title == "" && songMetadata != nil {
+		lrcDoc.Metadata.Title = songMetadata.Title()
+	}
+	if lrcDoc.Metadata.Artist == "" && songMetadata != nil {
+		lrcDoc.Metadata.Artist = songMetadata.Artist()
+	}
+	if lrcDoc.Metadata.Album == "" && songMetadata != nil {
+		lrcDoc.Metadata.Album = songMetadata.Album()
+	}
+	// Detect language if not set in LRC metadata
+	if lrcDoc.Metadata.Language == "" {
+		detectedLang := lrcDoc.detectLanguageFromContent()
+		lrcDoc.Metadata.Language = detectedLang
+	}
+
+	// Convert to JSON for storage (preserves timing and metadata)
+	jsonContent, err := lrcDoc.ToJSON()
+	if err != nil {
+		log.Printf("Failed to convert LRC to JSON %s: %v", lrcPath, err)
+		return nil
+	}
+
+	return &ExtractedLyrics{
+		Content:  jsonContent,
+		Type:     "synced",
+		Source:   "external_lrc",
+		Language: lrcDoc.DetectLanguage(),
+	}
+}
+
+// extractTxtFile attempts to find and read a .txt file with the same name as the audio file
+func (ms *MetadataService) extractTxtFile(audioFilePath string) *ExtractedLyrics {
+	// Build expected .txt file path
+	baseName := strings.TrimSuffix(audioFilePath, filepath.Ext(audioFilePath))
+	txtPath := baseName + ".txt"
+
+	// Check if .txt file exists
+	if _, err := os.Stat(txtPath); os.IsNotExist(err) {
+		return nil
+	}
+
+	// Read .txt file content
+	content, err := os.ReadFile(txtPath)
+	if err != nil {
+		log.Printf("Failed to read TXT file %s: %v", txtPath, err)
+		return nil
+	}
+
+	// Skip empty files
+	if len(strings.TrimSpace(string(content))) == 0 {
+		return nil
+	}
+
+	return &ExtractedLyrics{
+		Content:  string(content),
+		Type:     "unsynced",
+		Source:   "external_txt",
+		Language: "eng", // Default to English
+	}
+}
+

@@ -307,13 +307,54 @@ func (bms *BatchMetadataService) insertSong(ctx context.Context, tx pgx.Tx, meta
 			bitrate = EXCLUDED.bitrate,
 			format = EXCLUDED.format,
 			cover_path = EXCLUDED.cover_path
+		RETURNING id
 	`
 
-	_, err := tx.Exec(ctx, query,
+	var songID int
+	err := tx.QueryRow(ctx, query,
 		metadata.Title, albumID, artistID, metadata.TrackNumber, metadata.DiscNumber,
 		metadata.Duration, metadata.FilePath, metadata.FileSize, metadata.FileModified,
 		metadata.Bitrate, metadata.Format, nullString(metadata.CoverURL),
-	)
+	).Scan(&songID)
+	
+	if err != nil {
+		return err
+	}
 
-	return err
+	// Store lyrics if any were extracted
+	if len(metadata.Lyrics) > 0 {
+		log.Printf("💾 Batch storing %d lyrics entries for song ID %d", len(metadata.Lyrics), songID)
+		err = bms.storeLyrics(ctx, tx, songID, metadata.Lyrics)
+		if err != nil {
+			return fmt.Errorf("failed to store lyrics in batch: %w", err)
+		}
+		log.Printf("✅ Successfully stored lyrics in batch for song ID %d", songID)
+	}
+
+	return nil
+}
+
+// storeLyrics stores lyrics data for a song (reused from MetadataService)
+func (bms *BatchMetadataService) storeLyrics(ctx context.Context, tx pgx.Tx, songID int, lyrics []ExtractedLyrics) error {
+	// First, delete any existing lyrics for this song
+	deleteQuery := "DELETE FROM lyrics WHERE song_id = $1"
+	_, err := tx.Exec(ctx, deleteQuery, songID)
+	if err != nil {
+		return fmt.Errorf("failed to delete existing lyrics: %w", err)
+	}
+
+	// Insert new lyrics
+	for _, lyric := range lyrics {
+		insertQuery := `
+			INSERT INTO lyrics (song_id, content, type, source, language, created_at)
+			VALUES ($1, $2, $3, $4, $5, NOW())
+		`
+		_, err = tx.Exec(ctx, insertQuery,
+			songID, lyric.Content, lyric.Type, lyric.Source, lyric.Language)
+		if err != nil {
+			return fmt.Errorf("failed to insert lyrics: %w", err)
+		}
+	}
+
+	return nil
 }

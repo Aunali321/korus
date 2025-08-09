@@ -6,6 +6,9 @@ A high-performance, self-hosted music streaming server built with Go, PostgreSQL
 
 - **RESTful API** with JWT authentication
 - **Real-time file scanning** with automatic metadata extraction
+- **Comprehensive lyrics support** with embedded, LRC, and TXT file extraction
+- **Custom LRC parser** for synchronized lyrics with precise timing
+- **Intelligent language detection** using lingua-go for automatic language identification
 - **Comprehensive cover art extraction** from embedded metadata and external files
 - **WebP, JPEG, PNG, GIF format support** for cover images
 - **Full-text search** powered by Bleve

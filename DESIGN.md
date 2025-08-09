@@ -332,6 +332,56 @@ Korus uses a two-library approach for comprehensive audio metadata extraction:
 - **Strict duration validation**: Only precise duration data from stream analysis is stored
 - **Error handling**: Files with incomplete audio properties return processing errors
 
+### Lyrics Extraction Process
+
+Korus extracts lyrics from three sources in priority order:
+
+**1. Embedded Lyrics (dhowden/tag):**
+- Extracts from ID3v2 USLT (Unsynchronized Lyrics) frames
+- Plain text format without timing information
+- Type: `unsynced`, Source: `embedded`
+
+**2. External LRC Files (Custom Parser):**
+- Matches audio filename: `song.mp3` → `song.lrc`
+- Custom LRC parser handles timestamps and metadata
+- Converts to structured JSON for database storage
+- Type: `synced`, Source: `external_lrc`
+
+**3. External TXT Files:**
+- Matches audio filename: `song.mp3` → `song.txt`
+- Plain text format for unsynchronized lyrics
+- Type: `unsynced`, Source: `external_txt`
+
+### Custom LRC Parser Implementation
+
+**Parser Features:**
+- Regex-based metadata parsing: `[ti:title]`, `[ar:artist]`, `[al:album]`
+- Timestamp parsing: `[mm:ss.xx]lyrics text` → milliseconds
+- Language detection from `[la:language]` tags
+- JSON serialization for structured storage
+
+**LRC Data Structure:**
+```
+{
+  "metadata": {
+    "title": "Song Title",
+    "artist": "Artist Name", 
+    "language": "eng"
+  },
+  "lines": [
+    {"time": 12340, "timeStr": "[00:12.34]", "text": "Lyrics line"}
+  ]
+}
+```
+
+### Language Detection Strategy
+
+- **LRC files**: Parse `[la:language]` metadata tags with ISO 639-2 mapping
+- **Content analysis**: Uses lingua-go library for automatic language detection from lyrics text
+- **Auto-metadata filling**: Missing LRC metadata (title, artist, album) populated from song information
+- **Supported languages**: eng, ara, urd, hin, spa, fre, ger, jpn, kor, chi, por, ita, rus
+- **Database storage**: Unique constraint per (song_id, language, type)
+
 ## 6. Cover Art System
 
 ### Architecture Overview
@@ -432,7 +482,7 @@ Song Cover Flow:
 4. Return null (no cover)
 ```
 
-## 7. User Experience
+## 8. User Experience
 
 ### Initial Setup
 1.  **Environment Preparation**:
@@ -509,7 +559,7 @@ Song Cover Flow:
 - Configurable debounce period (default: 5s) to handle rapid changes
 - Background processing of new/modified files via the internal job queue
 
-## 8. Operational Features
+## 9. Operational Features
 
 ### Background Jobs
 Background jobs are managed by a robust, transactional job queue built directly into PostgreSQL, eliminating external dependencies and ensuring data integrity.
@@ -536,7 +586,7 @@ Background jobs are managed by a robust, transactional job queue built directly 
 - **HTTP/2 Support**: Multiplexed requests for improved client performance
 - **Artwork Caching**: Disk-based caching of resized images
 
-## 9. Post-MVP Roadmap
+## 10. Post-MVP Roadmap
 
 ### Phase 1: Core Enhancements
 1. **Advanced Permissions**

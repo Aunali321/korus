@@ -66,6 +66,17 @@ type Song struct {
 	DateAdded    time.Time `json:"date_added" db:"date_added"`
 	Artist       *Artist   `json:"artist,omitempty"`
 	Album        *Album    `json:"album,omitempty"`
+	Lyrics       []Lyrics  `json:"lyrics,omitempty"`
+}
+
+type Lyrics struct {
+	ID        int       `json:"id" db:"id"`
+	SongID    int       `json:"song_id" db:"song_id"`
+	Content   string    `json:"content" db:"content"`
+	Type      string    `json:"type" db:"type"`         // "synced" or "unsynced"
+	Source    string    `json:"source" db:"source"`     // "embedded", "external_lrc", "external_txt"
+	Language  string    `json:"language" db:"language"` // ISO 639-2 language codes
+	CreatedAt time.Time `json:"created_at" db:"created_at"`
 }
 
 type Playlist struct {
