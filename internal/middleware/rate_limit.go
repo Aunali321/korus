@@ -10,11 +10,11 @@ import (
 )
 
 type rateLimiter struct {
-	mu       sync.RWMutex
-	clients  map[string]*clientRate
-	rate     int           // requests per window
-	window   time.Duration // time window
-	cleanup  time.Duration // cleanup interval
+	mu      sync.RWMutex
+	clients map[string]*clientRate
+	rate    int           // requests per window
+	window  time.Duration // time window
+	cleanup time.Duration // cleanup interval
 }
 
 type clientRate struct {
@@ -30,20 +30,20 @@ func NewRateLimiter(rate int, window time.Duration) *rateLimiter {
 		window:  window,
 		cleanup: window * 2,
 	}
-	
+
 	// Start cleanup goroutine
 	go rl.cleanupClients()
-	
+
 	return rl
 }
 
 func (rl *rateLimiter) Allow(clientID string) bool {
 	rl.mu.Lock()
 	defer rl.mu.Unlock()
-	
+
 	now := time.Now()
 	client, exists := rl.clients[clientID]
-	
+
 	if !exists {
 		rl.clients[clientID] = &clientRate{
 			lastSeen: now,
@@ -52,7 +52,7 @@ func (rl *rateLimiter) Allow(clientID string) bool {
 		}
 		return true
 	}
-	
+
 	// Check if we're in a new window
 	if now.Sub(client.window) >= rl.window {
 		client.count = 1
@@ -60,13 +60,13 @@ func (rl *rateLimiter) Allow(clientID string) bool {
 		client.lastSeen = now
 		return true
 	}
-	
+
 	// Check if rate limit exceeded
 	if client.count >= rl.rate {
 		client.lastSeen = now
 		return false
 	}
-	
+
 	client.count++
 	client.lastSeen = now
 	return true
@@ -75,7 +75,7 @@ func (rl *rateLimiter) Allow(clientID string) bool {
 func (rl *rateLimiter) cleanupClients() {
 	ticker := time.NewTicker(rl.cleanup)
 	defer ticker.Stop()
-	
+
 	for range ticker.C {
 		rl.mu.Lock()
 		now := time.Now()
@@ -90,16 +90,16 @@ func (rl *rateLimiter) cleanupClients() {
 
 func RateLimit(rate int, window time.Duration) gin.HandlerFunc {
 	limiter := NewRateLimiter(rate, window)
-	
+
 	return func(c *gin.Context) {
 		// Use IP address as client identifier
 		clientID := c.ClientIP()
-		
+
 		// For authenticated users, use user ID for more precise limiting
 		if userID, exists := c.Get("user_id"); exists {
 			clientID = fmt.Sprintf("user:%v", userID)
 		}
-		
+
 		if !limiter.Allow(clientID) {
 			c.JSON(http.StatusTooManyRequests, gin.H{
 				"error":   "rate_limit_exceeded",
@@ -108,7 +108,7 @@ func RateLimit(rate int, window time.Duration) gin.HandlerFunc {
 			c.Abort()
 			return
 		}
-		
+
 		c.Next()
 	}
 }

@@ -72,6 +72,40 @@ Authenticate user and receive tokens.
 }
 ```
 
+#### POST /auth/register
+Register a new user account.
+
+**Request Body:**
+```json
+{
+  "username": "newuser",
+  "password": "secure_password_123",
+  "email": "user@example.com"
+}
+```
+
+**Success Response (201):**
+```json
+{
+  "message": "User created successfully",
+  "user": {
+    "id": 2,
+    "username": "newuser",
+    "email": "user@example.com",
+    "role": "user",
+    "created_at": "2025-08-01T16:00:00Z"
+  }
+}
+```
+
+**Error Response (400):**
+```json
+{
+  "error": "validation_failed",
+  "message": "Username already exists"
+}
+```
+
 #### POST /auth/refresh
 Refresh access token using refresh token.
 
@@ -933,7 +967,7 @@ Remove songs from playlist.
 
 **Success Response (204):** No content
 
-#### PUT /playlists/{id}/reorder
+#### PUT /playlists/{id}/songs/reorder
 Reorder songs in playlist.
 
 **Headers:** `Authorization: Bearer <token>`
@@ -950,7 +984,7 @@ Reorder songs in playlist.
 
 ### ❤️ User Library
 
-#### GET /me/library/liked/songs
+#### GET /me/library/songs
 Get user's liked songs.
 
 **Headers:** `Authorization: Bearer <token>`
@@ -975,13 +1009,12 @@ Get user's liked songs.
     "album": {
       "id": 1,
       "name": "Abbey Road"
-    },
-    "liked_at": "2025-08-01T15:30:00Z"
+    }
   }
 ]
 ```
 
-#### GET /me/library/liked/albums
+#### GET /me/library/albums
 Get user's liked albums.
 
 **Headers:** `Authorization: Bearer <token>`
@@ -990,7 +1023,7 @@ Get user's liked albums.
 
 **Success Response (200):** Array of album objects with `liked_at` timestamp
 
-#### GET /me/library/followed/artists
+#### GET /me/library/artists
 Get user's followed artists.
 
 **Headers:** `Authorization: Bearer <token>`
@@ -999,7 +1032,7 @@ Get user's followed artists.
 
 **Success Response (200):** Array of artist objects with `followed_at` timestamp
 
-#### POST /me/library/like/songs
+#### POST /songs/like
 Like songs.
 
 **Headers:** `Authorization: Bearer <token>`
@@ -1013,7 +1046,7 @@ Like songs.
 
 **Success Response (204):** No content
 
-#### DELETE /me/library/unlike/songs
+#### DELETE /songs/like
 Unlike songs.
 
 **Headers:** `Authorization: Bearer <token>`
@@ -1027,28 +1060,28 @@ Unlike songs.
 
 **Success Response (204):** No content
 
-#### POST /me/library/like/albums/{id}
+#### POST /albums/{id}/like
 Like an album.
 
 **Headers:** `Authorization: Bearer <token>`
 
 **Success Response (204):** No content
 
-#### DELETE /me/library/unlike/albums/{id}
+#### DELETE /albums/{id}/like
 Unlike an album.
 
 **Headers:** `Authorization: Bearer <token>`
 
 **Success Response (204):** No content
 
-#### POST /me/library/follow/artists/{id}
+#### POST /artists/{id}/follow
 Follow an artist.
 
 **Headers:** `Authorization: Bearer <token>`
 
 **Success Response (204):** No content
 
-#### DELETE /me/library/unfollow/artists/{id}
+#### DELETE /artists/{id}/follow
 Unfollow an artist.
 
 **Headers:** `Authorization: Bearer <token>`
@@ -1057,22 +1090,26 @@ Unfollow an artist.
 
 ### 📊 History & Statistics
 
-#### POST /me/history/play
-Record a play event.
+#### POST /me/history/scrobble
+Record a play event (scrobble).
 
 **Headers:** `Authorization: Bearer <token>`
 
 **Request Body:**
 ```json
 {
-  "song_id": 1,
-  "played_at": "2025-08-01T16:00:00Z",
-  "duration_played": 180,
-  "completed": true
+  "songId": 1,
+  "playedAt": "2025-08-01T16:00:00Z",
+  "playDuration": 180
 }
 ```
 
-**Success Response (204):** No content
+**Success Response (201):**
+```json
+{
+  "message": "Play recorded successfully"
+}
+```
 
 #### GET /me/history/recent
 Get recent listening history.
@@ -1167,7 +1204,7 @@ Get personalized home data.
 
 All admin endpoints require admin role.
 
-#### POST /admin/library/scan
+#### POST /library/scan
 Trigger library scan.
 
 **Headers:** `Authorization: Bearer <token>` (admin required)
@@ -1180,7 +1217,7 @@ Trigger library scan.
 }
 ```
 
-#### GET /admin/system/status
+#### GET /admin/status
 Get system status.
 
 **Headers:** `Authorization: Bearer <token>` (admin required)
@@ -1211,7 +1248,7 @@ Get system status.
 }
 ```
 
-#### GET /admin/scans/history
+#### GET /admin/scans
 Get recent scan history.
 
 **Headers:** `Authorization: Bearer <token>` (admin required)
@@ -1227,16 +1264,39 @@ Get recent scan history.
     "started_at": "2025-08-01T10:00:00Z",
     "completed_at": "2025-08-01T10:05:30Z",
     "status": "completed",
-    "files_processed": 1250,
-    "files_added": 25,
-    "files_updated": 5,
-    "files_removed": 2,
-    "errors": 0
+    "songs_added": 25,
+    "songs_updated": 5,
+    "songs_removed": 2
   }
 ]
 ```
 
-#### POST /admin/cleanup/jobs
+#### GET /admin/jobs
+Get pending jobs in the queue.
+
+**Headers:** `Authorization: Bearer <token>` (admin required)
+
+**Query Parameters:**
+- `limit` (default: 20) - Number of results
+- `status` - Filter by status: `pending`, `processing`, `completed`, `failed`
+
+**Success Response (200):**
+```json
+[
+  {
+    "id": 123,
+    "type": "metadata_extract",
+    "status": "pending",
+    "payload": {
+      "file_path": "/music/artist/album/song.mp3"
+    },
+    "created_at": "2025-08-01T16:00:00Z",
+    "attempts": 0
+  }
+]
+```
+
+#### DELETE /admin/jobs/cleanup
 Clean up old jobs.
 
 **Headers:** `Authorization: Bearer <token>` (admin required)
@@ -1244,12 +1304,13 @@ Clean up old jobs.
 **Success Response (200):**
 ```json
 {
-  "message": "Cleanup completed",
-  "jobs_removed": 150
+  "message": "Jobs cleanup completed",
+  "deleted_count": 150,
+  "older_than_days": 7
 }
 ```
 
-#### POST /admin/cleanup/sessions
+#### DELETE /admin/sessions/cleanup
 Clean up old sessions.
 
 **Headers:** `Authorization: Bearer <token>` (admin required)
@@ -1257,8 +1318,8 @@ Clean up old sessions.
 **Success Response (200):**
 ```json
 {
-  "message": "Cleanup completed",
-  "sessions_removed": 25
+  "message": "Sessions cleanup completed",
+  "deleted_count": 25
 }
 ```
 

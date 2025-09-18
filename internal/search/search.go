@@ -22,7 +22,7 @@ type SearchService struct {
 
 type SearchDocument struct {
 	ID          string `json:"id"`
-	Type        string `json:"type"`        // "song", "album", "artist"
+	Type        string `json:"type"` // "song", "album", "artist"
 	Title       string `json:"title"`
 	Artist      string `json:"artist"`
 	Album       string `json:"album"`
@@ -42,7 +42,7 @@ type SearchOptions struct {
 
 func NewSearchService(db *database.DB, config *config.LibraryConfig) (*SearchService, error) {
 	indexPath := filepath.Join(config.CacheDir, "search_index")
-	
+
 	// Try to open existing index
 	index, err := bleve.Open(indexPath)
 	if err != nil {
@@ -63,23 +63,23 @@ func NewSearchService(db *database.DB, config *config.LibraryConfig) (*SearchSer
 func createSearchIndex(indexPath string) (bleve.Index, error) {
 	// Create index mapping
 	mapping := bleve.NewIndexMapping()
-	
+
 	// Configure text field mapping for better search
 	textFieldMapping := bleve.NewTextFieldMapping()
 	textFieldMapping.Analyzer = "standard"
 	textFieldMapping.Store = true
 	textFieldMapping.Index = true
-	
+
 	// Configure keyword field mapping for exact matches
 	keywordFieldMapping := bleve.NewKeywordFieldMapping()
 	keywordFieldMapping.Store = true
 	keywordFieldMapping.Index = true
-	
+
 	// Configure numeric field mapping
 	numericFieldMapping := bleve.NewNumericFieldMapping()
 	numericFieldMapping.Store = true
 	numericFieldMapping.Index = true
-	
+
 	// Create document mapping
 	docMapping := bleve.NewDocumentMapping()
 	docMapping.AddFieldMappingsAt("type", keywordFieldMapping)
@@ -91,9 +91,9 @@ func createSearchIndex(indexPath string) (bleve.Index, error) {
 	docMapping.AddFieldMappingsAt("duration", numericFieldMapping)
 	docMapping.AddFieldMappingsAt("format", keywordFieldMapping)
 	docMapping.AddFieldMappingsAt("file_path", keywordFieldMapping)
-	
+
 	mapping.DefaultMapping = docMapping
-	
+
 	// Create index
 	return bleve.New(indexPath, mapping)
 }
@@ -110,12 +110,12 @@ func (s *SearchService) IndexSong(ctx context.Context, song *models.Song) error 
 		Duration: song.Duration,
 		FilePath: song.FilePath,
 	}
-	
+
 	// Add format if available
 	if song.Format != nil {
 		doc.Format = *song.Format
 	}
-	
+
 	// Get artist and album information
 	if song.ArtistID != nil {
 		artist, err := s.getArtist(ctx, *song.ArtistID)
@@ -123,7 +123,7 @@ func (s *SearchService) IndexSong(ctx context.Context, song *models.Song) error 
 			doc.Artist = artist.Name
 		}
 	}
-	
+
 	if song.AlbumID != nil {
 		album, err := s.getAlbum(ctx, *song.AlbumID)
 		if err == nil {
@@ -131,7 +131,7 @@ func (s *SearchService) IndexSong(ctx context.Context, song *models.Song) error 
 			if album.Year != nil {
 				doc.Year = *album.Year
 			}
-			
+
 			// Get album artist
 			if album.AlbumArtistID != nil {
 				albumArtist, err := s.getArtist(ctx, *album.AlbumArtistID)
@@ -141,7 +141,7 @@ func (s *SearchService) IndexSong(ctx context.Context, song *models.Song) error 
 			}
 		}
 	}
-	
+
 	return s.index.Index(doc.ID, doc)
 }
 
@@ -151,11 +151,11 @@ func (s *SearchService) IndexAlbum(ctx context.Context, album *models.Album) err
 		Type:  "album",
 		Title: album.Name,
 	}
-	
+
 	if album.Year != nil {
 		doc.Year = *album.Year
 	}
-	
+
 	// Get artist information
 	if album.ArtistID != nil {
 		artist, err := s.getArtist(ctx, *album.ArtistID)
@@ -163,7 +163,7 @@ func (s *SearchService) IndexAlbum(ctx context.Context, album *models.Album) err
 			doc.Artist = artist.Name
 		}
 	}
-	
+
 	// Get album artist information
 	if album.AlbumArtistID != nil {
 		albumArtist, err := s.getArtist(ctx, *album.AlbumArtistID)
@@ -171,7 +171,7 @@ func (s *SearchService) IndexAlbum(ctx context.Context, album *models.Album) err
 			doc.AlbumArtist = albumArtist.Name
 		}
 	}
-	
+
 	return s.index.Index(doc.ID, doc)
 }
 
@@ -182,7 +182,7 @@ func (s *SearchService) IndexArtist(ctx context.Context, artist *models.Artist) 
 		Title:  artist.Name,
 		Artist: artist.Name,
 	}
-	
+
 	return s.index.Index(doc.ID, doc)
 }
 
@@ -197,61 +197,61 @@ func (s *SearchService) Search(ctx context.Context, options SearchOptions) (*mod
 	if err != nil {
 		return nil, fmt.Errorf("failed to build search query: %w", err)
 	}
-	
+
 	// Create search request
 	searchRequest := bleve.NewSearchRequest(query)
 	searchRequest.Size = options.Limit
 	searchRequest.From = options.Offset
 	searchRequest.Fields = []string{"*"}
-	
+
 	// Add highlighting
 	searchRequest.Highlight = bleve.NewHighlight()
 	searchRequest.Highlight.AddField("title")
 	searchRequest.Highlight.AddField("artist")
 	searchRequest.Highlight.AddField("album")
-	
+
 	// Execute search
 	searchResult, err := s.index.Search(searchRequest)
 	if err != nil {
 		return nil, fmt.Errorf("search failed: %w", err)
 	}
-	
+
 	// Convert results to models
 	return s.convertSearchResults(ctx, searchResult)
 }
 
 func (s *SearchService) buildSearchQuery(options SearchOptions) (query.Query, error) {
 	var queries []query.Query
-	
+
 	// Main text query
 	if options.Query != "" {
 		// Create a disjunction query across multiple fields
 		titleQuery := bleve.NewMatchQuery(options.Query)
 		titleQuery.SetField("title")
 		titleQuery.SetBoost(2.0) // Boost title matches
-		
+
 		artistQuery := bleve.NewMatchQuery(options.Query)
 		artistQuery.SetField("artist")
 		artistQuery.SetBoost(1.5) // Boost artist matches
-		
+
 		albumQuery := bleve.NewMatchQuery(options.Query)
 		albumQuery.SetField("album")
-		
+
 		albumArtistQuery := bleve.NewMatchQuery(options.Query)
 		albumArtistQuery.SetField("album_artist")
-		
+
 		// Create disjunction (OR) query
 		textQuery := bleve.NewDisjunctionQuery(titleQuery, artistQuery, albumQuery, albumArtistQuery)
 		queries = append(queries, textQuery)
 	}
-	
+
 	// Type filter
 	if options.Type != "" {
 		typeQuery := bleve.NewTermQuery(options.Type)
 		typeQuery.SetField("type")
 		queries = append(queries, typeQuery)
 	}
-	
+
 	// Combine queries with conjunction (AND)
 	if len(queries) == 0 {
 		return bleve.NewMatchAllQuery(), nil
@@ -268,20 +268,20 @@ func (s *SearchService) convertSearchResults(ctx context.Context, searchResult *
 		Albums:  []models.Album{},
 		Artists: []models.Artist{},
 	}
-	
+
 	for _, hit := range searchResult.Hits {
 		// Extract type and ID from document ID
 		parts := strings.SplitN(hit.ID, "_", 2)
 		if len(parts) != 2 {
 			continue
 		}
-		
+
 		itemType := parts[0]
 		id, err := strconv.Atoi(parts[1])
 		if err != nil {
 			continue
 		}
-		
+
 		// Fetch full object from database
 		switch itemType {
 		case "song":
@@ -301,7 +301,7 @@ func (s *SearchService) convertSearchResults(ctx context.Context, searchResult *
 			}
 		}
 	}
-	
+
 	return results, nil
 }
 
@@ -310,22 +310,22 @@ func (s *SearchService) RebuildIndex(ctx context.Context) error {
 	if err := s.clearIndex(); err != nil {
 		return fmt.Errorf("failed to clear index: %w", err)
 	}
-	
+
 	// Index all songs
 	if err := s.indexAllSongs(ctx); err != nil {
 		return fmt.Errorf("failed to index songs: %w", err)
 	}
-	
+
 	// Index all albums
 	if err := s.indexAllAlbums(ctx); err != nil {
 		return fmt.Errorf("failed to index albums: %w", err)
 	}
-	
+
 	// Index all artists
 	if err := s.indexAllArtists(ctx); err != nil {
 		return fmt.Errorf("failed to index artists: %w", err)
 	}
-	
+
 	return nil
 }
 
@@ -335,19 +335,19 @@ func (s *SearchService) clearIndex() error {
 	searchRequest := bleve.NewSearchRequest(query)
 	searchRequest.Size = 10000 // Large number to get all documents
 	searchRequest.Fields = []string{}
-	
+
 	searchResult, err := s.index.Search(searchRequest)
 	if err != nil {
 		return err
 	}
-	
+
 	// Delete all documents
 	for _, hit := range searchResult.Hits {
 		if err := s.index.Delete(hit.ID); err != nil {
 			return err
 		}
 	}
-	
+
 	return nil
 }
 
@@ -358,13 +358,13 @@ func (s *SearchService) indexAllSongs(ctx context.Context) error {
 		FROM songs
 		ORDER BY id
 	`
-	
+
 	rows, err := s.db.QueryContext(ctx, query)
 	if err != nil {
 		return err
 	}
 	defer rows.Close()
-	
+
 	for rows.Next() {
 		var song models.Song
 		err := rows.Scan(&song.ID, &song.Title, &song.AlbumID, &song.ArtistID,
@@ -374,13 +374,13 @@ func (s *SearchService) indexAllSongs(ctx context.Context) error {
 		if err != nil {
 			continue
 		}
-		
+
 		if err := s.IndexSong(ctx, &song); err != nil {
 			// Log error but continue
 			fmt.Printf("Failed to index song %d: %v\n", song.ID, err)
 		}
 	}
-	
+
 	return rows.Err()
 }
 
@@ -390,13 +390,13 @@ func (s *SearchService) indexAllAlbums(ctx context.Context) error {
 		FROM albums
 		ORDER BY id
 	`
-	
+
 	rows, err := s.db.QueryContext(ctx, query)
 	if err != nil {
 		return err
 	}
 	defer rows.Close()
-	
+
 	for rows.Next() {
 		var album models.Album
 		err := rows.Scan(&album.ID, &album.Name, &album.ArtistID, &album.AlbumArtistID,
@@ -404,13 +404,13 @@ func (s *SearchService) indexAllAlbums(ctx context.Context) error {
 		if err != nil {
 			continue
 		}
-		
+
 		if err := s.IndexAlbum(ctx, &album); err != nil {
 			// Log error but continue
 			fmt.Printf("Failed to index album %d: %v\n", album.ID, err)
 		}
 	}
-	
+
 	return rows.Err()
 }
 
@@ -420,26 +420,26 @@ func (s *SearchService) indexAllArtists(ctx context.Context) error {
 		FROM artists
 		ORDER BY id
 	`
-	
+
 	rows, err := s.db.QueryContext(ctx, query)
 	if err != nil {
 		return err
 	}
 	defer rows.Close()
-	
+
 	for rows.Next() {
 		var artist models.Artist
 		err := rows.Scan(&artist.ID, &artist.Name, &artist.SortName, &artist.MusicBrainzID)
 		if err != nil {
 			continue
 		}
-		
+
 		if err := s.IndexArtist(ctx, &artist); err != nil {
 			// Log error but continue
 			fmt.Printf("Failed to index artist %d: %v\n", artist.ID, err)
 		}
 	}
-	
+
 	return rows.Err()
 }
 
@@ -451,14 +451,14 @@ func (s *SearchService) getSong(ctx context.Context, id int) (*models.Song, erro
 		FROM songs
 		WHERE id = $1
 	`
-	
+
 	var song models.Song
 	err := s.db.QueryRowContext(ctx, query, id).
 		Scan(&song.ID, &song.Title, &song.AlbumID, &song.ArtistID,
-			 &song.TrackNumber, &song.DiscNumber, &song.Duration,
-			 &song.FilePath, &song.FileSize, &song.FileModified,
-			 &song.Bitrate, &song.Format, &song.DateAdded)
-	
+			&song.TrackNumber, &song.DiscNumber, &song.Duration,
+			&song.FilePath, &song.FileSize, &song.FileModified,
+			&song.Bitrate, &song.Format, &song.DateAdded)
+
 	return &song, err
 }
 
@@ -468,12 +468,12 @@ func (s *SearchService) getAlbum(ctx context.Context, id int) (*models.Album, er
 		FROM albums
 		WHERE id = $1
 	`
-	
+
 	var album models.Album
 	err := s.db.QueryRowContext(ctx, query, id).
 		Scan(&album.ID, &album.Name, &album.ArtistID, &album.AlbumArtistID,
-			 &album.Year, &album.MusicBrainzID, &album.CoverPath, &album.DateAdded)
-	
+			&album.Year, &album.MusicBrainzID, &album.CoverPath, &album.DateAdded)
+
 	return &album, err
 }
 
@@ -483,10 +483,10 @@ func (s *SearchService) getArtist(ctx context.Context, id int) (*models.Artist, 
 		FROM artists
 		WHERE id = $1
 	`
-	
+
 	var artist models.Artist
 	err := s.db.QueryRowContext(ctx, query, id).
 		Scan(&artist.ID, &artist.Name, &artist.SortName, &artist.MusicBrainzID)
-	
+
 	return &artist, err
 }

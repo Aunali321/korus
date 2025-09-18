@@ -37,7 +37,7 @@ func (hs *HistoryService) GetRecentHistory(ctx context.Context, userID int, limi
 	query := `
 		SELECT ph.id, ph.user_id, ph.song_id, ph.played_at, ph.play_duration, ph.ip_address,
 			   s.id, s.title, s.album_id, s.artist_id, s.track_number, s.disc_number,
-			   s.duration, s.file_path, s.file_size, s.file_modified, 
+			   s.duration, s.file_path, s.file_size, s.file_modified,
 			   s.bitrate, s.format, s.cover_path, s.date_added,
 			   ar.name as artist_name,
 			   a.name as album_name
@@ -131,7 +131,7 @@ func (hs *HistoryService) GetUserStats(ctx context.Context, userID int) (*models
 	// Get most played song
 	songQuery := `
 		SELECT s.id, s.title, s.album_id, s.artist_id, s.track_number, s.disc_number,
-			   s.duration, s.file_path, s.file_size, s.file_modified, 
+			   s.duration, s.file_path, s.file_size, s.file_modified,
 			   s.bitrate, s.format, s.cover_path, s.date_added,
 			   ar.name as artist_name,
 			   a.name as album_name,
@@ -142,7 +142,7 @@ func (hs *HistoryService) GetUserStats(ctx context.Context, userID int) (*models
 		LEFT JOIN albums a ON s.album_id = a.id
 		WHERE ph.user_id = $1
 		GROUP BY s.id, s.title, s.album_id, s.artist_id, s.track_number, s.disc_number,
-				 s.duration, s.file_path, s.file_size, s.file_modified, 
+				 s.duration, s.file_path, s.file_size, s.file_modified,
 				 s.bitrate, s.format, s.cover_path, s.date_added, ar.name, a.name
 		ORDER BY play_count DESC
 		LIMIT 1
@@ -200,7 +200,7 @@ func (hs *HistoryService) GetHomeData(ctx context.Context, userID int, limit int
 
 	// Get recently added albums
 	recentAlbumsQuery := `
-		SELECT a.id, a.name, a.artist_id, a.album_artist_id, a.year, 
+		SELECT a.id, a.name, a.artist_id, a.album_artist_id, a.year,
 			   a.musicbrainz_id, a.cover_path, a.date_added,
 			   ar.name as artist_name,
 			   COUNT(DISTINCT s.id) as song_count,
@@ -208,7 +208,7 @@ func (hs *HistoryService) GetHomeData(ctx context.Context, userID int, limit int
 		FROM albums a
 		LEFT JOIN artists ar ON a.artist_id = ar.id
 		LEFT JOIN songs s ON a.id = s.album_id
-		GROUP BY a.id, a.name, a.artist_id, a.album_artist_id, a.year, 
+		GROUP BY a.id, a.name, a.artist_id, a.album_artist_id, a.year,
 				 a.musicbrainz_id, a.cover_path, a.date_added, ar.name
 		ORDER BY a.date_added DESC
 		LIMIT $1
@@ -244,9 +244,9 @@ func (hs *HistoryService) GetHomeData(ctx context.Context, userID int, limit int
 
 	// Get recently played songs (distinct)
 	recentSongsQuery := `
-		SELECT DISTINCT ON (s.id) s.id, s.title, s.album_id, s.artist_id, s.track_number, s.disc_number,
-			   s.duration, s.file_path, s.file_size, s.file_modified, 
-			   s.bitrate, s.format, s.date_added,
+		SELECT s.id, s.title, s.album_id, s.artist_id, s.track_number, s.disc_number,
+			   s.duration, s.file_path, s.file_size, s.file_modified,
+			   s.bitrate, s.format, s.cover_path, s.date_added,
 			   ar.name as artist_name,
 			   a.name as album_name,
 			   MAX(ph.played_at) as last_played
@@ -256,9 +256,9 @@ func (hs *HistoryService) GetHomeData(ctx context.Context, userID int, limit int
 		LEFT JOIN albums a ON s.album_id = a.id
 		WHERE ph.user_id = $1
 		GROUP BY s.id, s.title, s.album_id, s.artist_id, s.track_number, s.disc_number,
-				 s.duration, s.file_path, s.file_size, s.file_modified, 
+				 s.duration, s.file_path, s.file_size, s.file_modified,
 				 s.bitrate, s.format, s.cover_path, s.date_added, ar.name, a.name
-		ORDER BY s.id, last_played DESC
+		ORDER BY last_played DESC
 		LIMIT $2
 	`
 
@@ -304,7 +304,7 @@ func (hs *HistoryService) GetHomeData(ctx context.Context, userID int, limit int
 	// Get most played songs for this user
 	mostPlayedQuery := `
 		SELECT s.id, s.title, s.album_id, s.artist_id, s.track_number, s.disc_number,
-			   s.duration, s.file_path, s.file_size, s.file_modified, 
+			   s.duration, s.file_path, s.file_size, s.file_modified,
 			   s.bitrate, s.format, s.cover_path, s.date_added,
 			   ar.name as artist_name,
 			   a.name as album_name,
@@ -315,7 +315,7 @@ func (hs *HistoryService) GetHomeData(ctx context.Context, userID int, limit int
 		LEFT JOIN albums a ON s.album_id = a.id
 		WHERE ph.user_id = $1
 		GROUP BY s.id, s.title, s.album_id, s.artist_id, s.track_number, s.disc_number,
-				 s.duration, s.file_path, s.file_size, s.file_modified, 
+				 s.duration, s.file_path, s.file_size, s.file_modified,
 				 s.bitrate, s.format, s.cover_path, s.date_added, ar.name, a.name
 		ORDER BY play_count DESC
 		LIMIT $2
@@ -363,7 +363,7 @@ func (hs *HistoryService) GetHomeData(ctx context.Context, userID int, limit int
 	// For recommended albums, we'll use a simple algorithm: albums from artists the user has played recently
 	// but albums they haven't played much themselves
 	recommendedQuery := `
-		SELECT DISTINCT a.id, a.name, a.artist_id, a.album_artist_id, a.year, 
+		SELECT a.id, a.name, a.artist_id, a.album_artist_id, a.year,
 			   a.musicbrainz_id, a.cover_path, a.date_added,
 			   ar.name as artist_name,
 			   COUNT(DISTINCT s.id) as song_count,
@@ -372,20 +372,22 @@ func (hs *HistoryService) GetHomeData(ctx context.Context, userID int, limit int
 		LEFT JOIN artists ar ON a.artist_id = ar.id
 		LEFT JOIN songs s ON a.id = s.album_id
 		WHERE a.artist_id IN (
-			SELECT DISTINCT s.artist_id 
+			SELECT s.artist_id
 			FROM play_history ph
 			JOIN songs s ON ph.song_id = s.id
 			WHERE ph.user_id = $1 AND s.artist_id IS NOT NULL
-			ORDER BY ph.played_at DESC
+			GROUP BY s.artist_id
+			ORDER BY MAX(ph.played_at) DESC
 			LIMIT 10
 		)
 		AND a.id NOT IN (
-			SELECT DISTINCT s.album_id
+			SELECT s.album_id
 			FROM play_history ph
 			JOIN songs s ON ph.song_id = s.id
 			WHERE ph.user_id = $1 AND s.album_id IS NOT NULL
+			GROUP BY s.album_id
 		)
-		GROUP BY a.id, a.name, a.artist_id, a.album_artist_id, a.year, 
+		GROUP BY a.id, a.name, a.artist_id, a.album_artist_id, a.year,
 				 a.musicbrainz_id, a.cover_path, a.date_added, ar.name
 		ORDER BY a.date_added DESC
 		LIMIT $2

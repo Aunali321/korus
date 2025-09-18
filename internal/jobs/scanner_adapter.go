@@ -22,11 +22,11 @@ func (a *ScannerAdapter) ScanLibrary(ctx context.Context, force bool) (*ScanResu
 
 	// Convert scanner.ScanResult to jobs.ScanResult
 	return &ScanResult{
-		FilesFound:    result.FilesFound,
-		FilesAdded:    result.FilesAdded,
-		FilesUpdated:  result.FilesUpdated,
-		FilesRemoved:  result.FilesRemoved,
-		Duration:      result.Duration,
-		Errors:        result.Errors,
+		FilesFound:   result.FilesFound,
+		FilesAdded:   result.FilesAdded,
+		FilesUpdated: result.FilesUpdated,
+		FilesRemoved: result.FilesRemoved,
+		Duration:     result.Duration,
+		Errors:       result.Errors,
 	}, nil
 }

@@ -5,9 +5,10 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/jackc/pgx/v5"
 	"korus/internal/database"
 	"korus/internal/models"
+
+	"github.com/jackc/pgx/v5"
 )
 
 type Service struct {
@@ -113,8 +114,8 @@ func (s *Service) CreateUser(ctx context.Context, username, email, password stri
 
 	// Create user
 	query := `
-		INSERT INTO users (username, email, password_hash, role) 
-		VALUES ($1, $2, $3, $4) 
+		INSERT INTO users (username, email, password_hash, role)
+		VALUES ($1, $2, $3, $4)
 		RETURNING id, username, email, role, created_at
 	`
 
@@ -143,8 +144,8 @@ func (s *Service) CreateAdminUser(ctx context.Context, username, password string
 
 	// Create admin user
 	query := `
-		INSERT INTO users (username, password_hash, role) 
-		VALUES ($1, $2, 'admin') 
+		INSERT INTO users (username, password_hash, role)
+		VALUES ($1, $2, 'admin')
 		RETURNING id, username, email, role, created_at
 	`
 
@@ -190,37 +191,37 @@ func (s *Service) HasUsers(ctx context.Context) (bool, error) {
 
 func (s *Service) getUserByUsername(ctx context.Context, username string) (*models.User, error) {
 	query := `
-		SELECT id, username, email, password_hash, role, created_at, last_login 
-		FROM users 
+		SELECT id, username, email, password_hash, role, created_at, last_login
+		FROM users
 		WHERE username = $1
 	`
 
 	var user models.User
 	err := s.db.QueryRowContext(ctx, query, username).
-		Scan(&user.ID, &user.Username, &user.Email, &user.PasswordHash, 
-			 &user.Role, &user.CreatedAt, &user.LastLogin)
-	
+		Scan(&user.ID, &user.Username, &user.Email, &user.PasswordHash,
+			&user.Role, &user.CreatedAt, &user.LastLogin)
+
 	return &user, err
 }
 
 func (s *Service) getUserByID(ctx context.Context, userID int) (*models.User, error) {
 	query := `
-		SELECT id, username, email, password_hash, role, created_at, last_login 
-		FROM users 
+		SELECT id, username, email, password_hash, role, created_at, last_login
+		FROM users
 		WHERE id = $1
 	`
 
 	var user models.User
 	err := s.db.QueryRowContext(ctx, query, userID).
-		Scan(&user.ID, &user.Username, &user.Email, &user.PasswordHash, 
-			 &user.Role, &user.CreatedAt, &user.LastLogin)
-	
+		Scan(&user.ID, &user.Username, &user.Email, &user.PasswordHash,
+			&user.Role, &user.CreatedAt, &user.LastLogin)
+
 	return &user, err
 }
 
 func (s *Service) storeRefreshToken(ctx context.Context, userID int, refreshToken string, expiresAt time.Time) error {
 	query := `
-		INSERT INTO user_sessions (user_id, refresh_token, expires_at) 
+		INSERT INTO user_sessions (user_id, refresh_token, expires_at)
 		VALUES ($1, $2, $3)
 	`
 	_, err := s.db.ExecContext(ctx, query, userID, refreshToken, expiresAt)
@@ -229,16 +230,16 @@ func (s *Service) storeRefreshToken(ctx context.Context, userID int, refreshToke
 
 func (s *Service) getSessionByRefreshToken(ctx context.Context, refreshToken string) (*models.UserSession, error) {
 	query := `
-		SELECT id, user_id, refresh_token, expires_at, created_at 
-		FROM user_sessions 
+		SELECT id, user_id, refresh_token, expires_at, created_at
+		FROM user_sessions
 		WHERE refresh_token = $1
 	`
 
 	var session models.UserSession
 	err := s.db.QueryRowContext(ctx, query, refreshToken).
-		Scan(&session.ID, &session.UserID, &session.RefreshToken, 
-			 &session.ExpiresAt, &session.CreatedAt)
-	
+		Scan(&session.ID, &session.UserID, &session.RefreshToken,
+			&session.ExpiresAt, &session.CreatedAt)
+
 	return &session, err
 }
 

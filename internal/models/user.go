@@ -5,12 +5,12 @@ import (
 )
 
 type User struct {
-	ID           int       `json:"id" db:"id"`
-	Username     string    `json:"username" db:"username"`
-	Email        *string   `json:"email,omitempty" db:"email"`
-	PasswordHash string    `json:"-" db:"password_hash"`
-	Role         string    `json:"role" db:"role"`
-	CreatedAt    time.Time `json:"created_at" db:"created_at"`
+	ID           int        `json:"id" db:"id"`
+	Username     string     `json:"username" db:"username"`
+	Email        *string    `json:"email,omitempty" db:"email"`
+	PasswordHash string     `json:"-" db:"password_hash"`
+	Role         string     `json:"role" db:"role"`
+	CreatedAt    time.Time  `json:"created_at" db:"created_at"`
 	LastLogin    *time.Time `json:"last_login,omitempty" db:"last_login"`
 }
 
@@ -139,18 +139,18 @@ type LibraryStats struct {
 }
 
 type UserStats struct {
-	TotalPlays         int     `json:"totalPlays"`
-	TotalTimeListened  int     `json:"totalTimeListened"`
-	MostPlayedArtist   *Artist `json:"mostPlayedArtist,omitempty"`
-	MostPlayedSong     *Song   `json:"mostPlayedSong,omitempty"`
-	TopGenres          []string `json:"topGenres"`
+	TotalPlays        int      `json:"totalPlays"`
+	TotalTimeListened int      `json:"totalTimeListened"`
+	MostPlayedArtist  *Artist  `json:"mostPlayedArtist,omitempty"`
+	MostPlayedSong    *Song    `json:"mostPlayedSong,omitempty"`
+	TopGenres         []string `json:"topGenres"`
 }
 
 type HomeData struct {
-	RecentlyAdded      []Album `json:"recentlyAdded"`
-	RecentlyPlayed     []Song  `json:"recentlyPlayed"`
-	MostPlayed         []Song  `json:"mostPlayed"`
-	RecommendedAlbums  []Album `json:"recommendedAlbums"`
+	RecentlyAdded     []Album `json:"recentlyAdded"`
+	RecentlyPlayed    []Song  `json:"recentlyPlayed"`
+	MostPlayed        []Song  `json:"mostPlayed"`
+	RecommendedAlbums []Album `json:"recommendedAlbums"`
 }
 
 type SearchResults struct {

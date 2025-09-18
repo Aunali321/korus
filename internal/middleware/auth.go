@@ -33,7 +33,7 @@ func AuthRequired(authService *auth.Service) gin.HandlerFunc {
 		}
 
 		token := strings.TrimPrefix(authHeader, "Bearer ")
-		
+
 		// Validate token and get user
 		user, err := authService.ValidateToken(c.Request.Context(), token)
 		if err != nil {
@@ -49,7 +49,7 @@ func AuthRequired(authService *auth.Service) gin.HandlerFunc {
 		c.Set("user", user)
 		c.Set("user_id", user.ID)
 		c.Set("user_role", user.Role)
-		
+
 		c.Next()
 	}
 }
@@ -94,7 +94,7 @@ func OptionalAuth(authService *auth.Service) gin.HandlerFunc {
 		}
 
 		token := strings.TrimPrefix(authHeader, "Bearer ")
-		
+
 		// Try to validate token but don't fail if invalid
 		user, err := authService.ValidateToken(c.Request.Context(), token)
 		if err == nil {
@@ -102,7 +102,7 @@ func OptionalAuth(authService *auth.Service) gin.HandlerFunc {
 			c.Set("user_id", user.ID)
 			c.Set("user_role", user.Role)
 		}
-		
+
 		c.Next()
 	}
 }
@@ -113,7 +113,7 @@ func GetCurrentUser(c *gin.Context) (*models.User, bool) {
 	if !exists {
 		return nil, false
 	}
-	
+
 	u, ok := user.(*models.User)
 	return u, ok
 }
@@ -124,7 +124,7 @@ func GetCurrentUserID(c *gin.Context) (int, bool) {
 	if !exists {
 		return 0, false
 	}
-	
+
 	id, ok := userID.(int)
 	return id, ok
 }
@@ -135,7 +135,7 @@ func IsCurrentUserAdmin(c *gin.Context) bool {
 	if !exists {
 		return false
 	}
-	
+
 	r, ok := role.(string)
 	return ok && r == "admin"
 }

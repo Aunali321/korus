@@ -16,12 +16,12 @@ type Config struct {
 }
 
 type DatabaseConfig struct {
-	URL          string
-	MaxConns     int
-	MinConns     int
-	MaxConnTime  time.Duration
-	MaxIdleTime  time.Duration
-	HealthCheck  time.Duration
+	URL         string
+	MaxConns    int
+	MinConns    int
+	MaxConnTime time.Duration
+	MaxIdleTime time.Duration
+	HealthCheck time.Duration
 }
 
 type ServerConfig struct {
@@ -34,11 +34,11 @@ type ServerConfig struct {
 }
 
 type AuthConfig struct {
-	JWTSecret           string
-	AccessTokenExpiry   time.Duration
-	RefreshTokenExpiry  time.Duration
-	AdminUsername       string
-	AdminPassword       string
+	JWTSecret          string
+	AccessTokenExpiry  time.Duration
+	RefreshTokenExpiry time.Duration
+	AdminUsername      string
+	AdminPassword      string
 }
 
 type LibraryConfig struct {
@@ -49,7 +49,7 @@ type LibraryConfig struct {
 }
 
 type CacheConfig struct {
-	ArtworkMaxSize int64
+	ArtworkMaxSize   int64
 	MetadataMaxItems int
 	MetadataTTL      time.Duration
 }
@@ -103,19 +103,19 @@ func (c *Config) validate() error {
 	if c.Auth.JWTSecret == "" {
 		return fmt.Errorf("JWT_SECRET is required")
 	}
-	
+
 	if c.Database.URL == "" {
 		return fmt.Errorf("DATABASE_URL is required")
 	}
-	
+
 	if c.Library.MusicDir == "" {
 		return fmt.Errorf("MUSIC_DIR is required")
 	}
-	
+
 	if c.Server.Port <= 0 || c.Server.Port > 65535 {
 		return fmt.Errorf("SERVER_PORT must be between 1 and 65535")
 	}
-	
+
 	return nil
 }
 

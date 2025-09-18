@@ -6,18 +6,19 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/jackc/pgx/v5"
 	"korus/internal/database"
 	"korus/internal/models"
+
+	"github.com/jackc/pgx/v5"
 )
 
 const (
-	JobTypeScan           = "scan"
+	JobTypeScan                 = "scan"
 	JobTypeMetadataExtract      = "metadata_extract"
 	JobTypeMetadataExtractBatch = "metadata_extract_batch"
-	JobTypeTranscode      = "transcode"
-	JobTypeCleanup        = "cleanup"
-	JobTypeStatsUpdate    = "stats_update"
+	JobTypeTranscode            = "transcode"
+	JobTypeCleanup              = "cleanup"
+	JobTypeStatsUpdate          = "stats_update"
 )
 
 const (
@@ -77,17 +78,17 @@ func (q *Queue) Enqueue(ctx context.Context, jobType string, payload interface{}
 	}
 
 	query := `
-		INSERT INTO job_queue (job_type, payload, status, created_at) 
-		VALUES ($1, $2, $3, NOW()) 
+		INSERT INTO job_queue (job_type, payload, status, created_at)
+		VALUES ($1, $2, $3, NOW())
 		RETURNING id, job_type, payload, status, created_at, processed_at, attempts, last_error
 	`
 
 	var job Job
 	job.Job = &models.Job{}
-	
+
 	err = q.db.QueryRowContext(ctx, query, jobType, payloadBytes, JobStatusPending).
-		Scan(&job.ID, &job.JobType, &job.Payload, &job.Status, 
-			 &job.CreatedAt, &job.ProcessedAt, &job.Attempts, &job.LastError)
+		Scan(&job.ID, &job.JobType, &job.Payload, &job.Status,
+			&job.CreatedAt, &job.ProcessedAt, &job.Attempts, &job.LastError)
 	if err != nil {
 		return nil, fmt.Errorf("failed to enqueue job: %w", err)
 	}
@@ -106,19 +107,19 @@ func (q *Queue) Dequeue(ctx context.Context, jobTypes []string) (*Job, error) {
 	// Build query with job type filter
 	query := `
 		SELECT id, job_type, payload, status, created_at, processed_at, attempts, last_error
-		FROM job_queue 
+		FROM job_queue
 		WHERE status = $1 AND job_type = ANY($2)
-		ORDER BY created_at ASC 
-		LIMIT 1 
+		ORDER BY created_at ASC
+		LIMIT 1
 		FOR UPDATE SKIP LOCKED
 	`
 
 	var job Job
 	job.Job = &models.Job{}
-	
+
 	err = tx.QueryRow(ctx, query, JobStatusPending, jobTypes).
-		Scan(&job.ID, &job.JobType, &job.Payload, &job.Status, 
-			 &job.CreatedAt, &job.ProcessedAt, &job.Attempts, &job.LastError)
+		Scan(&job.ID, &job.JobType, &job.Payload, &job.Status,
+			&job.CreatedAt, &job.ProcessedAt, &job.Attempts, &job.LastError)
 	if err != nil {
 		if err == pgx.ErrNoRows {
 			return nil, nil // No jobs available
@@ -127,7 +128,7 @@ func (q *Queue) Dequeue(ctx context.Context, jobTypes []string) (*Job, error) {
 	}
 
 	// Mark job as processing
-	_, err = tx.Exec(ctx, 
+	_, err = tx.Exec(ctx,
 		"UPDATE job_queue SET status = $1, attempts = attempts + 1 WHERE id = $2",
 		JobStatusProcessing, job.ID)
 	if err != nil {
@@ -148,69 +149,69 @@ func (q *Queue) Dequeue(ctx context.Context, jobTypes []string) (*Job, error) {
 
 func (q *Queue) Complete(ctx context.Context, jobID int) error {
 	query := `
-		UPDATE job_queue 
-		SET status = $1, processed_at = NOW() 
+		UPDATE job_queue
+		SET status = $1, processed_at = NOW()
 		WHERE id = $2
 	`
-	
+
 	_, err := q.db.ExecContext(ctx, query, JobStatusCompleted, jobID)
 	if err != nil {
 		return fmt.Errorf("failed to mark job as completed: %w", err)
 	}
-	
+
 	return nil
 }
 
 func (q *Queue) Fail(ctx context.Context, jobID int, errorMsg string) error {
 	query := `
-		UPDATE job_queue 
-		SET status = $1, last_error = $2, processed_at = NOW() 
+		UPDATE job_queue
+		SET status = $1, last_error = $2, processed_at = NOW()
 		WHERE id = $3
 	`
-	
+
 	_, err := q.db.ExecContext(ctx, query, JobStatusFailed, errorMsg, jobID)
 	if err != nil {
 		return fmt.Errorf("failed to mark job as failed: %w", err)
 	}
-	
+
 	return nil
 }
 
 func (q *Queue) Retry(ctx context.Context, jobID int, maxAttempts int) error {
 	query := `
-		UPDATE job_queue 
-		SET status = CASE 
-			WHEN attempts < $2 THEN $3 
-			ELSE $4 
+		UPDATE job_queue
+		SET status = CASE
+			WHEN attempts < $2 THEN $3
+			ELSE $4
 		END,
-		last_error = CASE 
-			WHEN attempts >= $2 THEN 'Max retry attempts exceeded' 
-			ELSE last_error 
+		last_error = CASE
+			WHEN attempts >= $2 THEN 'Max retry attempts exceeded'
+			ELSE last_error
 		END
 		WHERE id = $1
 	`
-	
+
 	_, err := q.db.ExecContext(ctx, query, jobID, maxAttempts, JobStatusPending, JobStatusFailed)
 	if err != nil {
 		return fmt.Errorf("failed to retry job: %w", err)
 	}
-	
+
 	return nil
 }
 
 func (q *Queue) GetJob(ctx context.Context, jobID int) (*Job, error) {
 	query := `
 		SELECT id, job_type, payload, status, created_at, processed_at, attempts, last_error
-		FROM job_queue 
+		FROM job_queue
 		WHERE id = $1
 	`
 
 	var job Job
 	job.Job = &models.Job{}
-	
+
 	err := q.db.QueryRowContext(ctx, query, jobID).
-		Scan(&job.ID, &job.JobType, &job.Payload, &job.Status, 
-			 &job.CreatedAt, &job.ProcessedAt, &job.Attempts, &job.LastError)
+		Scan(&job.ID, &job.JobType, &job.Payload, &job.Status,
+			&job.CreatedAt, &job.ProcessedAt, &job.Attempts, &job.LastError)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get job: %w", err)
 	}
@@ -225,9 +226,9 @@ func (q *Queue) GetJob(ctx context.Context, jobID int) (*Job, error) {
 func (q *Queue) ListJobs(ctx context.Context, status string, limit, offset int) ([]Job, error) {
 	query := `
 		SELECT id, job_type, payload, status, created_at, processed_at, attempts, last_error
-		FROM job_queue 
+		FROM job_queue
 		WHERE ($1 = '' OR status = $1)
-		ORDER BY created_at DESC 
+		ORDER BY created_at DESC
 		LIMIT $2 OFFSET $3
 	`
 
@@ -241,9 +242,9 @@ func (q *Queue) ListJobs(ctx context.Context, status string, limit, offset int) 
 	for rows.Next() {
 		var job Job
 		job.Job = &models.Job{}
-		
-		err := rows.Scan(&job.ID, &job.JobType, &job.Payload, &job.Status, 
-						&job.CreatedAt, &job.ProcessedAt, &job.Attempts, &job.LastError)
+
+		err := rows.Scan(&job.ID, &job.JobType, &job.Payload, &job.Status,
+			&job.CreatedAt, &job.ProcessedAt, &job.Attempts, &job.LastError)
 		if err != nil {
 			return nil, fmt.Errorf("failed to scan job: %w", err)
 		}
@@ -261,22 +262,22 @@ func (q *Queue) ListJobs(ctx context.Context, status string, limit, offset int) 
 
 func (q *Queue) CleanupCompletedJobs(ctx context.Context, olderThan time.Time) (int, error) {
 	query := `
-		DELETE FROM job_queue 
+		DELETE FROM job_queue
 		WHERE status = $1 AND processed_at < $2
 	`
-	
+
 	result, err := q.db.ExecContext(ctx, query, JobStatusCompleted, olderThan)
 	if err != nil {
 		return 0, fmt.Errorf("failed to cleanup completed jobs: %w", err)
 	}
-	
+
 	return int(result.RowsAffected()), nil
 }
 
 func (q *Queue) GetQueueStats(ctx context.Context) (map[string]int, error) {
 	query := `
-		SELECT status, COUNT(*) 
-		FROM job_queue 
+		SELECT status, COUNT(*)
+		FROM job_queue
 		GROUP BY status
 	`
 
@@ -290,11 +291,11 @@ func (q *Queue) GetQueueStats(ctx context.Context) (map[string]int, error) {
 	for rows.Next() {
 		var status string
 		var count int
-		
+
 		if err := rows.Scan(&status, &count); err != nil {
 			return nil, fmt.Errorf("failed to scan queue stats: %w", err)
 		}
-		
+
 		stats[status] = count
 	}
 
@@ -313,35 +314,35 @@ func (q *Queue) unmarshalPayload(job *Job) error {
 			return err
 		}
 		job.PayloadData = payload
-		
+
 	case JobTypeMetadataExtract:
 		var payload MetadataExtractJobPayload
 		if err := json.Unmarshal(job.Payload, &payload); err != nil {
 			return err
 		}
 		job.PayloadData = payload
-		
+
 	case JobTypeMetadataExtractBatch:
 		var payload BatchMetadataExtractJobPayload
 		if err := json.Unmarshal(job.Payload, &payload); err != nil {
 			return err
 		}
 		job.PayloadData = payload
-		
+
 	case JobTypeTranscode:
 		var payload TranscodeJobPayload
 		if err := json.Unmarshal(job.Payload, &payload); err != nil {
 			return err
 		}
 		job.PayloadData = payload
-		
+
 	case JobTypeCleanup:
 		var payload CleanupJobPayload
 		if err := json.Unmarshal(job.Payload, &payload); err != nil {
 			return err
 		}
 		job.PayloadData = payload
-		
+
 	case JobTypeStatsUpdate:
 		var payload StatsUpdateJobPayload
 		if err := json.Unmarshal(job.Payload, &payload); err != nil {

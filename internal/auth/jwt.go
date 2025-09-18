@@ -6,9 +6,10 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/golang-jwt/jwt/v5"
 	"korus/internal/config"
 	"korus/internal/models"
+
+	"github.com/golang-jwt/jwt/v5"
 )
 
 type TokenPair struct {

@@ -65,7 +65,7 @@ func (p *LRCParser) Parse(reader io.Reader) (*LRCDocument, error) {
 	for scanner.Scan() {
 		lineNumber++
 		line := strings.TrimSpace(scanner.Text())
-		
+
 		// Skip empty lines
 		if line == "" {
 			continue
@@ -88,7 +88,7 @@ func (p *LRCParser) Parse(reader io.Reader) (*LRCDocument, error) {
 			// This looks like an unrecognized tag, skip it
 			continue
 		}
-		
+
 		// Plain text line without timestamp - include it with time 0
 		doc.Lines = append(doc.Lines, LRCLine{
 			Time:    0,
@@ -179,27 +179,27 @@ func (doc *LRCDocument) ToJSON() (string, error) {
 	// We can use the struct tags to marshal to JSON
 	// For now, return a simple JSON representation
 	var result strings.Builder
-	
+
 	result.WriteString("{")
-	result.WriteString(fmt.Sprintf(`"metadata":{"title":"%s","artist":"%s","album":"%s","by":"%s","offset":%d,"length":"%s","language":"%s"},`, 
-		escapeJSON(doc.Metadata.Title), 
-		escapeJSON(doc.Metadata.Artist), 
-		escapeJSON(doc.Metadata.Album), 
-		escapeJSON(doc.Metadata.By), 
-		doc.Metadata.Offset, 
-		escapeJSON(doc.Metadata.Length), 
+	result.WriteString(fmt.Sprintf(`"metadata":{"title":"%s","artist":"%s","album":"%s","by":"%s","offset":%d,"length":"%s","language":"%s"},`,
+		escapeJSON(doc.Metadata.Title),
+		escapeJSON(doc.Metadata.Artist),
+		escapeJSON(doc.Metadata.Album),
+		escapeJSON(doc.Metadata.By),
+		doc.Metadata.Offset,
+		escapeJSON(doc.Metadata.Length),
 		escapeJSON(doc.Metadata.Language)))
-	
+
 	result.WriteString(`"lines":[`)
 	for i, line := range doc.Lines {
 		if i > 0 {
 			result.WriteString(",")
 		}
-		result.WriteString(fmt.Sprintf(`{"time":%d,"timeStr":"%s","text":"%s"}`, 
+		result.WriteString(fmt.Sprintf(`{"time":%d,"timeStr":"%s","text":"%s"}`,
 			line.Time, line.TimeStr, escapeJSON(line.Text)))
 	}
 	result.WriteString("]}")
-	
+
 	return result.String(), nil
 }
 
@@ -263,7 +263,7 @@ func (doc *LRCDocument) detectLanguageFromContent() string {
 			textBuilder.WriteString(" ")
 		}
 	}
-	
+
 	text := strings.TrimSpace(textBuilder.String())
 	if text == "" {
 		return "eng" // Default fallback
@@ -285,7 +285,7 @@ func (doc *LRCDocument) detectLanguageFromContent() string {
 		lingua.Italian,
 		lingua.Russian,
 	}
-	
+
 	detector := lingua.NewLanguageDetectorBuilder().
 		FromLanguages(languages...).
 		WithMinimumRelativeDistance(0.9).

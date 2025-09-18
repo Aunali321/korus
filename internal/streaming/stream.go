@@ -84,13 +84,13 @@ func (s *StreamingService) StreamSong(c *gin.Context) {
 
 	// Set content type based on file extension
 	contentType := getContentType(song.FilePath)
-	
+
 	// Set basic headers
 	c.Header("Content-Type", contentType)
 	c.Header("Accept-Ranges", "bytes")
 	c.Header("Last-Modified", lastModified.Format(http.TimeFormat))
 	c.Header("Cache-Control", "public, max-age=31536000") // Cache for 1 year
-	
+
 	// Handle conditional requests
 	if checkNotModified(c, lastModified) {
 		c.Status(http.StatusNotModified)
@@ -144,10 +144,9 @@ func (s *StreamingService) StreamSong(c *gin.Context) {
 	io.CopyN(c.Writer, file, contentLength)
 }
 
-
 func getContentType(filePath string) string {
 	ext := strings.ToLower(filepath.Ext(filePath))
-	
+
 	switch ext {
 	case ".mp3":
 		return "audio/mpeg"
@@ -202,19 +201,19 @@ func parseRangeHeader(rangeHeader string, fileSize int64) ([]rangeSpec, error) {
 
 	for _, r := range ranges {
 		r = strings.TrimSpace(r)
-		
+
 		if strings.HasPrefix(r, "-") {
 			// Suffix range: -500 means last 500 bytes
 			suffixLength, err := strconv.ParseInt(r[1:], 10, 64)
 			if err != nil || suffixLength <= 0 || suffixLength > fileSize {
 				return nil, fmt.Errorf("invalid suffix range")
 			}
-			
+
 			start := fileSize - suffixLength
 			if start < 0 {
 				start = 0
 			}
-			
+
 			parsedRanges = append(parsedRanges, rangeSpec{
 				start: start,
 				end:   fileSize - 1,
@@ -225,7 +224,7 @@ func parseRangeHeader(rangeHeader string, fileSize int64) ([]rangeSpec, error) {
 			if err != nil || start < 0 || start >= fileSize {
 				return nil, fmt.Errorf("invalid prefix range")
 			}
-			
+
 			parsedRanges = append(parsedRanges, rangeSpec{
 				start: start,
 				end:   fileSize - 1,
@@ -236,17 +235,17 @@ func parseRangeHeader(rangeHeader string, fileSize int64) ([]rangeSpec, error) {
 			if len(parts) != 2 {
 				return nil, fmt.Errorf("invalid range format")
 			}
-			
+
 			start, err := strconv.ParseInt(parts[0], 10, 64)
 			if err != nil || start < 0 {
 				return nil, fmt.Errorf("invalid range start")
 			}
-			
+
 			end, err := strconv.ParseInt(parts[1], 10, 64)
 			if err != nil || end < start || end >= fileSize {
 				return nil, fmt.Errorf("invalid range end")
 			}
-			
+
 			parsedRanges = append(parsedRanges, rangeSpec{
 				start: start,
 				end:   end,

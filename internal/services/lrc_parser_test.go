@@ -22,7 +22,7 @@ func TestLRCParser_Parse(t *testing.T) {
 
 	parser := NewLRCParser()
 	doc, err := parser.Parse(strings.NewReader(lrcContent))
-	
+
 	if err != nil {
 		t.Fatalf("Failed to parse LRC: %v", err)
 	}

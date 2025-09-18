@@ -68,36 +68,36 @@ func main() {
 		log.Fatal("Failed to initialize search service:", err)
 	}
 	defer searchService.Close()
-	
+
 	streamingService := streaming.NewStreamingService(libraryService)
-	
+
 	// Initialize job system
 	workerPool := jobs.NewWorkerPool(cfg.Library.ScanWorkers, db)
-	
+
 	// Create queue adapter inline to avoid import cycles
 	queueAdapter := &queueAdapter{queue: workerPool.GetQueue()}
 	scannerInstance, err := scanner.NewScanner(db, queueAdapter, &cfg.Library)
 	if err != nil {
 		log.Fatal("Failed to initialize scanner:", err)
 	}
-	
+
 	// Register job handlers
 	scannerAdapter := jobs.NewScannerAdapter(scannerInstance)
 	batchMetadataService := services.NewBatchMetadataService(db)
-	
+
 	workerPool.RegisterHandler(jobs.JobTypeMetadataExtract, jobs.NewMetadataExtractionHandler(metadataService))
 	workerPool.RegisterHandler(jobs.JobTypeMetadataExtractBatch, jobs.NewBatchMetadataExtractionHandler(batchMetadataService))
 	workerPool.RegisterHandler(jobs.JobTypeScan, jobs.NewScanHandler(scannerAdapter))
 	workerPool.RegisterHandler(jobs.JobTypeCleanup, jobs.NewCleanupHandler())
 	workerPool.RegisterHandler(jobs.JobTypeStatsUpdate, jobs.NewStatsUpdateHandler())
-	
+
 	// Start worker pool and scanner
 	ctx := context.Background()
 	if err := workerPool.Start(ctx); err != nil {
 		log.Fatal("Failed to start worker pool:", err)
 	}
 	defer workerPool.Stop()
-	
+
 	if err := scannerInstance.Start(ctx); err != nil {
 		log.Fatal("Failed to start file scanner:", err)
 	}
@@ -139,7 +139,7 @@ func main() {
 	go func() {
 		fmt.Printf("🎵 Korus server starting on %s:%d\n", cfg.Server.Host, cfg.Server.Port)
 		fmt.Printf("Environment: %s\n", cfg.Server.Environment)
-		
+
 		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			log.Fatal("Failed to start server:", err)
 		}
@@ -193,7 +193,7 @@ func setupRouter(cfg *config.Config, authService *auth.Service, healthHandler *h
 		protected.Use(middleware.AuthRequired(authService))
 		{
 			protected.GET("/me", authHandler.Me)
-			
+
 			// Library endpoints
 			protected.GET("/library/stats", libraryHandler.GetStats)
 			protected.GET("/artists", libraryHandler.GetArtists)
@@ -203,10 +203,10 @@ func setupRouter(cfg *config.Config, authService *auth.Service, healthHandler *h
 			protected.GET("/songs", libraryHandler.GetSongs)
 			protected.GET("/songs/:id", libraryHandler.GetSong)
 			protected.GET("/search", libraryHandler.Search)
-			
+
 			// Streaming endpoints
 			protected.GET("/songs/:id/stream", streamingService.StreamSong)
-			
+
 			// Playlist endpoints
 			protected.GET("/playlists", playlistHandler.GetUserPlaylists)
 			protected.POST("/playlists", playlistHandler.CreatePlaylist)
@@ -216,7 +216,7 @@ func setupRouter(cfg *config.Config, authService *auth.Service, healthHandler *h
 			protected.POST("/playlists/:id/songs", playlistHandler.AddSongsToPlaylist)
 			protected.PUT("/playlists/:id/songs/reorder", playlistHandler.ReorderPlaylistSongs)
 			protected.DELETE("/playlists/:id/songs", playlistHandler.RemoveSongsFromPlaylist)
-			
+
 			// User library endpoints
 			protected.GET("/me/library/songs", userLibraryHandler.GetLikedSongs)
 			protected.GET("/me/library/albums", userLibraryHandler.GetLikedAlbums)
@@ -227,13 +227,13 @@ func setupRouter(cfg *config.Config, authService *auth.Service, healthHandler *h
 			protected.DELETE("/albums/:id/like", userLibraryHandler.UnlikeAlbum)
 			protected.POST("/artists/:id/follow", userLibraryHandler.FollowArtist)
 			protected.DELETE("/artists/:id/follow", userLibraryHandler.UnfollowArtist)
-			
+
 			// History and stats endpoints
 			protected.POST("/me/history/scrobble", historyHandler.Scrobble)
 			protected.GET("/me/history/recent", historyHandler.GetRecentHistory)
 			protected.GET("/me/stats", historyHandler.GetUserStats)
 			protected.GET("/me/home", historyHandler.GetHomeData)
-			
+
 			// Admin endpoints
 			admin := protected.Group("")
 			admin.Use(middleware.AdminRequired())
@@ -250,7 +250,7 @@ func setupRouter(cfg *config.Config, authService *auth.Service, healthHandler *h
 
 	// Serve static files (covers are always available)
 	router.Static("/static", "./static")
-	
+
 	// Serve cover images specifically
 	router.Static("/covers", "./static/covers")
 
@@ -259,17 +259,17 @@ func setupRouter(cfg *config.Config, authService *auth.Service, healthHandler *h
 
 func createInitialAdminUser(authService *auth.Service, cfg *config.Config) error {
 	ctx := context.Background()
-	
+
 	// Check if any users exist
 	hasUsers, err := authService.HasUsers(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to check if users exist: %w", err)
 	}
-	
+
 	if hasUsers {
 		return nil // Users already exist, no need to create admin
 	}
-	
+
 	// Generate secure password if not provided
 	adminPassword := cfg.Auth.AdminPassword
 	if adminPassword == "" {
@@ -278,19 +278,19 @@ func createInitialAdminUser(authService *auth.Service, cfg *config.Config) error
 			return fmt.Errorf("failed to generate admin password: %w", err)
 		}
 	}
-	
+
 	// Create admin user
 	user, err := authService.CreateAdminUser(ctx, cfg.Auth.AdminUsername, adminPassword)
 	if err != nil {
 		return fmt.Errorf("failed to create admin user: %w", err)
 	}
-	
+
 	// Print admin credentials (only on first run)
 	fmt.Println("====================KORUS INITIAL SETUP====================")
 	fmt.Println("ADMIN ACCOUNT CREATED:")
 	fmt.Printf("Username: %s\n", user.Username)
 	fmt.Printf("Password: %s (Securely generated - change immediately)\n", adminPassword)
 	fmt.Println("==========================================================")
-	
+
 	return nil
 }

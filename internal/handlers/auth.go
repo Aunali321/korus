@@ -153,12 +153,5 @@ func (h *AuthHandler) Me(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"id":        user.ID,
-		"username":  user.Username,
-		"email":     user.Email,
-		"role":      user.Role,
-		"createdAt": user.CreatedAt,
-		"lastLogin": user.LastLogin,
-	})
+	c.JSON(http.StatusOK, user)
 }

@@ -102,8 +102,8 @@ func (h *AdminHandler) CleanupJobs(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{
-		"message":        "Jobs cleanup completed",
-		"deleted_count":  deletedCount,
+		"message":         "Jobs cleanup completed",
+		"deleted_count":   deletedCount,
 		"older_than_days": days,
 	})
 }

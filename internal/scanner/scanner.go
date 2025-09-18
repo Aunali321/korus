@@ -39,12 +39,12 @@ type Debouncer struct {
 }
 
 type ScanResult struct {
-	FilesFound    int
-	FilesAdded    int
-	FilesUpdated  int
-	FilesRemoved  int
-	Duration      time.Duration
-	Errors        []error
+	FilesFound   int
+	FilesAdded   int
+	FilesUpdated int
+	FilesRemoved int
+	Duration     time.Duration
+	Errors       []error
 }
 
 func NewScanner(db *database.DB, jobQueue JobQueue, config *config.LibraryConfig) (*Scanner, error) {
@@ -96,11 +96,11 @@ func (s *Scanner) Start(ctx context.Context) error {
 func (s *Scanner) Stop() {
 	close(s.stopCh)
 	s.wg.Wait()
-	
+
 	if s.watcher != nil {
 		s.watcher.Close()
 	}
-	
+
 	log.Println("File scanner stopped")
 }
 
@@ -108,7 +108,7 @@ func (s *Scanner) ScanLibrary(ctx context.Context, force bool) (*ScanResult, err
 	start := time.Now()
 	result := &ScanResult{}
 
-	log.Printf("Starting %s library scan of %s", 
+	log.Printf("Starting %s library scan of %s",
 		func() string {
 			if force {
 				return "full"
@@ -144,7 +144,7 @@ func (s *Scanner) ScanLibrary(ctx context.Context, force bool) (*ScanResult, err
 		}
 
 		result.FilesFound++
-		
+
 		// Log progress every 100 files
 		if result.FilesFound%100 == 0 {
 			log.Printf("📊 Found %d audio files so far...", result.FilesFound)
@@ -200,7 +200,7 @@ func (s *Scanner) ScanLibrary(ctx context.Context, force bool) (*ScanResult, err
 	}
 
 	result.Duration = time.Since(start)
-	log.Printf("Library scan completed in %v: %d files found, %d to process, %d removed", 
+	log.Printf("Library scan completed in %v: %d files found, %d to process, %d removed",
 		result.Duration, result.FilesFound, result.FilesAdded, result.FilesRemoved)
 
 	return result, nil
@@ -329,8 +329,8 @@ func (s *Scanner) shouldHandleEvent(event fsnotify.Event) bool {
 
 	// Only handle create, write, and remove events
 	return event.Op&fsnotify.Create == fsnotify.Create ||
-		   event.Op&fsnotify.Write == fsnotify.Write ||
-		   event.Op&fsnotify.Remove == fsnotify.Remove
+		event.Op&fsnotify.Write == fsnotify.Write ||
+		event.Op&fsnotify.Remove == fsnotify.Remove
 }
 
 func (s *Scanner) isSupportedAudioFile(path string) bool {
@@ -359,7 +359,7 @@ func (s *Scanner) shouldProcessFile(ctx context.Context, path string, info os.Fi
 	// Check if file exists in database and if it's been modified
 	query := "SELECT file_modified FROM songs WHERE file_path = $1"
 	var dbModified time.Time
-	
+
 	err := s.db.QueryRowContext(ctx, query, path).Scan(&dbModified)
 	if err != nil {
 		// File not in database, should process
@@ -416,7 +416,7 @@ func (d *Debouncer) debounce(key string) {
 		d.mu.Lock()
 		delete(d.pending, key)
 		d.mu.Unlock()
-		
+
 		d.callback(key)
 	})
 }

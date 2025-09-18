@@ -49,7 +49,7 @@ func NewWorker(id int, queue *Queue) *Worker {
 
 func NewWorkerPool(workerCount int, db *database.DB) *WorkerPool {
 	queue := NewQueue(db)
-	
+
 	return &WorkerPool{
 		workers:     make([]*Worker, workerCount),
 		queue:       queue,
@@ -75,7 +75,7 @@ func (w *Worker) Stop() {
 
 func (w *Worker) run(ctx context.Context) {
 	defer w.wg.Done()
-	
+
 	log.Printf("Worker %d started", w.id)
 	defer log.Printf("Worker %d stopped", w.id)
 
@@ -135,12 +135,12 @@ func (w *Worker) processJob(ctx context.Context) error {
 
 	if err != nil {
 		log.Printf("Worker %d job %d failed after %v: %v", w.id, job.ID, duration, err)
-		
+
 		// Retry job up to 3 times
 		if job.Attempts < 3 {
 			return w.queue.Retry(ctx, job.ID, 3)
 		}
-		
+
 		return w.queue.Fail(ctx, job.ID, err.Error())
 	}
 
@@ -158,12 +158,12 @@ func (wp *WorkerPool) Start(ctx context.Context) error {
 	// Create and start workers
 	for i := 0; i < wp.workerCount; i++ {
 		worker := NewWorker(i+1, wp.queue)
-		
+
 		// Register all handlers with each worker
 		for jobType, handler := range wp.handlers {
 			worker.RegisterHandler(jobType, handler)
 		}
-		
+
 		wp.workers[i] = worker
 		worker.Start(ctx)
 	}
@@ -177,7 +177,7 @@ func (wp *WorkerPool) Start(ctx context.Context) error {
 
 func (wp *WorkerPool) Stop() {
 	log.Println("Stopping worker pool...")
-	
+
 	close(wp.stopCh)
 
 	// Stop all workers
@@ -199,7 +199,7 @@ func (wp *WorkerPool) GetQueue() *Queue {
 
 func (wp *WorkerPool) cleanupRoutine(ctx context.Context) {
 	defer wp.wg.Done()
-	
+
 	ticker := time.NewTicker(1 * time.Hour) // Cleanup every hour
 	defer ticker.Stop()
 
@@ -227,12 +227,12 @@ func (wp *WorkerPool) StartNotificationListener(ctx context.Context, db *databas
 	wp.wg.Add(1)
 	go func() {
 		defer wp.wg.Done()
-		
+
 		if err := wp.listenForJobNotifications(ctx, db); err != nil {
 			log.Printf("Notification listener error: %v", err)
 		}
 	}()
-	
+
 	return nil
 }
 

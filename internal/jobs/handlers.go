@@ -61,7 +61,7 @@ func (h *BatchMetadataExtractionHandler) Handle(ctx context.Context, job *Job) e
 		return fmt.Errorf("failed to process metadata batch: %w", err)
 	}
 
-	log.Printf("Batch processing completed: %d processed, %d success, %d errors in %v", 
+	log.Printf("Batch processing completed: %d processed, %d success, %d errors in %v",
 		result.ProcessedCount, result.SuccessCount, result.ErrorCount, result.Duration)
 
 	// Log batch errors but don't fail the job
@@ -73,12 +73,12 @@ func (h *BatchMetadataExtractionHandler) Handle(ctx context.Context, job *Job) e
 }
 
 type ScanResult struct {
-	FilesFound    int
-	FilesAdded    int
-	FilesUpdated  int
-	FilesRemoved  int
-	Duration      time.Duration
-	Errors        []error
+	FilesFound   int
+	FilesAdded   int
+	FilesUpdated int
+	FilesRemoved int
+	Duration     time.Duration
+	Errors       []error
 }
 
 type ScanHandler struct {
@@ -99,7 +99,7 @@ func (h *ScanHandler) Handle(ctx context.Context, job *Job) error {
 		return fmt.Errorf("invalid payload type for scan job")
 	}
 
-	log.Printf("Starting library scan: path=%s, recursive=%t, force=%t", 
+	log.Printf("Starting library scan: path=%s, recursive=%t, force=%t",
 		payload.Path, payload.Recursive, payload.Force)
 
 	// Perform scan
@@ -108,7 +108,7 @@ func (h *ScanHandler) Handle(ctx context.Context, job *Job) error {
 		return fmt.Errorf("scan failed: %w", err)
 	}
 
-	log.Printf("Scan completed: %d files found, %d added, %d updated, %d removed, %d errors", 
+	log.Printf("Scan completed: %d files found, %d added, %d updated, %d removed, %d errors",
 		result.FilesFound, result.FilesAdded, result.FilesUpdated, result.FilesRemoved, len(result.Errors))
 
 	// Log any errors but don't fail the job

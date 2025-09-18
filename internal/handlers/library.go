@@ -80,7 +80,7 @@ func (h *LibraryHandler) GetAlbums(c *gin.Context) {
 	limit := parseIntParam(c, "limit", 50)
 	offset := parseIntParam(c, "offset", 0)
 	sort := c.DefaultQuery("sort", "artist")
-	
+
 	var year *int
 	if yearStr := c.Query("year"); yearStr != "" {
 		if y, err := strconv.Atoi(yearStr); err == nil {
@@ -122,16 +122,15 @@ func (h *LibraryHandler) GetAlbum(c *gin.Context) {
 	c.JSON(http.StatusOK, album)
 }
 
-
 func (h *LibraryHandler) GetSongs(c *gin.Context) {
 	idsParam := c.Query("ids")
-	
+
 	// If ids parameter is provided, do batch fetch
 	if idsParam != "" {
 		// Parse comma-separated IDs
 		idStrings := strings.Split(idsParam, ",")
 		ids := make([]int, 0, len(idStrings))
-		
+
 		for _, idStr := range idStrings {
 			if id, err := strconv.Atoi(strings.TrimSpace(idStr)); err == nil {
 				ids = append(ids, id)

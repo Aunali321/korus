@@ -25,16 +25,16 @@ services:
       JWT_SECRET: ${JWT_SECRET:-generate-a-secure-jwt-secret-key}
       ADMIN_USERNAME: ${ADMIN_USERNAME:-admin}
       ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}
-      MUSIC_DIR: /home/aun/Programming/Projects/Scripts/ytm-exporter/music_downloads
+      MUSIC_DIR: /music
       CACHE_DIR: /cache
       ENVIRONMENT: ${ENVIRONMENT:-production}
       SERVER_HOST: 0.0.0.0
-      SERVER_PORT: 3000
+      SERVER_PORT: ${SERVER_PORT:-3000}
     volumes:
-      - ${MUSIC_PATH:-./music}:/music:ro
+      - ${MUSIC_DIR:-./music}:/music:ro
       - cache_data:/cache
     ports:
-      - "${PORT:-3000}:3000"
+      - "${SERVER_PORT:-3000}:3000"
     depends_on:
       postgres:
         condition: service_healthy

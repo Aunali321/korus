@@ -52,7 +52,7 @@ func (as *AdminService) GetSystemStatus(ctx context.Context) (map[string]interfa
 
 	// Get library statistics
 	libraryStats := make(map[string]interface{})
-	
+
 	// Get total counts
 	countsQuery := `
 		SELECT 

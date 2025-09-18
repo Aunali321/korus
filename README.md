@@ -45,7 +45,7 @@ export POSTGRES_PASSWORD=$(openssl rand -base64 32)
 export JWT_SECRET=$(openssl rand -base64 32)
 
 # Set your music library path
-export MUSIC_PATH=/path/to/your/music/library
+export MUSIC_DIR=/path/to/your/music/library
 ```
 
 4. Start the services:

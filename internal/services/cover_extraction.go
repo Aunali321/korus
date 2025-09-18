@@ -69,15 +69,15 @@ func (ce *CoverExtractor) ExtractEmbeddedCover(filePath string) (string, error) 
 // ScanForExternalCover looks for common cover art files in the same directory as the audio file
 func (ce *CoverExtractor) ScanForExternalCover(audioFilePath string) (string, error) {
 	dir := filepath.Dir(audioFilePath)
-	
+
 	// Common cover art filenames (in order of preference)
 	coverNames := []string{
 		"cover", "folder", "front", "albumart", "album",
 	}
-	
+
 	// Supported image extensions including WebP
 	extensions := []string{".jpg", ".jpeg", ".png", ".webp", ".gif"}
-	
+
 	// Search for cover files
 	for _, name := range coverNames {
 		for _, ext := range extensions {
@@ -87,7 +87,7 @@ func (ce *CoverExtractor) ScanForExternalCover(audioFilePath string) (string, er
 			}
 		}
 	}
-	
+
 	return "", fmt.Errorf("no external cover art found")
 }
 
@@ -95,10 +95,10 @@ func (ce *CoverExtractor) ScanForExternalCover(audioFilePath string) (string, er
 func (ce *CoverExtractor) ScanForSongSpecificCover(audioFilePath string) (string, error) {
 	dir := filepath.Dir(audioFilePath)
 	baseName := ce.getFileBaseName(audioFilePath)
-	
-	// Supported image extensions including WebP  
+
+	// Supported image extensions including WebP
 	extensions := []string{".jpg", ".jpeg", ".png", ".webp", ".gif"}
-	
+
 	// Look for song-specific cover (same name as audio file)
 	for _, ext := range extensions {
 		coverFile := filepath.Join(dir, baseName+ext)
@@ -106,7 +106,7 @@ func (ce *CoverExtractor) ScanForSongSpecificCover(audioFilePath string) (string
 			return ce.copyCoverToStatic(coverFile)
 		}
 	}
-	
+
 	return "", fmt.Errorf("no song-specific cover art found")
 }
 
@@ -175,23 +175,23 @@ func (ce *CoverExtractor) isValidImageData(data []byte) bool {
 	if data[0] == 0xFF && data[1] == 0xD8 {
 		return true
 	}
-	
+
 	// PNG: 89 50 4E 47
 	if len(data) >= 8 && data[0] == 0x89 && data[1] == 0x50 && data[2] == 0x4E && data[3] == 0x47 {
 		return true
 	}
-	
+
 	// WebP: 52 49 46 46 (RIFF) ... 57 45 42 50 (WEBP)
-	if len(data) >= 12 && 
+	if len(data) >= 12 &&
 		data[0] == 0x52 && data[1] == 0x49 && data[2] == 0x46 && data[3] == 0x46 &&
 		data[8] == 0x57 && data[9] == 0x45 && data[10] == 0x42 && data[11] == 0x50 {
 		return true
 	}
-	
+
 	// GIF87a or GIF89a
-	if len(data) >= 6 && 
+	if len(data) >= 6 &&
 		((data[0] == 0x47 && data[1] == 0x49 && data[2] == 0x46 && data[3] == 0x38 && data[4] == 0x37 && data[5] == 0x61) ||
-		 (data[0] == 0x47 && data[1] == 0x49 && data[2] == 0x46 && data[3] == 0x38 && data[4] == 0x39 && data[5] == 0x61)) {
+			(data[0] == 0x47 && data[1] == 0x49 && data[2] == 0x46 && data[3] == 0x38 && data[4] == 0x39 && data[5] == 0x61)) {
 		return true
 	}
 

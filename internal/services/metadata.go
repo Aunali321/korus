@@ -36,8 +36,8 @@ type ExtractedMetadata struct {
 	FilePath     string
 	FileSize     int64
 	FileModified time.Time
-	CoverURL     string             // URL for cover image
-	Lyrics       []ExtractedLyrics  // Extracted lyrics data
+	CoverURL     string            // URL for cover image
+	Lyrics       []ExtractedLyrics // Extracted lyrics data
 }
 
 type ExtractedLyrics struct {
@@ -665,4 +665,3 @@ func (ms *MetadataService) extractTxtFile(audioFilePath string) *ExtractedLyrics
 		Language: "eng", // Default to English
 	}
 }
-

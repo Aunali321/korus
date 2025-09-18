@@ -91,7 +91,7 @@ func (bms *BatchMetadataService) storeBatchMetadata(ctx context.Context, metadat
 			if metadata.AlbumArtist != "" && metadata.AlbumArtist != metadata.Artist {
 				artistMap[strings.ToLower(metadata.AlbumArtist)] = true
 			}
-			
+
 			albumKeyName := strings.ToLower(metadata.Album)
 			if existingAlbum, exists := albumMap[albumKeyName]; exists {
 				// Keep existing cover if it exists, otherwise use this song's cover
@@ -316,7 +316,7 @@ func (bms *BatchMetadataService) insertSong(ctx context.Context, tx pgx.Tx, meta
 		metadata.Duration, metadata.FilePath, metadata.FileSize, metadata.FileModified,
 		metadata.Bitrate, metadata.Format, nullString(metadata.CoverURL),
 	).Scan(&songID)
-	
+
 	if err != nil {
 		return err
 	}

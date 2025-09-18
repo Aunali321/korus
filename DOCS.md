@@ -38,7 +38,7 @@ export POSTGRES_PASSWORD=$(openssl rand -base64 32)
 export JWT_SECRET=$(openssl rand -base64 32)
 
 # Set music library path
-export MUSIC_PATH=/path/to/your/music
+export MUSIC_DIR=/path/to/your/music
 
 # Start services
 docker-compose up -d
@@ -66,12 +66,12 @@ Both services include comprehensive health checks:
 |----------|-------------|---------|
 | `POSTGRES_PASSWORD` | Database password | Generated with `openssl rand -base64 32` |
 | `JWT_SECRET` | JWT signing secret | Generated with `openssl rand -base64 32` |
-| `MUSIC_PATH` | Host path to music library | `/home/user/Music` |
+| `MUSIC_DIR` | Host path to music library | `/home/user/Music` |
 
 ### Optional Environment Variables
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `PORT` | `3000` | HTTP server port |
+| `SERVER_PORT` | `3000` | HTTP server port |
 | `ENVIRONMENT` | `production` | Runtime environment |
 | `ADMIN_USERNAME` | `admin` | Initial admin username |
 | `ADMIN_PASSWORD` | Generated | Initial admin password |
