@@ -69,6 +69,16 @@ type Song struct {
 	Lyrics       []Lyrics  `json:"lyrics,omitempty"`
 }
 
+type SongEmbedding struct {
+	SongID    int       `json:"songId" db:"song_id"`
+	Embedding []float32 `json:"embedding" db:"embedding"`
+	Dim       int16     `json:"dim" db:"dim"`
+	Segments  int16     `json:"segments" db:"segments"`
+	Method    string    `json:"method" db:"method"`
+	Model     string    `json:"model" db:"model"`
+	UpdatedAt time.Time `json:"updatedAt" db:"updated_at"`
+}
+
 type Lyrics struct {
 	ID        int       `json:"id" db:"id"`
 	SongID    int       `json:"song_id" db:"song_id"`

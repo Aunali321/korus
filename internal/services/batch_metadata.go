@@ -23,6 +23,12 @@ type BatchResult struct {
 	ErrorCount     int
 	Errors         []error
 	Duration       time.Duration
+	SuccessFiles   []ProcessedSong
+}
+
+type ProcessedSong struct {
+	SongID   int
+	FilePath string
 }
 
 func NewBatchMetadataService(db *database.DB) *BatchMetadataService {
@@ -36,6 +42,7 @@ func (bms *BatchMetadataService) ProcessBatch(ctx context.Context, filePaths []s
 	start := time.Now()
 	result := &BatchResult{
 		ProcessedCount: len(filePaths),
+		SuccessFiles:   make([]ProcessedSong, 0, len(filePaths)),
 	}
 
 	log.Printf("🚀 Starting batch processing of %d files", len(filePaths))
@@ -137,7 +144,7 @@ func (bms *BatchMetadataService) storeBatchMetadata(ctx context.Context, metadat
 		log.Printf("🎵 Inserting %d songs...", len(metadataList))
 		successCount := 0
 		for i, metadata := range metadataList {
-			err := bms.insertSong(ctx, tx, metadata, artistIDs, albumIDs)
+			songID, err := bms.insertSong(ctx, tx, metadata, artistIDs, albumIDs)
 			if err != nil {
 				log.Printf("❌ Failed to insert song [%d/%d] %s: %v", i+1, len(metadataList), metadata.Title, err)
 				result.Errors = append(result.Errors, fmt.Errorf("failed to insert song %s: %w", metadata.FilePath, err))
@@ -145,6 +152,7 @@ func (bms *BatchMetadataService) storeBatchMetadata(ctx context.Context, metadat
 				continue
 			}
 			successCount++
+			result.SuccessFiles = append(result.SuccessFiles, ProcessedSong{SongID: songID, FilePath: metadata.FilePath})
 		}
 
 		log.Printf("✅ Successfully inserted %d/%d songs", successCount, len(metadataList))
@@ -277,15 +285,15 @@ func (bms *BatchMetadataService) batchUpsertAlbums(ctx context.Context, tx pgx.T
 	return result, nil
 }
 
-func (bms *BatchMetadataService) insertSong(ctx context.Context, tx pgx.Tx, metadata *ExtractedMetadata, artistIDs map[string]int, albumIDs map[string]int) error {
+func (bms *BatchMetadataService) insertSong(ctx context.Context, tx pgx.Tx, metadata *ExtractedMetadata, artistIDs map[string]int, albumIDs map[string]int) (int, error) {
 	artistID, exists := artistIDs[strings.ToLower(metadata.Artist)]
 	if !exists {
-		return fmt.Errorf("artist not found: %s", metadata.Artist)
+		return 0, fmt.Errorf("artist not found: %s", metadata.Artist)
 	}
 
 	albumID, exists := albumIDs[strings.ToLower(metadata.Album)]
 	if !exists {
-		return fmt.Errorf("album not found: %s", metadata.Album)
+		return 0, fmt.Errorf("album not found: %s", metadata.Album)
 	}
 
 	query := `
@@ -318,7 +326,7 @@ func (bms *BatchMetadataService) insertSong(ctx context.Context, tx pgx.Tx, meta
 	).Scan(&songID)
 
 	if err != nil {
-		return err
+		return 0, err
 	}
 
 	// Store lyrics if any were extracted
@@ -326,12 +334,12 @@ func (bms *BatchMetadataService) insertSong(ctx context.Context, tx pgx.Tx, meta
 		log.Printf("💾 Batch storing %d lyrics entries for song ID %d", len(metadata.Lyrics), songID)
 		err = bms.storeLyrics(ctx, tx, songID, metadata.Lyrics)
 		if err != nil {
-			return fmt.Errorf("failed to store lyrics in batch: %w", err)
+			return 0, fmt.Errorf("failed to store lyrics in batch: %w", err)
 		}
 		log.Printf("✅ Successfully stored lyrics in batch for song ID %d", songID)
 	}
 
-	return nil
+	return songID, nil
 }
 
 // storeLyrics stores lyrics data for a song (reused from MetadataService)

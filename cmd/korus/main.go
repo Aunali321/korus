@@ -63,6 +63,14 @@ func main() {
 	authService := auth.NewService(db, tokenManager)
 	libraryService := services.NewLibraryService(db)
 	metadataService := services.NewMetadataService(db)
+	embeddingService, err := services.NewEmbeddingService(db, &cfg.Recommender)
+	if err != nil {
+		log.Fatal("Failed to initialize embedding service:", err)
+	}
+	recommenderService, err := services.NewRecommenderService(db, &cfg.Recommender)
+	if err != nil {
+		log.Fatal("Failed to initialize recommender service:", err)
+	}
 	searchService, err := search.NewSearchService(db, &cfg.Library)
 	if err != nil {
 		log.Fatal("Failed to initialize search service:", err)
@@ -85,9 +93,13 @@ func main() {
 	scannerAdapter := jobs.NewScannerAdapter(scannerInstance)
 	batchMetadataService := services.NewBatchMetadataService(db)
 
+	queue := workerPool.GetQueue()
 	workerPool.RegisterHandler(jobs.JobTypeMetadataExtract, jobs.NewMetadataExtractionHandler(metadataService))
 	workerPool.RegisterHandler(jobs.JobTypeMetadataExtractBatch, jobs.NewBatchMetadataExtractionHandler(batchMetadataService))
-	workerPool.RegisterHandler(jobs.JobTypeScan, jobs.NewScanHandler(scannerAdapter))
+	workerPool.RegisterHandler(jobs.JobTypeEmbeddingExtract, jobs.NewEmbeddingExtractionHandler(embeddingService, recommenderService))
+	workerPool.RegisterHandler(jobs.JobTypeEmbeddingExtractBatch, jobs.NewBatchEmbeddingExtractionHandler(embeddingService, recommenderService))
+	workerPool.RegisterHandler(jobs.JobTypeEmbeddingBatchCreator, jobs.NewEmbeddingBatchHandler(db, queue, cfg.Recommender.CleanupBatchSize, embeddingService, recommenderService))
+	workerPool.RegisterHandler(jobs.JobTypeScan, jobs.NewScanHandler(scannerAdapter, queue, embeddingService.Enabled(), cfg.Recommender.CleanupBatchSize))
 	workerPool.RegisterHandler(jobs.JobTypeCleanup, jobs.NewCleanupHandler())
 	workerPool.RegisterHandler(jobs.JobTypeStatsUpdate, jobs.NewStatsUpdateHandler())
 
@@ -122,9 +134,10 @@ func main() {
 	userLibraryHandler := handlers.NewUserLibraryHandler(userLibraryService)
 	historyHandler := handlers.NewHistoryHandler(historyService)
 	adminHandler := handlers.NewAdminHandler(adminService)
+	recommendHandler := handlers.NewRecommendHandler(recommenderService, &cfg.Recommender)
 
 	// Setup router
-	router := setupRouter(cfg, authService, healthHandler, authHandler, libraryHandler, playlistHandler, userLibraryHandler, historyHandler, adminHandler, streamingService)
+	router := setupRouter(cfg, authService, healthHandler, authHandler, libraryHandler, playlistHandler, userLibraryHandler, historyHandler, adminHandler, recommendHandler, streamingService)
 
 	// Setup HTTP server
 	server := &http.Server{
@@ -163,7 +176,7 @@ func main() {
 	fmt.Println("✅ Server shutdown complete")
 }
 
-func setupRouter(cfg *config.Config, authService *auth.Service, healthHandler *handlers.HealthHandler, authHandler *handlers.AuthHandler, libraryHandler *handlers.LibraryHandler, playlistHandler *handlers.PlaylistHandler, userLibraryHandler *handlers.UserLibraryHandler, historyHandler *handlers.HistoryHandler, adminHandler *handlers.AdminHandler, streamingService *streaming.StreamingService) *gin.Engine {
+func setupRouter(cfg *config.Config, authService *auth.Service, healthHandler *handlers.HealthHandler, authHandler *handlers.AuthHandler, libraryHandler *handlers.LibraryHandler, playlistHandler *handlers.PlaylistHandler, userLibraryHandler *handlers.UserLibraryHandler, historyHandler *handlers.HistoryHandler, adminHandler *handlers.AdminHandler, recommendHandler *handlers.RecommendHandler, streamingService *streaming.StreamingService) *gin.Engine {
 	router := gin.New()
 
 	// Global middleware
@@ -233,6 +246,10 @@ func setupRouter(cfg *config.Config, authService *auth.Service, healthHandler *h
 			protected.GET("/me/history/recent", historyHandler.GetRecentHistory)
 			protected.GET("/me/stats", historyHandler.GetUserStats)
 			protected.GET("/me/home", historyHandler.GetHomeData)
+
+			protected.GET("/songs/:id/similar", recommendHandler.SimilarSongs)
+			protected.GET("/me/recommendations", recommendHandler.UserRecommendations)
+			protected.POST("/radio", recommendHandler.Radio)
 
 			// Admin endpoints
 			admin := protected.Group("")
