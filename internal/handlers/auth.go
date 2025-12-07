@@ -3,9 +3,10 @@ package handlers
 import (
 	"net/http"
 
-	"github.com/gin-gonic/gin"
 	"korus/internal/auth"
 	"korus/internal/middleware"
+
+	"github.com/gin-gonic/gin"
 )
 
 type AuthHandler struct {
@@ -91,10 +92,11 @@ func (h *AuthHandler) Register(c *gin.Context) {
 	c.JSON(http.StatusCreated, gin.H{
 		"message": "User created successfully",
 		"user": gin.H{
-			"id":       user.ID,
-			"username": user.Username,
-			"email":    user.Email,
-			"role":     user.Role,
+			"id":        user.ID,
+			"username":  user.Username,
+			"email":     user.Email,
+			"role":      user.Role,
+			"createdAt": user.CreatedAt,
 		},
 	})
 }

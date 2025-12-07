@@ -190,18 +190,18 @@ List artists with pagination and sorting.
   {
     "id": 1,
     "name": "The Beatles",
-    "sort_name": "Beatles, The",
-    "musicbrainz_id": "b10bbbfc-cf9e-42e0-be17-e2c3e1d2600d",
-    "album_count": 12,
-    "song_count": 147
+    "sortName": "Beatles, The",
+    "musicbrainzId": "b10bbbfc-cf9e-42e0-be17-e2c3e1d2600d",
+    "albumCount": 12,
+    "songCount": 147
   },
   {
     "id": 2,
     "name": "Led Zeppelin",
-    "sort_name": "Led Zeppelin",
-    "musicbrainz_id": null,
-    "album_count": 8,
-    "song_count": 94
+    "sortName": "Led Zeppelin",
+    "musicbrainzId": null,
+    "albumCount": 8,
+    "songCount": 94
   }
 ]
 ```
@@ -221,33 +221,33 @@ Get artist details by ID, including all albums and top tracks.
 {
   "id": 1,
   "name": "The Beatles",
-  "sort_name": "Beatles, The",
-  "musicbrainz_id": "b10bbbfc-cf9e-42e0-be17-e2c3e1d2600d",
-  "album_count": 12,
-  "song_count": 147,
+  "sortName": "Beatles, The",
+  "musicbrainzId": "b10bbbfc-cf9e-42e0-be17-e2c3e1d2600d",
+  "albumCount": 12,
+  "songCount": 147,
   "albums": [
     {
       "id": 1,
       "name": "Abbey Road",
       "year": 1969,
-      "cover_path": "/covers/f1e2d3c4b5a6.jpg",
-      "song_count": 17,
+      "coverPath": "/covers/f1e2d3c4b5a6.jpg",
+      "songCount": 17,
       "duration": 2854
     },
     {
       "id": 2,
       "name": "Let It Be",
       "year": 1970,
-      "cover_path": "/covers/a6b5c4d3e2f1.jpg",
-      "song_count": 12,
+      "coverPath": "/covers/a6b5c4d3e2f1.jpg",
+      "songCount": 12,
       "duration": 2156
     },
     {
       "id": 3,
       "name": "Sgt. Pepper's Lonely Hearts Club Band",
       "year": 1967,
-      "cover_path": "/covers/b1c2d3e4f5a6.webp",
-      "song_count": 13,
+      "coverPath": "/covers/b1c2d3e4f5a6.webp",
+      "songCount": 13,
       "duration": 2387
     }
   ],
@@ -310,17 +310,17 @@ List albums with pagination, sorting, and filtering.
   {
     "id": 1,
     "name": "Abbey Road",
-    "artist_id": 1,
-    "album_artist_id": 1,
+    "artistId": 1,
+    "albumArtistId": 1,
     "year": 1969,
-    "musicbrainz_id": "7add7441-8f2c-4fbb-828d-0db9c0c2d43b",
-    "cover_path": "/covers/f1e2d3c4b5a6.jpg",
-    "date_added": "2025-08-01T10:00:00Z",
+    "musicbrainzId": "7add7441-8f2c-4fbb-828d-0db9c0c2d43b",
+    "coverPath": "/covers/f1e2d3c4b5a6.jpg",
+    "dateAdded": "2025-08-01T10:00:00Z",
     "artist": {
       "id": 1,
       "name": "The Beatles"
     },
-    "song_count": 17,
+    "songCount": 17,
     "duration": 2854
   }
 ]
@@ -341,38 +341,38 @@ Get album details by ID, including all songs in the album.
 {
   "id": 1,
   "name": "Abbey Road",
-  "artist_id": 1,
-  "album_artist_id": 1,  
+  "artistId": 1,
+  "albumArtistId": 1,  
   "year": 1969,
-  "musicbrainz_id": "7add7441-8f2c-4fbb-828d-0db9c0c2d43b",
-  "cover_path": "/covers/f1e2d3c4b5a6.jpg",
-  "date_added": "2025-08-01T10:00:00Z",
+  "musicbrainzId": "7add7441-8f2c-4fbb-828d-0db9c0c2d43b",
+  "coverPath": "/covers/f1e2d3c4b5a6.jpg",
+  "dateAdded": "2025-08-01T10:00:00Z",
   "artist": {
     "id": 1,
     "name": "The Beatles"
   },
-  "album_artist": {
+  "albumArtist": {
     "id": 1,
     "name": "The Beatles"
   },
-  "song_count": 17,
+  "songCount": 17,
   "duration": 2854,
   "songs": [
     {
       "id": 1,
       "title": "Come Together",
-      "album_id": 1,
-      "artist_id": 1,
-      "track_number": 1,
-      "disc_number": 1,
+      "albumId": 1,
+      "artistId": 1,
+      "trackNumber": 1,
+      "discNumber": 1,
       "duration": 259,
-      "file_path": "/music/The Beatles/Abbey Road/01 Come Together.mp3",
-      "file_size": 6234567,
-      "file_modified": "2025-07-15T14:30:00Z",
+      "filePath": "/music/The Beatles/Abbey Road/01 Come Together.mp3",
+      "fileSize": 6234567,
+      "fileModified": "2025-07-15T14:30:00Z",
       "bitrate": 320,
       "format": "mp3",
-      "cover_path": "/covers/d4e5f6a1b2c3.jpg",
-      "date_added": "2025-08-01T10:00:00Z",
+      "coverPath": "/covers/d4e5f6a1b2c3.jpg",
+      "dateAdded": "2025-08-01T10:00:00Z",
       "artist": {
         "id": 1,
         "name": "The Beatles"
@@ -381,18 +381,18 @@ Get album details by ID, including all songs in the album.
     {
       "id": 2,
       "title": "Something",
-      "album_id": 1,
-      "artist_id": 1,
-      "track_number": 2,
-      "disc_number": 1,
+      "albumId": 1,
+      "artistId": 1,
+      "trackNumber": 2,
+      "discNumber": 1,
       "duration": 182,
-      "file_path": "/music/The Beatles/Abbey Road/02 Something.mp3",
-      "file_size": 4567890,
-      "file_modified": "2025-07-15T14:30:00Z",
+      "filePath": "/music/The Beatles/Abbey Road/02 Something.mp3",
+      "fileSize": 4567890,
+      "fileModified": "2025-07-15T14:30:00Z",
       "bitrate": 320,
       "format": "mp3",
-      "cover_path": null,
-      "date_added": "2025-08-01T10:00:00Z",
+      "coverPath": null,
+      "dateAdded": "2025-08-01T10:00:00Z",
       "artist": {
         "id": 1,
         "name": "The Beatles"
@@ -427,18 +427,18 @@ List all songs with pagination and sorting, or batch fetch songs by IDs.
   {
     "id": 1,
     "title": "Come Together",
-    "album_id": 1,
-    "artist_id": 1,
-    "track_number": 1,
-    "disc_number": 1,
+    "albumId": 1,
+    "artistId": 1,
+    "trackNumber": 1,
+    "discNumber": 1,
     "duration": 259,
-    "file_path": "/music/The Beatles/Abbey Road/01 Come Together.mp3",
-    "file_size": 6234567,
-    "file_modified": "2025-07-15T14:30:00Z",
+    "filePath": "/music/The Beatles/Abbey Road/01 Come Together.mp3",
+    "fileSize": 6234567,
+    "fileModified": "2025-07-15T14:30:00Z",
     "bitrate": 320,
     "format": "mp3",
-    "cover_path": "/covers/d4e5f6a1b2c3.jpg",
-    "date_added": "2025-08-01T10:00:00Z",
+    "coverPath": "/covers/d4e5f6a1b2c3.jpg",
+    "dateAdded": "2025-08-01T10:00:00Z",
     "artist": {
       "id": 1,
       "name": "The Beatles"
@@ -450,30 +450,30 @@ List all songs with pagination and sorting, or batch fetch songs by IDs.
     "lyrics": [
       {
         "id": 1,
-        "song_id": 1,
+        "songId": 1,
         "content": "Come together right now over me...",
         "type": "unsynced",
         "source": "embedded",
         "language": "eng",
-        "created_at": "2025-08-01T10:00:00Z"
+        "createdAt": "2025-08-01T10:00:00Z"
       },
       {
         "id": 2,
-        "song_id": 1,
+        "songId": 1,
         "content": "{\"metadata\":{\"title\":\"Come Together\",\"artist\":\"The Beatles\",\"album\":\"Abbey Road\",\"language\":\"eng\"},\"lines\":[{\"time\":1234,\"timeStr\":\"[00:01.23]\",\"text\":\"Come together\"},{\"time\":5678,\"timeStr\":\"[00:05.67]\",\"text\":\"Right now over me\"}]}",
         "type": "synced",
         "source": "external_lrc",
         "language": "eng",
-        "created_at": "2025-08-01T10:00:00Z"
+        "createdAt": "2025-08-01T10:00:00Z"
       },
       {
         "id": 3,
-        "song_id": 1,
+        "songId": 1,
         "content": "Ven juntos ahora sobre mí...",
         "type": "unsynced",
         "source": "external_txt",
         "language": "spa",
-        "created_at": "2025-08-01T10:00:00Z"
+        "createdAt": "2025-08-01T10:00:00Z"
       }
     ]
   }
@@ -517,13 +517,13 @@ Search across songs, albums, and artists.
     {
       "id": 1,
       "title": "Come Together",
-      "album_id": 1,
-      "artist_id": 1,
-      "track_number": 1,
-      "disc_number": 1,
+      "albumId": 1,
+      "artistId": 1,
+      "trackNumber": 1,
+      "discNumber": 1,
       "duration": 259,
-      "file_path": "/music/The Beatles/Abbey Road/01 Come Together.mp3",
-      "cover_path": "/covers/d4e5f6a1b2c3.jpg",
+      "filePath": "/music/The Beatles/Abbey Road/01 Come Together.mp3",
+      "coverPath": "/covers/d4e5f6a1b2c3.jpg",
       "artist": {
         "id": 1,
         "name": "The Beatles"
@@ -539,7 +539,7 @@ Search across songs, albums, and artists.
     {
       "id": 1,
       "name": "The Beatles",
-      "sort_name": "Beatles, The"
+      "sortName": "Beatles, The"
     }
   ]
 }
@@ -647,10 +647,10 @@ Detailed health status (no authentication required).
     "database": {
       "status": "healthy",
       "stats": {
-        "total_connections": 20,
-        "idle_connections": 15,
-        "acquired_connections": 5,
-        "constructing_connections": 0
+        "totalConnections": 20,
+        "idleConnections": 15,
+        "acquiredConnections": 5,
+        "constructingConnections": 0
       }
     }
   }
@@ -818,11 +818,11 @@ List user's playlists.
     "id": 1,
     "name": "My Favorites",
     "description": "Songs I love",
-    "user_id": 1,
+    "userId": 1,
     "visibility": "public",
-    "created_at": "2025-08-01T10:00:00Z",
-    "updated_at": "2025-08-01T15:30:00Z",
-    "song_count": 25,
+    "createdAt": "2025-08-01T10:00:00Z",
+    "updatedAt": "2025-08-01T15:30:00Z",
+    "songCount": 25,
     "duration": 5400
   }
 ]
@@ -848,11 +848,11 @@ Create a new playlist.
   "id": 2,
   "name": "My New Playlist",
   "description": "Optional description",
-  "user_id": 1,
+  "userId": 1,
   "visibility": "private",
-  "created_at": "2025-08-01T16:00:00Z",
-  "updated_at": "2025-08-01T16:00:00Z",
-  "song_count": 0,
+  "createdAt": "2025-08-01T16:00:00Z",
+  "updatedAt": "2025-08-01T16:00:00Z",
+  "songCount": 0,
   "duration": 0
 }
 ```
@@ -868,10 +868,10 @@ Get playlist details with full, ordered tracklist.
   "id": 1,
   "name": "My Favorites",
   "description": "Songs I love",
-  "user_id": 1,
+  "userId": 1,
   "visibility": "public",
-  "created_at": "2025-08-01T10:00:00Z",
-  "updated_at": "2025-08-01T15:30:00Z",
+  "createdAt": "2025-08-01T10:00:00Z",
+  "updatedAt": "2025-08-01T15:30:00Z",
   "duration": 5400,
   "owner": {
     "id": 1,
@@ -1125,9 +1125,9 @@ Get recent listening history.
 [
   {
     "id": 1,
-    "song_id": 1,
-    "played_at": "2025-08-01T16:00:00Z",
-    "duration_played": 180,
+    "songId": 1,
+    "playedAt": "2025-08-01T16:00:00Z",
+    "durationPlayed": 180,
     "completed": true,
     "song": {
       "id": 1,
@@ -1153,33 +1153,33 @@ Get user listening statistics.
 **Success Response (200):**
 ```json
 {
-  "total_plays": 1234,
-  "total_listening_time": 98765,
-  "unique_songs": 456,
-  "unique_artists": 89,
-  "unique_albums": 123,
-  "top_artists": [
+  "totalPlays": 1234,
+  "totalListeningTime": 98765,
+  "uniqueSongs": 456,
+  "uniqueArtists": 89,
+  "uniqueAlbums": 123,
+  "topArtists": [
     {
       "id": 1,
       "name": "The Beatles",
-      "play_count": 87
+      "playCount": 87
     }
   ],
-  "top_albums": [
+  "topAlbums": [
     {
       "id": 1,
       "name": "Abbey Road",
-      "artist_name": "The Beatles",
-      "play_count": 34
+      "artistName": "The Beatles",
+      "playCount": 34
     }
   ],
-  "top_songs": [
+  "topSongs": [
     {
       "id": 1,
       "title": "Come Together",
-      "artist_name": "The Beatles",
-      "album_name": "Abbey Road",
-      "play_count": 12
+      "artistName": "The Beatles",
+      "albumName": "Abbey Road",
+      "playCount": 12
     }
   ]
 }
@@ -1193,10 +1193,10 @@ Get personalized home data.
 **Success Response (200):**
 ```json
 {
-  "recent_plays": [],
-  "recommended_songs": [],
-  "recommended_albums": [],
-  "recently_added": []
+  "recentPlays": [],
+  "recommendedSongs": [],
+  "recommendedAlbums": [],
+  "recentlyAdded": []
 }
 ```
 
@@ -1216,7 +1216,7 @@ Trigger an asynchronous library scan. Returns immediately with a job ID for trac
 ```json
 {
   "message": "Library scan started",
-  "job_id": "550e8400-e29b-41d4-a716-446655440000",
+  "jobId": "550e8400-e29b-41d4-a716-446655440000",
   "force": false
 }
 ```
@@ -1243,7 +1243,7 @@ Get the status of a library scan job by ID.
   "progress": 150,
   "total": 500,
   "force": false,
-  "started_at": "2025-08-01T16:00:00Z"
+  "startedAt": "2025-08-01T16:00:00Z"
 }
 ```
 
@@ -1256,17 +1256,17 @@ Get the status of a library scan job by ID.
   "progress": 500,
   "total": 500,
   "force": false,
-  "started_at": "2025-08-01T16:00:00Z",
-  "completed_at": "2025-08-01T16:05:30Z",
+  "startedAt": "2025-08-01T16:00:00Z",
+  "completedAt": "2025-08-01T16:05:30Z",
   "result": {
-    "started_at": "2025-08-01T16:00:00Z",
-    "completed_at": "2025-08-01T16:05:30Z",
+    "startedAt": "2025-08-01T16:00:00Z",
+    "completedAt": "2025-08-01T16:05:30Z",
     "duration": "5m30s",
-    "files_discovered": 1250,
-    "files_queued": 500,
-    "files_new": 25,
-    "files_updated": 5,
-    "files_removed": 2,
+    "filesDiscovered": 1250,
+    "filesQueued": 500,
+    "filesNew": 25,
+    "filesUpdated": 5,
+    "filesRemoved": 2,
     "ingested": 30,
     "errors": []
   }
@@ -1308,26 +1308,26 @@ Get system status.
     "artists": 89,
     "users": 5,
     "playlists": 12,
-    "total_duration": 18750
+    "totalDuration": 18750
   },
   "indexer": {
     "running": false,
-    "last_run": {
-      "started_at": "2025-08-01T10:00:00Z",
-      "completed_at": "2025-08-01T10:05:30Z",
+    "lastRun": {
+      "startedAt": "2025-08-01T10:00:00Z",
+      "completedAt": "2025-08-01T10:05:30Z",
       "duration": "5m30s",
-      "files_discovered": 1250,
+      "filesDiscovered": 1250,
       "ingested": 30
     },
-    "last_error": null
+    "lastError": null
   },
-  "recent_scans": [...],
+  "recentScans": [...],
   "activity": {
-    "plays_24h": 150,
-    "plays_7d": 892,
-    "plays_30d": 3200,
-    "total_plays": 12500,
-    "active_users_30d": 3
+    "plays24h": 150,
+    "plays7d": 892,
+    "plays30d": 3200,
+    "totalPlays": 12500,
+    "activeUsers30d": 3
   }
 }
 ```
@@ -1345,11 +1345,11 @@ Get recent scan history.
 [
   {
     "id": 15,
-    "started_at": "2025-08-01T10:00:00Z",
-    "completed_at": "2025-08-01T10:05:30Z",
-    "songs_added": 25,
-    "songs_updated": 5,
-    "songs_removed": 2
+    "startedAt": "2025-08-01T10:00:00Z",
+    "completedAt": "2025-08-01T10:05:30Z",
+    "songsAdded": 25,
+    "songsUpdated": 5,
+    "songsRemoved": 2
   }
 ]
 ```
@@ -1363,7 +1363,7 @@ Clean up expired user sessions.
 ```json
 {
   "message": "Sessions cleanup completed",
-  "deleted_count": 25
+  "deletedCount": 25
 }
 ```
 

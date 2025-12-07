@@ -41,7 +41,7 @@ func (h *AdminHandler) TriggerLibraryScan(c *gin.Context) {
 
 	c.JSON(http.StatusAccepted, gin.H{
 		"message": "Library scan started",
-		"job_id":  jobID,
+		"jobId":   jobID,
 		"force":   force,
 	})
 }
@@ -121,8 +121,8 @@ func (h *AdminHandler) CleanupSessions(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{
-		"message":       "Sessions cleanup completed",
-		"deleted_count": deletedCount,
+		"message":      "Sessions cleanup completed",
+		"deletedCount": deletedCount,
 	})
 }
 
@@ -145,16 +145,16 @@ func mapIndexerResult(res *services.LibraryScanResult) gin.H {
 		errors = append(errors, err.Error())
 	}
 	return gin.H{
-		"started_at":       res.StartedAt,
-		"completed_at":     res.CompletedAt,
-		"duration":         res.Duration.String(),
-		"files_discovered": res.FilesDiscovered,
-		"files_queued":     res.FilesQueued,
-		"files_new":        res.FilesNew,
-		"files_updated":    res.FilesUpdated,
-		"files_removed":    res.FilesRemoved,
-		"ingested":         res.Ingested,
-		"errors":           errors,
+		"startedAt":       res.StartedAt,
+		"completedAt":     res.CompletedAt,
+		"duration":        res.Duration.String(),
+		"filesDiscovered": res.FilesDiscovered,
+		"filesQueued":     res.FilesQueued,
+		"filesNew":        res.FilesNew,
+		"filesUpdated":    res.FilesUpdated,
+		"filesRemoved":    res.FilesRemoved,
+		"ingested":        res.Ingested,
+		"errors":          errors,
 	}
 }
 
@@ -163,16 +163,16 @@ func mapScanJob(job *services.LibraryScanJob) gin.H {
 		return gin.H{}
 	}
 	response := gin.H{
-		"id":         job.ID,
-		"status":     job.Status,
-		"phase":      job.Phase,
-		"progress":   job.Progress,
-		"total":      job.Total,
-		"force":      job.Force,
-		"started_at": job.StartedAt,
+		"id":        job.ID,
+		"status":    job.Status,
+		"phase":     job.Phase,
+		"progress":  job.Progress,
+		"total":     job.Total,
+		"force":     job.Force,
+		"startedAt": job.StartedAt,
 	}
 	if job.CompletedAt != nil {
-		response["completed_at"] = job.CompletedAt
+		response["completedAt"] = job.CompletedAt
 	}
 	if job.Result != nil {
 		response["result"] = mapIndexerResult(job.Result)

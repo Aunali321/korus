@@ -5,10 +5,11 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/gin-gonic/gin"
 	"korus/internal/auth"
 	"korus/internal/middleware"
 	"korus/internal/services"
+
+	"github.com/gin-gonic/gin"
 )
 
 type PlaylistHandler struct {
@@ -169,12 +170,12 @@ func (h *PlaylistHandler) GetPlaylist(c *gin.Context) {
 
 	response := gin.H{
 		"id":          playlist.ID,
-		"user_id":     playlist.UserID,
+		"userId":      playlist.UserID,
 		"name":        playlist.Name,
 		"description": playlist.Description,
 		"visibility":  playlist.Visibility,
-		"created_at":  playlist.CreatedAt,
-		"updated_at":  playlist.UpdatedAt,
+		"createdAt":   playlist.CreatedAt,
+		"updatedAt":   playlist.UpdatedAt,
 		"duration":    playlist.Duration,
 		"owner": gin.H{
 			"id":       owner.ID,

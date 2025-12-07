@@ -3,8 +3,9 @@ package handlers
 import (
 	"net/http"
 
-	"github.com/gin-gonic/gin"
 	"korus/internal/database"
+
+	"github.com/gin-gonic/gin"
 )
 
 type HealthHandler struct {
@@ -63,10 +64,10 @@ func (h *HealthHandler) Health(c *gin.Context) {
 	if dbHealthy {
 		stats := h.db.Stats()
 		response["checks"].(gin.H)["database"].(gin.H)["stats"] = gin.H{
-			"total_connections":        stats.TotalConns(),
-			"idle_connections":         stats.IdleConns(),
-			"acquired_connections":     stats.AcquiredConns(),
-			"constructing_connections": stats.ConstructingConns(),
+			"totalConnections":        stats.TotalConns(),
+			"idleConnections":         stats.IdleConns(),
+			"acquiredConnections":     stats.AcquiredConns(),
+			"constructingConnections": stats.ConstructingConns(),
 		}
 	}
 

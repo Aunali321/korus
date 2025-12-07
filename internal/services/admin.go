@@ -31,8 +31,8 @@ type LibraryScanJob struct {
 	Progress    int                `json:"progress"`
 	Total       int                `json:"total"`
 	Force       bool               `json:"force"`
-	StartedAt   time.Time          `json:"started_at"`
-	CompletedAt *time.Time         `json:"completed_at,omitempty"`
+	StartedAt   time.Time          `json:"startedAt"`
+	CompletedAt *time.Time         `json:"completedAt,omitempty"`
 	Result      *LibraryScanResult `json:"result,omitempty"`
 	Error       string             `json:"error,omitempty"`
 }
@@ -52,8 +52,8 @@ type LibraryScanResult struct {
 
 type LibraryIndexerStatus struct {
 	Running   bool               `json:"running"`
-	LastRun   *LibraryScanResult `json:"last_run,omitempty"`
-	LastError string             `json:"last_error,omitempty"`
+	LastRun   *LibraryScanResult `json:"lastRun,omitempty"`
+	LastError string             `json:"lastError,omitempty"`
 }
 
 // TriggerLibraryScan starts an async scan and returns a job ID for tracking
@@ -110,7 +110,7 @@ func (as *AdminService) GetSystemStatus(ctx context.Context) (map[string]interfa
 	if err != nil {
 		return nil, fmt.Errorf("failed to get total duration: %w", err)
 	}
-	libraryStats["total_duration"] = totalDuration
+	libraryStats["totalDuration"] = totalDuration
 
 	status["library"] = libraryStats
 
@@ -119,7 +119,7 @@ func (as *AdminService) GetSystemStatus(ctx context.Context) (map[string]interfa
 	if err != nil {
 		return nil, fmt.Errorf("failed to get scan history: %w", err)
 	}
-	status["recent_scans"] = scanHistory
+	status["recentScans"] = scanHistory
 
 	if as.indexer != nil {
 		status["indexer"] = as.indexer.Status()
@@ -185,10 +185,10 @@ func (as *AdminService) getActivityStats(ctx context.Context) (map[string]interf
 		return nil, fmt.Errorf("failed to get play counts: %w", err)
 	}
 
-	stats["plays_24h"] = plays24h
-	stats["plays_7d"] = plays7d
-	stats["plays_30d"] = plays30d
-	stats["total_plays"] = totalPlays
+	stats["plays24h"] = plays24h
+	stats["plays7d"] = plays7d
+	stats["plays30d"] = plays30d
+	stats["totalPlays"] = totalPlays
 
 	// Get active users (users who played something in the last 30 days)
 	activeUsersQuery := `
@@ -202,7 +202,7 @@ func (as *AdminService) getActivityStats(ctx context.Context) (map[string]interf
 	if err != nil {
 		return nil, fmt.Errorf("failed to get active users count: %w", err)
 	}
-	stats["active_users_30d"] = activeUsers
+	stats["activeUsers30d"] = activeUsers
 
 	return stats, nil
 }
