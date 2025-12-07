@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
@@ -305,7 +306,13 @@ func setupRouter(cfg *config.Config, authService *auth.Service, healthHandler *h
 	// Serve static files (covers are always available)
 	router.Static("/static", "./static")
 
-	// Serve cover images specifically
+	// Serve cover images with cache headers (1 year cache - filenames are content-hashed)
+	router.Use(func(c *gin.Context) {
+		if strings.HasPrefix(c.Request.URL.Path, "/covers/") {
+			c.Header("Cache-Control", "public, max-age=31536000, immutable")
+		}
+		c.Next()
+	})
 	router.Static("/covers", "./static/covers")
 
 	return router
