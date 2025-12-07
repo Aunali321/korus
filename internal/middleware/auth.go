@@ -11,7 +11,6 @@ import (
 
 func AuthRequired(authService *auth.Service) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		// Get token from Authorization header
 		authHeader := c.GetHeader("Authorization")
 		if authHeader == "" {
 			c.JSON(http.StatusUnauthorized, gin.H{
@@ -22,7 +21,6 @@ func AuthRequired(authService *auth.Service) gin.HandlerFunc {
 			return
 		}
 
-		// Check Bearer token format
 		if !strings.HasPrefix(authHeader, "Bearer ") {
 			c.JSON(http.StatusUnauthorized, gin.H{
 				"error":   "unauthorized",
@@ -34,7 +32,6 @@ func AuthRequired(authService *auth.Service) gin.HandlerFunc {
 
 		token := strings.TrimPrefix(authHeader, "Bearer ")
 
-		// Validate token and get user
 		user, err := authService.ValidateToken(c.Request.Context(), token)
 		if err != nil {
 			c.JSON(http.StatusUnauthorized, gin.H{
@@ -45,7 +42,6 @@ func AuthRequired(authService *auth.Service) gin.HandlerFunc {
 			return
 		}
 
-		// Set user in context
 		c.Set("user", user)
 		c.Set("user_id", user.ID)
 		c.Set("user_role", user.Role)
@@ -95,7 +91,6 @@ func OptionalAuth(authService *auth.Service) gin.HandlerFunc {
 
 		token := strings.TrimPrefix(authHeader, "Bearer ")
 
-		// Try to validate token but don't fail if invalid
 		user, err := authService.ValidateToken(c.Request.Context(), token)
 		if err == nil {
 			c.Set("user", user)
@@ -107,7 +102,6 @@ func OptionalAuth(authService *auth.Service) gin.HandlerFunc {
 	}
 }
 
-// Helper function to get current user from context
 func GetCurrentUser(c *gin.Context) (*models.User, bool) {
 	user, exists := c.Get("user")
 	if !exists {
@@ -118,7 +112,6 @@ func GetCurrentUser(c *gin.Context) (*models.User, bool) {
 	return u, ok
 }
 
-// Helper function to get current user ID from context
 func GetCurrentUserID(c *gin.Context) (int, bool) {
 	userID, exists := c.Get("user_id")
 	if !exists {
@@ -129,7 +122,6 @@ func GetCurrentUserID(c *gin.Context) (int, bool) {
 	return id, ok
 }
 
-// Helper function to check if current user is admin
 func IsCurrentUserAdmin(c *gin.Context) bool {
 	role, exists := c.Get("user_role")
 	if !exists {

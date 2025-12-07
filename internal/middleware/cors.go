@@ -10,7 +10,6 @@ func CORS(allowedOrigins []string) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		origin := c.GetHeader("Origin")
 
-		// Check if origin is allowed
 		allowed := false
 		for _, allowedOrigin := range allowedOrigins {
 			if allowedOrigin == "*" || allowedOrigin == origin {
@@ -29,7 +28,6 @@ func CORS(allowedOrigins []string) gin.HandlerFunc {
 		c.Header("Access-Control-Allow-Credentials", "true")
 		c.Header("Access-Control-Max-Age", "86400") // 24 hours
 
-		// Handle preflight requests
 		if c.Request.Method == "OPTIONS" {
 			c.AbortWithStatus(http.StatusNoContent)
 			return

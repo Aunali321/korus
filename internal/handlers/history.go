@@ -78,7 +78,6 @@ func (h *HistoryHandler) GetRecentHistory(c *gin.Context) {
 		return
 	}
 
-	// Parse limit parameter
 	limit := parseIntParam(c, "limit", 50)
 	if limit > 200 {
 		limit = 200 // Cap at 200 to prevent excessive queries
@@ -130,7 +129,6 @@ func (h *HistoryHandler) GetHomeData(c *gin.Context) {
 		return
 	}
 
-	// Parse limit parameter for each section
 	limit := parseIntParam(c, "limit", 10)
 	if limit > 50 {
 		limit = 50 // Cap at 50 to prevent excessive queries

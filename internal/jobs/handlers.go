@@ -27,7 +27,6 @@ func (h *MetadataExtractionHandler) Handle(ctx context.Context, job *Job) error 
 
 	log.Printf("Extracting metadata for file: %s", payload.FilePath)
 
-	// Extract and store metadata
 	song, err := h.metadataService.ExtractAndStoreMetadata(ctx, payload.FilePath)
 	if err != nil {
 		return fmt.Errorf("failed to extract metadata: %w", err)
@@ -55,7 +54,6 @@ func (h *BatchMetadataExtractionHandler) Handle(ctx context.Context, job *Job) e
 
 	log.Printf("Processing batch metadata extraction for %d files", len(payload.FilePaths))
 
-	// Process the batch
 	result, err := h.batchMetadataService.ProcessBatch(ctx, payload.FilePaths)
 	if err != nil {
 		return fmt.Errorf("failed to process metadata batch: %w", err)
@@ -102,7 +100,6 @@ func (h *ScanHandler) Handle(ctx context.Context, job *Job) error {
 	log.Printf("Starting library scan: path=%s, recursive=%t, force=%t",
 		payload.Path, payload.Recursive, payload.Force)
 
-	// Perform scan
 	result, err := h.scanner.ScanLibrary(ctx, payload.Force)
 	if err != nil {
 		return fmt.Errorf("scan failed: %w", err)
@@ -135,18 +132,14 @@ func (h *CleanupHandler) Handle(ctx context.Context, job *Job) error {
 
 	log.Printf("Starting cleanup job: type=%s, older_than=%v", payload.Type, payload.OlderThan)
 
-	// Implement cleanup logic based on type
 	switch payload.Type {
 	case "sessions":
-		// Clean up expired user sessions
 		// TODO: implement session cleanup
 		log.Println("Session cleanup completed")
 	case "jobs":
-		// Clean up old completed jobs
 		// TODO: implement job cleanup
 		log.Println("Job cleanup completed")
 	case "cache":
-		// Clean up cached files
 		// TODO: implement cache cleanup
 		log.Println("Cache cleanup completed")
 	default:

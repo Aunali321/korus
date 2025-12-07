@@ -16,7 +16,6 @@ func NewUserLibraryService(db *database.DB) *UserLibraryService {
 	return &UserLibraryService{db: db}
 }
 
-// GetLikedSongs returns all songs liked by the user
 func (uls *UserLibraryService) GetLikedSongs(ctx context.Context, userID int, limit, offset int, sort string) ([]models.Song, error) {
 	query := `
 		SELECT s.id, s.title, s.album_id, s.artist_id, s.track_number, s.disc_number,
@@ -32,7 +31,6 @@ func (uls *UserLibraryService) GetLikedSongs(ctx context.Context, userID int, li
 		WHERE ls.user_id = $1
 	`
 
-	// Add sorting
 	switch sort {
 	case "title":
 		query += " ORDER BY s.title"
@@ -73,7 +71,6 @@ func (uls *UserLibraryService) GetLikedSongs(ctx context.Context, userID int, li
 			return nil, fmt.Errorf("failed to scan liked song: %w", err)
 		}
 
-		// Set artist info
 		if song.ArtistID != nil && artistName != nil {
 			song.Artist = &models.Artist{
 				ID:   *song.ArtistID,
@@ -81,7 +78,6 @@ func (uls *UserLibraryService) GetLikedSongs(ctx context.Context, userID int, li
 			}
 		}
 
-		// Set album info
 		if song.AlbumID != nil && albumName != nil {
 			song.Album = &models.Album{
 				ID:   *song.AlbumID,
@@ -95,7 +91,6 @@ func (uls *UserLibraryService) GetLikedSongs(ctx context.Context, userID int, li
 	return songs, rows.Err()
 }
 
-// GetLikedAlbums returns all albums liked by the user
 func (uls *UserLibraryService) GetLikedAlbums(ctx context.Context, userID int, limit, offset int) ([]models.Album, error) {
 	query := `
 		SELECT a.id, a.name, a.artist_id, a.album_artist_id, a.year, 
@@ -134,7 +129,6 @@ func (uls *UserLibraryService) GetLikedAlbums(ctx context.Context, userID int, l
 			return nil, fmt.Errorf("failed to scan liked album: %w", err)
 		}
 
-		// Set artist info if available
 		if album.ArtistID != nil && artistName != nil {
 			album.Artist = &models.Artist{
 				ID:   *album.ArtistID,
@@ -148,7 +142,6 @@ func (uls *UserLibraryService) GetLikedAlbums(ctx context.Context, userID int, l
 	return albums, rows.Err()
 }
 
-// GetFollowedArtists returns all artists followed by the user
 func (uls *UserLibraryService) GetFollowedArtists(ctx context.Context, userID int, limit, offset int) ([]models.Artist, error) {
 	query := `
 		SELECT a.id, a.name, a.sort_name, a.musicbrainz_id,
@@ -174,7 +167,7 @@ func (uls *UserLibraryService) GetFollowedArtists(ctx context.Context, userID in
 	artists := make([]models.Artist, 0)
 	for rows.Next() {
 		var artist models.Artist
-		var followedAt interface{} // We don't need this in the response but it's in the query
+		var followedAt interface{}
 
 		err := rows.Scan(&artist.ID, &artist.Name, &artist.SortName, &artist.MusicBrainzID,
 			&artist.AlbumCount, &artist.SongCount, &followedAt)
@@ -187,7 +180,6 @@ func (uls *UserLibraryService) GetFollowedArtists(ctx context.Context, userID in
 	return artists, rows.Err()
 }
 
-// LikeSongs adds songs to user's liked songs
 func (uls *UserLibraryService) LikeSongs(ctx context.Context, userID int, songIDs []int) error {
 	if len(songIDs) == 0 {
 		return nil
@@ -207,7 +199,6 @@ func (uls *UserLibraryService) LikeSongs(ctx context.Context, userID int, songID
 	return nil
 }
 
-// UnlikeSongs removes songs from user's liked songs
 func (uls *UserLibraryService) UnlikeSongs(ctx context.Context, userID int, songIDs []int) error {
 	if len(songIDs) == 0 {
 		return nil
@@ -223,7 +214,6 @@ func (uls *UserLibraryService) UnlikeSongs(ctx context.Context, userID int, song
 	return nil
 }
 
-// LikeAlbum adds an album to user's liked albums
 func (uls *UserLibraryService) LikeAlbum(ctx context.Context, userID, albumID int) error {
 	query := `
 		INSERT INTO liked_albums (user_id, album_id, liked_at)
@@ -239,7 +229,6 @@ func (uls *UserLibraryService) LikeAlbum(ctx context.Context, userID, albumID in
 	return nil
 }
 
-// UnlikeAlbum removes an album from user's liked albums
 func (uls *UserLibraryService) UnlikeAlbum(ctx context.Context, userID, albumID int) error {
 	query := `DELETE FROM liked_albums WHERE user_id = $1 AND album_id = $2`
 
@@ -255,7 +244,6 @@ func (uls *UserLibraryService) UnlikeAlbum(ctx context.Context, userID, albumID 
 	return nil
 }
 
-// FollowArtist adds an artist to user's followed artists
 func (uls *UserLibraryService) FollowArtist(ctx context.Context, userID, artistID int) error {
 	query := `
 		INSERT INTO followed_artists (user_id, artist_id, followed_at)
@@ -271,7 +259,6 @@ func (uls *UserLibraryService) FollowArtist(ctx context.Context, userID, artistI
 	return nil
 }
 
-// UnfollowArtist removes an artist from user's followed artists
 func (uls *UserLibraryService) UnfollowArtist(ctx context.Context, userID, artistID int) error {
 	query := `DELETE FROM followed_artists WHERE user_id = $1 AND artist_id = $2`
 
@@ -287,7 +274,6 @@ func (uls *UserLibraryService) UnfollowArtist(ctx context.Context, userID, artis
 	return nil
 }
 
-// CheckSongLiked checks if a user has liked a specific song
 func (uls *UserLibraryService) CheckSongLiked(ctx context.Context, userID, songID int) (bool, error) {
 	query := `SELECT EXISTS(SELECT 1 FROM liked_songs WHERE user_id = $1 AND song_id = $2)`
 
@@ -300,7 +286,6 @@ func (uls *UserLibraryService) CheckSongLiked(ctx context.Context, userID, songI
 	return liked, nil
 }
 
-// CheckAlbumLiked checks if a user has liked a specific album
 func (uls *UserLibraryService) CheckAlbumLiked(ctx context.Context, userID, albumID int) (bool, error) {
 	query := `SELECT EXISTS(SELECT 1 FROM liked_albums WHERE user_id = $1 AND album_id = $2)`
 
@@ -313,7 +298,6 @@ func (uls *UserLibraryService) CheckAlbumLiked(ctx context.Context, userID, albu
 	return liked, nil
 }
 
-// CheckArtistFollowed checks if a user is following a specific artist
 func (uls *UserLibraryService) CheckArtistFollowed(ctx context.Context, userID, artistID int) (bool, error) {
 	query := `SELECT EXISTS(SELECT 1 FROM followed_artists WHERE user_id = $1 AND artist_id = $2)`
 

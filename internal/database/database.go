@@ -21,18 +21,15 @@ func New(cfg *config.DatabaseConfig) (*DB, error) {
 		return nil, fmt.Errorf("failed to parse database URL: %w", err)
 	}
 
-	// Configure connection pool
 	config.MaxConns = int32(cfg.MaxConns)
 	config.MinConns = int32(cfg.MinConns)
 	config.MaxConnLifetime = cfg.MaxConnTime
 	config.MaxConnIdleTime = cfg.MaxIdleTime
 	config.HealthCheckPeriod = cfg.HealthCheck
 
-	// Configure connection settings
 	config.ConnConfig.ConnectTimeout = 10 * time.Second
 	config.ConnConfig.RuntimeParams["application_name"] = "korus"
 
-	// Create connection pool
 	pool, err := pgxpool.NewWithConfig(context.Background(), config)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create database pool: %w", err)
@@ -40,7 +37,6 @@ func New(cfg *config.DatabaseConfig) (*DB, error) {
 
 	db := &DB{Pool: pool}
 
-	// Test connection
 	if err := db.Ping(context.Background()); err != nil {
 		pool.Close()
 		return nil, fmt.Errorf("failed to connect to database: %w", err)
@@ -76,14 +72,12 @@ func (db *DB) Stats() *pgxpool.Stat {
 }
 
 func (db *DB) Health(ctx context.Context) error {
-	// Check if we can acquire a connection
 	conn, err := db.Pool.Acquire(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to acquire connection: %w", err)
 	}
 	defer conn.Release()
 
-	// Run a simple query
 	var result int
 	if err := conn.QueryRow(ctx, "SELECT 1").Scan(&result); err != nil {
 		return fmt.Errorf("health check query failed: %w", err)
@@ -95,8 +89,6 @@ func (db *DB) Health(ctx context.Context) error {
 
 	return nil
 }
-
-// Helper functions for common database operations
 
 func (db *DB) QueryRowContext(ctx context.Context, query string, args ...interface{}) pgx.Row {
 	return db.Pool.QueryRow(ctx, query, args...)

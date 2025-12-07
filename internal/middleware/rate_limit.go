@@ -31,7 +31,6 @@ func NewRateLimiter(rate int, window time.Duration) *rateLimiter {
 		cleanup: window * 2,
 	}
 
-	// Start cleanup goroutine
 	go rl.cleanupClients()
 
 	return rl
@@ -53,7 +52,6 @@ func (rl *rateLimiter) Allow(clientID string) bool {
 		return true
 	}
 
-	// Check if we're in a new window
 	if now.Sub(client.window) >= rl.window {
 		client.count = 1
 		client.window = now
@@ -61,7 +59,6 @@ func (rl *rateLimiter) Allow(clientID string) bool {
 		return true
 	}
 
-	// Check if rate limit exceeded
 	if client.count >= rl.rate {
 		client.lastSeen = now
 		return false
@@ -92,10 +89,8 @@ func RateLimit(rate int, window time.Duration) gin.HandlerFunc {
 	limiter := NewRateLimiter(rate, window)
 
 	return func(c *gin.Context) {
-		// Use IP address as client identifier
 		clientID := c.ClientIP()
 
-		// For authenticated users, use user ID for more precise limiting
 		if userID, exists := c.Get("user_id"); exists {
 			clientID = fmt.Sprintf("user:%v", userID)
 		}
@@ -113,15 +108,14 @@ func RateLimit(rate int, window time.Duration) gin.HandlerFunc {
 	}
 }
 
-// Predefined rate limiters for different endpoints
 func AuthRateLimit() gin.HandlerFunc {
-	return RateLimit(10, time.Minute) // 10 requests per minute for auth endpoints
+	return RateLimit(10, time.Minute)
 }
 
 func APIRateLimit() gin.HandlerFunc {
-	return RateLimit(1000, time.Hour) // 1000 requests per hour for general API
+	return RateLimit(1000, time.Hour)
 }
 
 func SearchRateLimit() gin.HandlerFunc {
-	return RateLimit(100, time.Minute) // 100 searches per minute
+	return RateLimit(100, time.Minute)
 }

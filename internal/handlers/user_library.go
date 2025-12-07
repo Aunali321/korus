@@ -34,7 +34,6 @@ func (h *UserLibraryHandler) GetLikedSongs(c *gin.Context) {
 		return
 	}
 
-	// Parse query parameters
 	limit := parseIntParam(c, "limit", 50)
 	offset := parseIntParam(c, "offset", 0)
 	sort := c.DefaultQuery("sort", "liked_at")
@@ -62,7 +61,6 @@ func (h *UserLibraryHandler) GetLikedAlbums(c *gin.Context) {
 		return
 	}
 
-	// Parse query parameters
 	limit := parseIntParam(c, "limit", 50)
 	offset := parseIntParam(c, "offset", 0)
 
@@ -89,7 +87,6 @@ func (h *UserLibraryHandler) GetFollowedArtists(c *gin.Context) {
 		return
 	}
 
-	// Parse query parameters
 	limit := parseIntParam(c, "limit", 50)
 	offset := parseIntParam(c, "offset", 0)
 

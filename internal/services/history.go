@@ -71,7 +71,6 @@ func (hs *HistoryService) GetRecentHistory(ctx context.Context, userID int, limi
 			return nil, fmt.Errorf("failed to scan play history: %w", err)
 		}
 
-		// Set artist info
 		if song.ArtistID != nil && artistName != nil {
 			song.Artist = &models.Artist{
 				ID:   *song.ArtistID,
@@ -79,7 +78,6 @@ func (hs *HistoryService) GetRecentHistory(ctx context.Context, userID int, limi
 			}
 		}
 
-		// Set album info
 		if song.AlbumID != nil && albumName != nil {
 			song.Album = &models.Album{
 				ID:   *song.AlbumID,
@@ -161,7 +159,6 @@ func (hs *HistoryService) GetUserStats(ctx context.Context, userID int) (*models
 				&song.Bitrate, &song.Format, &song.CoverPath, &song.DateAdded,
 				&artistName, &albumName, &songPlayCount)
 			if err == nil {
-				// Set artist info
 				if song.ArtistID != nil && artistName != nil {
 					song.Artist = &models.Artist{
 						ID:   *song.ArtistID,
@@ -169,7 +166,6 @@ func (hs *HistoryService) GetUserStats(ctx context.Context, userID int) (*models
 					}
 				}
 
-				// Set album info
 				if song.AlbumID != nil && albumName != nil {
 					song.Album = &models.Album{
 						ID:   *song.AlbumID,
@@ -231,7 +227,6 @@ func (hs *HistoryService) GetHomeData(ctx context.Context, userID int, limit int
 			return nil, fmt.Errorf("failed to scan recent album: %w", err)
 		}
 
-		// Set artist info if available
 		if album.ArtistID != nil && artistName != nil {
 			album.Artist = &models.Artist{
 				ID:   *album.ArtistID,
@@ -282,7 +277,6 @@ func (hs *HistoryService) GetHomeData(ctx context.Context, userID int, limit int
 			return nil, fmt.Errorf("failed to scan recent song: %w", err)
 		}
 
-		// Set artist info
 		if song.ArtistID != nil && artistName != nil {
 			song.Artist = &models.Artist{
 				ID:   *song.ArtistID,
@@ -290,7 +284,6 @@ func (hs *HistoryService) GetHomeData(ctx context.Context, userID int, limit int
 			}
 		}
 
-		// Set album info
 		if song.AlbumID != nil && albumName != nil {
 			song.Album = &models.Album{
 				ID:   *song.AlbumID,
@@ -341,7 +334,6 @@ func (hs *HistoryService) GetHomeData(ctx context.Context, userID int, limit int
 			return nil, fmt.Errorf("failed to scan most played song: %w", err)
 		}
 
-		// Set artist info
 		if song.ArtistID != nil && artistName != nil {
 			song.Artist = &models.Artist{
 				ID:   *song.ArtistID,
@@ -349,7 +341,6 @@ func (hs *HistoryService) GetHomeData(ctx context.Context, userID int, limit int
 			}
 		}
 
-		// Set album info
 		if song.AlbumID != nil && albumName != nil {
 			song.Album = &models.Album{
 				ID:   *song.AlbumID,
@@ -410,7 +401,6 @@ func (hs *HistoryService) GetHomeData(ctx context.Context, userID int, limit int
 			return nil, fmt.Errorf("failed to scan recommended album: %w", err)
 		}
 
-		// Set artist info if available
 		if album.ArtistID != nil && artistName != nil {
 			album.Artist = &models.Artist{
 				ID:   *album.ArtistID,

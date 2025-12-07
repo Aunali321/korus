@@ -59,13 +59,11 @@ func NewMetadataService(db *database.DB, lyricsEnabled bool) *MetadataService {
 }
 
 func (ms *MetadataService) ExtractAndStoreMetadata(ctx context.Context, filePath string) (*models.Song, error) {
-	// Extract metadata from file
 	metadata, err := ms.extractMetadata(filePath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to extract metadata from %s: %w", filePath, err)
 	}
 
-	// Store in database
 	song, err := ms.storeMetadata(ctx, metadata)
 	if err != nil {
 		return nil, fmt.Errorf("failed to store metadata for %s: %w", filePath, err)
@@ -75,33 +73,28 @@ func (ms *MetadataService) ExtractAndStoreMetadata(ctx context.Context, filePath
 }
 
 func (ms *MetadataService) extractMetadata(filePath string) (*ExtractedMetadata, error) {
-	// Get file info
 	info, err := os.Stat(filePath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to stat file: %w", err)
 	}
 
-	// Open file for metadata reading
 	file, err := os.Open(filePath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to open file: %w", err)
 	}
 	defer file.Close()
 
-	// Read metadata tags
 	metadata, err := tag.ReadFrom(file)
 	if err != nil {
 		// If we can't read tags, we still need accurate duration data
 		return ms.fallbackMetadata(filePath, info)
 	}
 
-	// Extract duration and bitrate (format-specific)
 	duration, bitrate, format, err := ms.extractAudioProperties(filePath, file)
 	if err != nil {
 		return nil, fmt.Errorf("failed to extract audio properties: %w", err)
 	}
 
-	// Build metadata struct
 	result := &ExtractedMetadata{
 		Title:        metadata.Title(),
 		Artist:       metadata.Artist(),
@@ -118,7 +111,6 @@ func (ms *MetadataService) extractMetadata(filePath string) (*ExtractedMetadata,
 		FileModified: info.ModTime(),
 	}
 
-	// Use fallback values if tags are empty
 	if result.Title == "" {
 		result.Title = ms.filenameWithoutExt(filePath)
 	}
@@ -135,10 +127,8 @@ func (ms *MetadataService) extractMetadata(filePath string) (*ExtractedMetadata,
 		result.DiscNumber = 1
 	}
 
-	// Extract cover art (try multiple methods in order of preference)
 	result.CoverURL = ms.extractCoverArt(filePath)
 
-	// Extract lyrics (try multiple methods in order of preference)
 	if ms.lyricsEnabled {
 		result.Lyrics = ms.extractLyrics(filePath, metadata)
 	}
@@ -149,13 +139,11 @@ func (ms *MetadataService) extractMetadata(filePath string) (*ExtractedMetadata,
 func (ms *MetadataService) storeMetadata(ctx context.Context, metadata *ExtractedMetadata) (*models.Song, error) {
 	var result *models.Song
 	err := ms.db.WithTransaction(ctx, func(tx pgx.Tx) error {
-		// Find or create artist
 		artistID, err := ms.findOrCreateArtist(ctx, tx, metadata.Artist)
 		if err != nil {
 			return fmt.Errorf("failed to find/create artist: %w", err)
 		}
 
-		// Find or create album artist (if different)
 		var albumArtistID *int
 		if metadata.AlbumArtist != "" && metadata.AlbumArtist != metadata.Artist {
 			id, err := ms.findOrCreateArtist(ctx, tx, metadata.AlbumArtist)
@@ -167,13 +155,11 @@ func (ms *MetadataService) storeMetadata(ctx context.Context, metadata *Extracte
 			albumArtistID = &artistID
 		}
 
-		// Find or create album
 		albumID, err := ms.findOrCreateAlbum(ctx, tx, metadata.Album, artistID, albumArtistID, metadata.Year, metadata.FilePath, metadata.CoverURL)
 		if err != nil {
 			return fmt.Errorf("failed to find/create album: %w", err)
 		}
 
-		// Insert or update song
 		song, err := ms.insertOrUpdateSong(ctx, tx, metadata, artistID, albumID)
 		if err != nil {
 			return fmt.Errorf("failed to insert/update song: %w", err)
@@ -187,7 +173,6 @@ func (ms *MetadataService) storeMetadata(ctx context.Context, metadata *Extracte
 }
 
 func (ms *MetadataService) findOrCreateArtist(ctx context.Context, tx pgx.Tx, name string) (int, error) {
-	// Atomic upsert - the correct way to handle concurrent inserts
 	sortName := generateSortName(name)
 	query := `
 		INSERT INTO artists (name, sort_name) 
@@ -207,18 +192,15 @@ func (ms *MetadataService) findOrCreateArtist(ctx context.Context, tx pgx.Tx, na
 }
 
 func (ms *MetadataService) findOrCreateAlbum(ctx context.Context, tx pgx.Tx, name string, artistID int, albumArtistID *int, year int, songFilePath string, songCoverURL string) (int, error) {
-	// Atomic upsert for albums - handles concurrent inserts properly
 	var yearPtr *int
 	if year > 0 {
 		yearPtr = &year
 	}
 
-	// Extract album cover (prefer external covers, fallback to song's embedded cover)
 	albumCoverURL := ""
 	if coverURL, err := ms.coverExtractor.ScanForExternalCover(songFilePath); err == nil {
 		albumCoverURL = coverURL
 	} else if songCoverURL != "" {
-		// Fallback: use the song's cover for the album if no external cover found
 		albumCoverURL = songCoverURL
 	}
 
@@ -243,7 +225,6 @@ func (ms *MetadataService) findOrCreateAlbum(ctx context.Context, tx pgx.Tx, nam
 }
 
 func (ms *MetadataService) insertOrUpdateSong(ctx context.Context, tx pgx.Tx, metadata *ExtractedMetadata, artistID, albumID int) (*models.Song, error) {
-	// Check if song already exists
 	var existingID int
 	checkQuery := "SELECT id FROM songs WHERE file_path = $1"
 	err := tx.QueryRow(ctx, checkQuery, metadata.FilePath).Scan(&existingID)
@@ -251,7 +232,6 @@ func (ms *MetadataService) insertOrUpdateSong(ctx context.Context, tx pgx.Tx, me
 	var song models.Song
 
 	if err == pgx.ErrNoRows {
-		// Insert new song
 		insertQuery := `
 			INSERT INTO songs (title, album_id, artist_id, track_number, disc_number, duration, 
 							 file_path, file_size, file_modified, bitrate, format, cover_path, date_added) 
@@ -270,7 +250,6 @@ func (ms *MetadataService) insertOrUpdateSong(ctx context.Context, tx pgx.Tx, me
 				&song.FilePath, &song.FileSize, &song.FileModified,
 				&song.Bitrate, &song.Format, &song.CoverPath, &song.DateAdded)
 	} else if err == nil {
-		// Update existing song
 		updateQuery := `
 			UPDATE songs 
 			SET title = $2, album_id = $3, artist_id = $4, track_number = $5, 
@@ -298,7 +277,6 @@ func (ms *MetadataService) insertOrUpdateSong(ctx context.Context, tx pgx.Tx, me
 		return nil, err
 	}
 
-	// Store lyrics if any were extracted
 	if len(metadata.Lyrics) > 0 {
 		log.Printf("💾 Storing %d lyrics entries for song ID %d", len(metadata.Lyrics), song.ID)
 		err = ms.storeLyrics(ctx, tx, song.ID, metadata.Lyrics)
@@ -313,20 +291,17 @@ func (ms *MetadataService) insertOrUpdateSong(ctx context.Context, tx pgx.Tx, me
 	return &song, nil
 }
 
-// storeLyrics stores lyrics data for a song using bulk insert
 func (ms *MetadataService) storeLyrics(ctx context.Context, tx pgx.Tx, songID int, lyrics []ExtractedLyrics) error {
 	if len(lyrics) == 0 {
 		return nil
 	}
 
-	// First, delete any existing lyrics for this song
 	deleteQuery := "DELETE FROM lyrics WHERE song_id = $1"
 	_, err := tx.Exec(ctx, deleteQuery, songID)
 	if err != nil {
 		return fmt.Errorf("failed to delete existing lyrics: %w", err)
 	}
 
-	// Build bulk insert query
 	valueStrings := make([]string, 0, len(lyrics))
 	valueArgs := make([]interface{}, 0, len(lyrics)*5)
 	paramIdx := 1
@@ -352,13 +327,11 @@ func (ms *MetadataService) storeLyrics(ctx context.Context, tx pgx.Tx, songID in
 }
 
 func (ms *MetadataService) extractAudioProperties(filePath string, file *os.File) (duration, bitrate int, format string, err error) {
-	// Get format from file extension
 	ext := strings.ToLower(filepath.Ext(filePath))
 	if len(ext) > 1 {
-		format = ext[1:] // Remove the dot
+		format = ext[1:]
 	}
 
-	// Use FFprobe to get accurate audio properties
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
@@ -367,27 +340,23 @@ func (ms *MetadataService) extractAudioProperties(filePath string, file *os.File
 		return 0, 0, format, fmt.Errorf("failed to probe audio file: %w", err)
 	}
 
-	// Find the first audio stream
 	audioStream := probeData.FirstAudioStream()
 	if audioStream == nil {
 		return 0, 0, format, fmt.Errorf("no audio stream found in file")
 	}
 
-	// Extract duration (convert from float seconds to int)
 	if probeData.Format.DurationSeconds != 0 {
 		duration = int(math.Round(probeData.Format.DurationSeconds))
 	} else {
 		return 0, 0, format, fmt.Errorf("no duration information available")
 	}
 
-	// Extract bitrate
 	if audioStream.BitRate != "" {
 		if parsedBitrate := parseInt(audioStream.BitRate); parsedBitrate > 0 {
-			bitrate = parsedBitrate / 1000 // Convert from bps to kbps
+			bitrate = parsedBitrate / 1000
 		}
 	}
 
-	// Use codec name if available, otherwise fall back to file extension
 	if audioStream.CodecName != "" {
 		format = audioStream.CodecName
 	}
@@ -396,7 +365,6 @@ func (ms *MetadataService) extractAudioProperties(filePath string, file *os.File
 }
 
 func (ms *MetadataService) fallbackMetadata(filePath string, info os.FileInfo) (*ExtractedMetadata, error) {
-	// Create basic metadata from filename and path
 	filename := ms.filenameWithoutExt(filePath)
 
 	// Even for fallback metadata, we require accurate duration data
@@ -421,14 +389,12 @@ func (ms *MetadataService) fallbackMetadata(filePath string, info os.FileInfo) (
 		return nil, fmt.Errorf("no duration information available for fallback metadata")
 	}
 
-	// Extract bitrate
 	if audioStream.BitRate != "" {
 		if parsedBitrate := parseInt(audioStream.BitRate); parsedBitrate > 0 {
-			bitrate = parsedBitrate / 1000 // Convert from bps to kbps
+			bitrate = parsedBitrate / 1000
 		}
 	}
 
-	// Use codec name if available, otherwise fall back to file extension
 	if audioStream.CodecName != "" {
 		format = audioStream.CodecName
 	}
@@ -455,8 +421,6 @@ func (ms *MetadataService) filenameWithoutExt(filePath string) string {
 	return strings.TrimSuffix(filename, filepath.Ext(filename))
 }
 
-// Helper functions
-
 func extractTrackNumber(track int, _ int) int {
 	return track
 }
@@ -469,7 +433,6 @@ func extractDiscNumber(disc int, _ int) int {
 }
 
 func generateSortName(name string) string {
-	// Remove articles from the beginning for sorting
 	lower := strings.ToLower(strings.TrimSpace(name))
 	articles := []string{"the ", "a ", "an "}
 
@@ -500,17 +463,14 @@ func parseInt(s string) int {
 	if s == "" {
 		return 0
 	}
-	// Simple integer parsing - handles basic numeric strings
 	var result int
 	fmt.Sscanf(s, "%d", &result)
 	return result
 }
 
-// extractCoverArt tries multiple methods to find cover art for a song
 func (ms *MetadataService) extractCoverArt(filePath string) string {
 	log.Printf("🖼️  Extracting cover art for: %s", filePath)
 
-	// Try 1: Song-specific cover (highest priority)
 	if coverURL, err := ms.coverExtractor.ScanForSongSpecificCover(filePath); err == nil {
 		log.Printf("✅ Found song-specific cover: %s", coverURL)
 		return coverURL
@@ -518,7 +478,6 @@ func (ms *MetadataService) extractCoverArt(filePath string) string {
 		log.Printf("❌ No song-specific cover found: %v", err)
 	}
 
-	// Try 2: Embedded cover art
 	if coverURL, err := ms.coverExtractor.ExtractEmbeddedCover(filePath); err == nil {
 		log.Printf("✅ Found embedded cover: %s", coverURL)
 		return coverURL
@@ -526,7 +485,6 @@ func (ms *MetadataService) extractCoverArt(filePath string) string {
 		log.Printf("❌ No embedded cover found: %v", err)
 	}
 
-	// Try 3: External cover in same directory (folder.jpg, cover.png, etc.)
 	if coverURL, err := ms.coverExtractor.ScanForExternalCover(filePath); err == nil {
 		log.Printf("✅ Found external cover: %s", coverURL)
 		return coverURL
@@ -535,28 +493,23 @@ func (ms *MetadataService) extractCoverArt(filePath string) string {
 	}
 
 	log.Printf("❌ No cover art found for: %s", filePath)
-	// No cover found
 	return ""
 }
 
-// extractLyrics tries multiple methods to find lyrics for a song
 func (ms *MetadataService) extractLyrics(filePath string, metadata tag.Metadata) []ExtractedLyrics {
 	log.Printf("🎵 Extracting lyrics for: %s", filePath)
 	var lyrics []ExtractedLyrics
 
-	// Try 1: Embedded lyrics from metadata tags
 	if embeddedLyrics := ms.extractEmbeddedLyrics(metadata); embeddedLyrics != nil {
 		lyrics = append(lyrics, *embeddedLyrics)
 		log.Printf("✅ Found embedded lyrics")
 	}
 
-	// Try 2: External .lrc file (synchronized lyrics)
 	if lrcLyrics := ms.extractLrcFileWithMetadata(filePath, metadata); lrcLyrics != nil {
 		lyrics = append(lyrics, *lrcLyrics)
 		log.Printf("✅ Found .lrc file")
 	}
 
-	// Try 3: External .txt file (plain text lyrics)
 	if txtLyrics := ms.extractTxtFile(filePath); txtLyrics != nil {
 		lyrics = append(lyrics, *txtLyrics)
 		log.Printf("✅ Found .txt file")
@@ -569,13 +522,11 @@ func (ms *MetadataService) extractLyrics(filePath string, metadata tag.Metadata)
 	return lyrics
 }
 
-// extractEmbeddedLyrics extracts lyrics from ID3 tags
 func (ms *MetadataService) extractEmbeddedLyrics(metadata tag.Metadata) *ExtractedLyrics {
 	if metadata == nil {
 		return nil
 	}
 
-	// Extract lyrics using the dhowden/tag library
 	lyricsText := metadata.Lyrics()
 	if lyricsText == "" {
 		return nil
@@ -589,18 +540,14 @@ func (ms *MetadataService) extractEmbeddedLyrics(metadata tag.Metadata) *Extract
 	}
 }
 
-// extractLrcFileWithMetadata attempts to find and parse a .lrc file, filling in missing metadata from song info
 func (ms *MetadataService) extractLrcFileWithMetadata(audioFilePath string, songMetadata tag.Metadata) *ExtractedLyrics {
-	// Build expected .lrc file path
 	baseName := strings.TrimSuffix(audioFilePath, filepath.Ext(audioFilePath))
 	lrcPath := baseName + ".lrc"
 
-	// Check if .lrc file exists
 	if _, err := os.Stat(lrcPath); os.IsNotExist(err) {
 		return nil
 	}
 
-	// Open and parse .lrc file
 	file, err := os.Open(lrcPath)
 	if err != nil {
 		log.Printf("Failed to open LRC file %s: %v", lrcPath, err)
@@ -608,7 +555,6 @@ func (ms *MetadataService) extractLrcFileWithMetadata(audioFilePath string, song
 	}
 	defer file.Close()
 
-	// Parse LRC content using our custom parser
 	parser := NewLRCParser()
 	lrcDoc, err := parser.Parse(file)
 	if err != nil {
@@ -616,13 +562,11 @@ func (ms *MetadataService) extractLrcFileWithMetadata(audioFilePath string, song
 		return nil
 	}
 
-	// Skip if no lyrics lines found
 	if len(lrcDoc.Lines) == 0 {
 		log.Printf("No lyrics lines found in LRC file %s", lrcPath)
 		return nil
 	}
 
-	// Fill in missing metadata from song information
 	if lrcDoc.Metadata.Title == "" && songMetadata != nil {
 		lrcDoc.Metadata.Title = songMetadata.Title()
 	}
@@ -632,13 +576,11 @@ func (ms *MetadataService) extractLrcFileWithMetadata(audioFilePath string, song
 	if lrcDoc.Metadata.Album == "" && songMetadata != nil {
 		lrcDoc.Metadata.Album = songMetadata.Album()
 	}
-	// Detect language if not set in LRC metadata
 	if lrcDoc.Metadata.Language == "" {
 		detectedLang := lrcDoc.detectLanguageFromContent()
 		lrcDoc.Metadata.Language = detectedLang
 	}
 
-	// Convert to JSON for storage (preserves timing and metadata)
 	jsonContent, err := lrcDoc.ToJSON()
 	if err != nil {
 		log.Printf("Failed to convert LRC to JSON %s: %v", lrcPath, err)
@@ -653,25 +595,20 @@ func (ms *MetadataService) extractLrcFileWithMetadata(audioFilePath string, song
 	}
 }
 
-// extractTxtFile attempts to find and read a .txt file with the same name as the audio file
 func (ms *MetadataService) extractTxtFile(audioFilePath string) *ExtractedLyrics {
-	// Build expected .txt file path
 	baseName := strings.TrimSuffix(audioFilePath, filepath.Ext(audioFilePath))
 	txtPath := baseName + ".txt"
 
-	// Check if .txt file exists
 	if _, err := os.Stat(txtPath); os.IsNotExist(err) {
 		return nil
 	}
 
-	// Read .txt file content
 	content, err := os.ReadFile(txtPath)
 	if err != nil {
 		log.Printf("Failed to read TXT file %s: %v", txtPath, err)
 		return nil
 	}
 
-	// Skip empty files
 	if len(strings.TrimSpace(string(content))) == 0 {
 		return nil
 	}
@@ -680,6 +617,6 @@ func (ms *MetadataService) extractTxtFile(audioFilePath string) *ExtractedLyrics
 		Content:  string(content),
 		Type:     "unsynced",
 		Source:   "external_txt",
-		Language: "eng", // Default to English
+		Language: "eng",
 	}
 }

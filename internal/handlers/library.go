@@ -36,7 +36,6 @@ func (h *LibraryHandler) GetStats(c *gin.Context) {
 }
 
 func (h *LibraryHandler) GetArtists(c *gin.Context) {
-	// Parse query parameters
 	limit := parseIntParam(c, "limit", 50)
 	offset := parseIntParam(c, "offset", 0)
 	sort := c.DefaultQuery("sort", "name")
@@ -76,7 +75,6 @@ func (h *LibraryHandler) GetArtist(c *gin.Context) {
 }
 
 func (h *LibraryHandler) GetAlbums(c *gin.Context) {
-	// Parse query parameters
 	limit := parseIntParam(c, "limit", 50)
 	offset := parseIntParam(c, "offset", 0)
 	sort := c.DefaultQuery("sort", "artist")
@@ -125,9 +123,7 @@ func (h *LibraryHandler) GetAlbum(c *gin.Context) {
 func (h *LibraryHandler) GetSongs(c *gin.Context) {
 	idsParam := c.Query("ids")
 
-	// If ids parameter is provided, do batch fetch
 	if idsParam != "" {
-		// Parse comma-separated IDs
 		idStrings := strings.Split(idsParam, ",")
 		ids := make([]int, 0, len(idStrings))
 
@@ -154,7 +150,6 @@ func (h *LibraryHandler) GetSongs(c *gin.Context) {
 			return
 		}
 
-		// Return 404 if no songs were found for any of the requested IDs
 		if len(songs) == 0 {
 			c.JSON(http.StatusNotFound, gin.H{
 				"error":   "not_found",
@@ -167,7 +162,6 @@ func (h *LibraryHandler) GetSongs(c *gin.Context) {
 		return
 	}
 
-	// Otherwise, list all songs with pagination and sorting
 	limit := parseIntParam(c, "limit", 50)
 	offset := parseIntParam(c, "offset", 0)
 	sort := c.DefaultQuery("sort", "title")
@@ -216,7 +210,6 @@ func (h *LibraryHandler) Search(c *gin.Context) {
 		return
 	}
 
-	// Parse search parameters
 	searchType := c.Query("type") // "song", "album", "artist", or empty for all
 	limit := parseIntParam(c, "limit", 20)
 	offset := parseIntParam(c, "offset", 0)

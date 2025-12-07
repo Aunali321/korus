@@ -132,7 +132,6 @@ func (s *SearchService) IndexSong(ctx context.Context, song *models.Song) error 
 				doc.Year = *album.Year
 			}
 
-			// Get album artist
 			if album.AlbumArtistID != nil {
 				albumArtist, err := s.getArtist(ctx, *album.AlbumArtistID)
 				if err == nil {
@@ -156,7 +155,6 @@ func (s *SearchService) IndexAlbum(ctx context.Context, album *models.Album) err
 		doc.Year = *album.Year
 	}
 
-	// Get artist information
 	if album.ArtistID != nil {
 		artist, err := s.getArtist(ctx, *album.ArtistID)
 		if err == nil {
@@ -164,7 +162,6 @@ func (s *SearchService) IndexAlbum(ctx context.Context, album *models.Album) err
 		}
 	}
 
-	// Get album artist information
 	if album.AlbumArtistID != nil {
 		albumArtist, err := s.getArtist(ctx, *album.AlbumArtistID)
 		if err == nil {
@@ -192,47 +189,40 @@ func (s *SearchService) RemoveFromIndex(itemType string, id int) error {
 }
 
 func (s *SearchService) Search(ctx context.Context, options SearchOptions) (*models.SearchResults, error) {
-	// Build search query
 	query, err := s.buildSearchQuery(options)
 	if err != nil {
 		return nil, fmt.Errorf("failed to build search query: %w", err)
 	}
 
-	// Create search request
 	searchRequest := bleve.NewSearchRequest(query)
 	searchRequest.Size = options.Limit
 	searchRequest.From = options.Offset
 	searchRequest.Fields = []string{"*"}
 
-	// Add highlighting
 	searchRequest.Highlight = bleve.NewHighlight()
 	searchRequest.Highlight.AddField("title")
 	searchRequest.Highlight.AddField("artist")
 	searchRequest.Highlight.AddField("album")
 
-	// Execute search
 	searchResult, err := s.index.Search(searchRequest)
 	if err != nil {
 		return nil, fmt.Errorf("search failed: %w", err)
 	}
 
-	// Convert results to models
 	return s.convertSearchResults(ctx, searchResult)
 }
 
 func (s *SearchService) buildSearchQuery(options SearchOptions) (query.Query, error) {
 	var queries []query.Query
 
-	// Main text query
 	if options.Query != "" {
-		// Create a disjunction query across multiple fields
 		titleQuery := bleve.NewMatchQuery(options.Query)
 		titleQuery.SetField("title")
-		titleQuery.SetBoost(2.0) // Boost title matches
+		titleQuery.SetBoost(2.0)
 
 		artistQuery := bleve.NewMatchQuery(options.Query)
 		artistQuery.SetField("artist")
-		artistQuery.SetBoost(1.5) // Boost artist matches
+		artistQuery.SetBoost(1.5)
 
 		albumQuery := bleve.NewMatchQuery(options.Query)
 		albumQuery.SetField("album")
@@ -240,19 +230,16 @@ func (s *SearchService) buildSearchQuery(options SearchOptions) (query.Query, er
 		albumArtistQuery := bleve.NewMatchQuery(options.Query)
 		albumArtistQuery.SetField("album_artist")
 
-		// Create disjunction (OR) query
 		textQuery := bleve.NewDisjunctionQuery(titleQuery, artistQuery, albumQuery, albumArtistQuery)
 		queries = append(queries, textQuery)
 	}
 
-	// Type filter
 	if options.Type != "" {
 		typeQuery := bleve.NewTermQuery(options.Type)
 		typeQuery.SetField("type")
 		queries = append(queries, typeQuery)
 	}
 
-	// Combine queries with conjunction (AND)
 	if len(queries) == 0 {
 		return bleve.NewMatchAllQuery(), nil
 	} else if len(queries) == 1 {
@@ -270,7 +257,6 @@ func (s *SearchService) convertSearchResults(ctx context.Context, searchResult *
 	}
 
 	for _, hit := range searchResult.Hits {
-		// Extract type and ID from document ID
 		parts := strings.SplitN(hit.ID, "_", 2)
 		if len(parts) != 2 {
 			continue
@@ -282,7 +268,6 @@ func (s *SearchService) convertSearchResults(ctx context.Context, searchResult *
 			continue
 		}
 
-		// Fetch full object from database
 		switch itemType {
 		case "song":
 			song, err := s.getSong(ctx, id)
@@ -306,22 +291,18 @@ func (s *SearchService) convertSearchResults(ctx context.Context, searchResult *
 }
 
 func (s *SearchService) RebuildIndex(ctx context.Context) error {
-	// Clear existing index
 	if err := s.clearIndex(); err != nil {
 		return fmt.Errorf("failed to clear index: %w", err)
 	}
 
-	// Index all songs
 	if err := s.indexAllSongs(ctx); err != nil {
 		return fmt.Errorf("failed to index songs: %w", err)
 	}
 
-	// Index all albums
 	if err := s.indexAllAlbums(ctx); err != nil {
 		return fmt.Errorf("failed to index albums: %w", err)
 	}
 
-	// Index all artists
 	if err := s.indexAllArtists(ctx); err != nil {
 		return fmt.Errorf("failed to index artists: %w", err)
 	}
@@ -330,10 +311,9 @@ func (s *SearchService) RebuildIndex(ctx context.Context) error {
 }
 
 func (s *SearchService) clearIndex() error {
-	// Get all document IDs
 	query := bleve.NewMatchAllQuery()
 	searchRequest := bleve.NewSearchRequest(query)
-	searchRequest.Size = 10000 // Large number to get all documents
+	searchRequest.Size = 10000
 	searchRequest.Fields = []string{}
 
 	searchResult, err := s.index.Search(searchRequest)
@@ -341,7 +321,6 @@ func (s *SearchService) clearIndex() error {
 		return err
 	}
 
-	// Delete all documents
 	for _, hit := range searchResult.Hits {
 		if err := s.index.Delete(hit.ID); err != nil {
 			return err
@@ -376,7 +355,6 @@ func (s *SearchService) indexAllSongs(ctx context.Context) error {
 		}
 
 		if err := s.IndexSong(ctx, &song); err != nil {
-			// Log error but continue
 			fmt.Printf("Failed to index song %d: %v\n", song.ID, err)
 		}
 	}
@@ -406,7 +384,6 @@ func (s *SearchService) indexAllAlbums(ctx context.Context) error {
 		}
 
 		if err := s.IndexAlbum(ctx, &album); err != nil {
-			// Log error but continue
 			fmt.Printf("Failed to index album %d: %v\n", album.ID, err)
 		}
 	}
@@ -435,7 +412,6 @@ func (s *SearchService) indexAllArtists(ctx context.Context) error {
 		}
 
 		if err := s.IndexArtist(ctx, &artist); err != nil {
-			// Log error but continue
 			fmt.Printf("Failed to index artist %d: %v\n", artist.ID, err)
 		}
 	}
@@ -443,7 +419,6 @@ func (s *SearchService) indexAllArtists(ctx context.Context) error {
 	return rows.Err()
 }
 
-// Helper methods to fetch data from database
 func (s *SearchService) getSong(ctx context.Context, id int) (*models.Song, error) {
 	query := `
 		SELECT id, title, album_id, artist_id, track_number, disc_number, duration, 

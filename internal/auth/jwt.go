@@ -43,7 +43,6 @@ func (tm *TokenManager) GenerateTokenPair(user *models.User) (*TokenPair, error)
 	now := time.Now()
 	expiresAt := now.Add(tm.accessTokenExpiry)
 
-	// Create access token claims
 	claims := &Claims{
 		UserID:   user.ID,
 		Username: user.Username,
@@ -57,14 +56,12 @@ func (tm *TokenManager) GenerateTokenPair(user *models.User) (*TokenPair, error)
 		},
 	}
 
-	// Generate access token
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
 	accessToken, err := token.SignedString(tm.jwtSecret)
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate access token: %w", err)
 	}
 
-	// Generate refresh token
 	refreshToken, err := tm.generateRefreshToken()
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate refresh token: %w", err)
@@ -79,7 +76,6 @@ func (tm *TokenManager) GenerateTokenPair(user *models.User) (*TokenPair, error)
 
 func (tm *TokenManager) ValidateAccessToken(tokenString string) (*Claims, error) {
 	token, err := jwt.ParseWithClaims(tokenString, &Claims{}, func(token *jwt.Token) (interface{}, error) {
-		// Validate signing method
 		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
 			return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
 		}

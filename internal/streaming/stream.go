@@ -43,7 +43,6 @@ func (s *StreamingService) StreamSong(c *gin.Context) {
 		return
 	}
 
-	// Get song from database
 	song, err := s.libraryService.GetSong(c.Request.Context(), songID)
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{
@@ -53,7 +52,6 @@ func (s *StreamingService) StreamSong(c *gin.Context) {
 		return
 	}
 
-	// Check if file exists
 	if _, err := os.Stat(song.FilePath); os.IsNotExist(err) {
 		c.JSON(http.StatusNotFound, gin.H{
 			"error":   "file_not_found",
@@ -62,19 +60,14 @@ func (s *StreamingService) StreamSong(c *gin.Context) {
 		return
 	}
 
-	// Check for transcoding request
 	format := c.Query("format")
 	bitrateStr := c.Query("bitrate")
 
 	if format != "" {
-		// Transcoding requested
 		s.handleTranscode(c, song.FilePath, format, bitrateStr)
 		return
 	}
 
-	// Serve original file (existing logic)
-
-	// Open file
 	file, err := os.Open(song.FilePath)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
@@ -85,7 +78,6 @@ func (s *StreamingService) StreamSong(c *gin.Context) {
 	}
 	defer file.Close()
 
-	// Get file info
 	fileInfo, err := file.Stat()
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
@@ -98,32 +90,26 @@ func (s *StreamingService) StreamSong(c *gin.Context) {
 	fileSize := fileInfo.Size()
 	lastModified := fileInfo.ModTime()
 
-	// Set content type based on file extension
 	contentType := getContentType(song.FilePath)
 
-	// Set basic headers
 	c.Header("Content-Type", contentType)
 	c.Header("Accept-Ranges", "bytes")
 	c.Header("Last-Modified", lastModified.Format(http.TimeFormat))
 	c.Header("Cache-Control", "public, max-age=31536000") // Cache for 1 year
 
-	// Handle conditional requests
 	if checkNotModified(c, lastModified) {
 		c.Status(http.StatusNotModified)
 		return
 	}
 
-	// Parse Range header if present
 	rangeHeader := c.GetHeader("Range")
 	if rangeHeader == "" {
-		// No range request, serve entire file
 		c.Header("Content-Length", strconv.FormatInt(fileSize, 10))
 		c.Status(http.StatusOK)
 		io.Copy(c.Writer, file)
 		return
 	}
 
-	// Parse range specification
 	ranges, err := parseRangeHeader(rangeHeader, fileSize)
 	if err != nil {
 		c.Header("Content-Range", fmt.Sprintf("bytes */%d", fileSize))
@@ -138,16 +124,13 @@ func (s *StreamingService) StreamSong(c *gin.Context) {
 		return
 	}
 
-	// Handle single range request
 	r := ranges[0]
 	contentLength := r.end - r.start + 1
 
-	// Set partial content headers
 	c.Header("Content-Range", fmt.Sprintf("bytes %d-%d/%d", r.start, r.end, fileSize))
 	c.Header("Content-Length", strconv.FormatInt(contentLength, 10))
 	c.Status(http.StatusPartialContent)
 
-	// Seek to start position
 	if _, err := file.Seek(r.start, io.SeekStart); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"error":   "seek_error",
@@ -156,13 +139,10 @@ func (s *StreamingService) StreamSong(c *gin.Context) {
 		return
 	}
 
-	// Copy the requested range
 	io.CopyN(c.Writer, file, contentLength)
 }
 
-// handleTranscode validates params and streams transcoded audio
 func (s *StreamingService) handleTranscode(c *gin.Context, filePath, format, bitrateStr string) {
-	// Check if transcoder is available
 	if s.transcoder == nil || !s.transcoder.IsAvailable() {
 		c.JSON(http.StatusServiceUnavailable, gin.H{
 			"error":   "transcoding_unavailable",
@@ -171,7 +151,6 @@ func (s *StreamingService) handleTranscode(c *gin.Context, filePath, format, bit
 		return
 	}
 
-	// Validate format and bitrate
 	bitrate, err := transcoding.ValidateParams(format, bitrateStr)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
@@ -181,18 +160,15 @@ func (s *StreamingService) handleTranscode(c *gin.Context, filePath, format, bit
 		return
 	}
 
-	// Set headers for transcoded stream
 	c.Header("Content-Type", transcoding.GetContentType(format))
 	c.Header("Accept-Ranges", "none")     // Cannot seek in transcoded stream
 	c.Header("Cache-Control", "no-cache") // Don't cache transcoded streams
 	c.Status(http.StatusOK)
 
-	// Stream transcoded audio
 	if err := s.transcoder.Stream(c.Request.Context(), filePath, format, bitrate, c.Writer); err != nil {
 		// If we haven't written anything yet, we can still send error
 		// Otherwise the error is logged but client already received partial data
 		if c.Writer.Written() {
-			// Already started writing, just log
 			fmt.Printf("Transcoding error (partial response sent): %v\n", err)
 		}
 		// Context cancelled (client disconnected) is not an error
@@ -224,7 +200,6 @@ func getContentType(filePath string) string {
 }
 
 func checkNotModified(c *gin.Context, lastModified time.Time) bool {
-	// Check If-Modified-Since header
 	if modSince := c.GetHeader("If-Modified-Since"); modSince != "" {
 		if t, err := time.Parse(http.TimeFormat, modSince); err == nil {
 			// Truncate to seconds for comparison
@@ -234,7 +209,6 @@ func checkNotModified(c *gin.Context, lastModified time.Time) bool {
 		}
 	}
 
-	// Check If-Unmodified-Since header
 	if unmodSince := c.GetHeader("If-Unmodified-Since"); unmodSince != "" {
 		if t, err := time.Parse(http.TimeFormat, unmodSince); err == nil {
 			if lastModified.After(t) {

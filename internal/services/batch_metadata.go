@@ -127,7 +127,6 @@ func (bms *BatchMetadataService) ProcessBatchWithOptions(ctx context.Context, fi
 
 	log.Printf("📖 Phase 1 complete: %d metadata extracted, %d errors", len(metadataList), result.ErrorCount)
 
-	// Phase 2: Batch database operations
 	if len(metadataList) > 0 {
 		log.Printf("💾 Phase 2: Storing %d songs to database", len(metadataList))
 		err := bms.storeBatchMetadata(ctx, metadataList, result)
@@ -152,7 +151,6 @@ func (bms *BatchMetadataService) ProcessBatchWithOptions(ctx context.Context, fi
 func (bms *BatchMetadataService) storeBatchMetadata(ctx context.Context, metadataList []*ExtractedMetadata, result *BatchResult) error {
 	log.Printf("💾 Starting database transaction for %d songs", len(metadataList))
 	return bms.db.WithTransaction(ctx, func(tx pgx.Tx) error {
-		// Collect unique artists and albums for batch processing
 		log.Printf("🔍 Collecting unique artists and albums...")
 		artistMap := make(map[string]bool)
 		albumMap := make(map[string]albumKey)
@@ -186,7 +184,6 @@ func (bms *BatchMetadataService) storeBatchMetadata(ctx context.Context, metadat
 
 		log.Printf("🎤 Found %d unique artists, %d unique albums", len(artistMap), len(albumMap))
 
-		// Batch insert/update artists
 		log.Printf("🎤 Batch upserting %d artists...", len(artistMap))
 		artistIDs, err := bms.batchUpsertArtists(ctx, tx, artistMap, metadataList)
 		if err != nil {
@@ -195,7 +192,6 @@ func (bms *BatchMetadataService) storeBatchMetadata(ctx context.Context, metadat
 		}
 		log.Printf("✅ Created/found %d artists", len(artistIDs))
 
-		// Batch insert/update albums
 		log.Printf("💿 Batch upserting %d albums...", len(albumMap))
 		albumIDs, err := bms.batchUpsertAlbums(ctx, tx, albumMap, artistIDs)
 		if err != nil {
@@ -204,7 +200,6 @@ func (bms *BatchMetadataService) storeBatchMetadata(ctx context.Context, metadat
 		}
 		log.Printf("✅ Created/found %d albums", len(albumIDs))
 
-		// Bulk insert/update songs
 		log.Printf("🎵 Bulk upserting %d songs...", len(metadataList))
 		songIDs, err := bms.bulkUpsertSongs(ctx, tx, metadataList, artistIDs, albumIDs)
 		if err != nil {
@@ -213,7 +208,6 @@ func (bms *BatchMetadataService) storeBatchMetadata(ctx context.Context, metadat
 		}
 		log.Printf("✅ Bulk upserted %d songs", len(songIDs))
 
-		// Build success files and lyrics map
 		songLyricsMap := make(map[int][]ExtractedLyrics)
 		for _, metadata := range metadataList {
 			songID, exists := songIDs[metadata.FilePath]
@@ -231,7 +225,6 @@ func (bms *BatchMetadataService) storeBatchMetadata(ctx context.Context, metadat
 			}
 		}
 
-		// Bulk insert all lyrics at once
 		if len(songLyricsMap) > 0 {
 			if err := bms.bulkStoreLyrics(ctx, tx, songLyricsMap); err != nil {
 				return fmt.Errorf("failed to bulk store lyrics: %w", err)
@@ -255,7 +248,6 @@ func (bms *BatchMetadataService) batchUpsertArtists(ctx context.Context, tx pgx.
 		return result, nil
 	}
 
-	// First, get existing artists
 	artistNames := make([]string, 0, len(artistMap))
 	for name := range artistMap {
 		artistNames = append(artistNames, name)
@@ -278,7 +270,6 @@ func (bms *BatchMetadataService) batchUpsertArtists(ctx context.Context, tx pgx.
 		delete(artistMap, nameLower) // Remove from map so we don't insert it
 	}
 
-	// Insert new artists in batch
 	if len(artistMap) > 0 {
 		valueStrings := make([]string, 0, len(artistMap))
 		valueArgs := make([]interface{}, 0, len(artistMap)*2)
@@ -338,7 +329,6 @@ func (bms *BatchMetadataService) batchUpsertAlbums(ctx context.Context, tx pgx.T
 		return result, nil
 	}
 
-	// Build bulk insert values
 	valueStrings := make([]string, 0, len(albumMap))
 	valueArgs := make([]interface{}, 0, len(albumMap)*3)
 	paramIdx := 1
@@ -358,7 +348,6 @@ func (bms *BatchMetadataService) batchUpsertAlbums(ctx context.Context, tx pgx.T
 		return result, nil
 	}
 
-	// Bulk upsert all albums
 	insertQuery := fmt.Sprintf(`
 		INSERT INTO albums (name, artist_id, album_artist_id, cover_path, date_added)
 		VALUES %s
@@ -372,7 +361,6 @@ func (bms *BatchMetadataService) batchUpsertAlbums(ctx context.Context, tx pgx.T
 		return nil, fmt.Errorf("failed to bulk insert albums: %w", err)
 	}
 
-	// Now query back all album IDs
 	albumNames := make([]string, 0, len(albumMap))
 	for _, albumInfo := range albumMap {
 		albumNames = append(albumNames, strings.ToLower(albumInfo.name))
@@ -405,7 +393,6 @@ func (bms *BatchMetadataService) bulkUpsertSongs(ctx context.Context, tx pgx.Tx,
 		return result, nil
 	}
 
-	// Build bulk insert values
 	valueStrings := make([]string, 0, len(metadataList))
 	valueArgs := make([]interface{}, 0, len(metadataList)*12)
 	filePaths := make([]string, 0, len(metadataList))
@@ -437,7 +424,6 @@ func (bms *BatchMetadataService) bulkUpsertSongs(ctx context.Context, tx pgx.Tx,
 		return result, nil
 	}
 
-	// Bulk upsert all songs
 	insertQuery := fmt.Sprintf(`
 		INSERT INTO songs (
 			title, album_id, artist_id, track_number, disc_number,
@@ -464,7 +450,6 @@ func (bms *BatchMetadataService) bulkUpsertSongs(ctx context.Context, tx pgx.Tx,
 		return nil, fmt.Errorf("failed to bulk insert songs: %w", err)
 	}
 
-	// Query back all song IDs by file_path
 	selectQuery := `SELECT id, file_path FROM songs WHERE file_path = ANY($1)`
 	rows, err := tx.Query(ctx, selectQuery, filePaths)
 	if err != nil {
@@ -490,20 +475,17 @@ func (bms *BatchMetadataService) bulkStoreLyrics(ctx context.Context, tx pgx.Tx,
 		return nil
 	}
 
-	// Collect all song IDs for bulk delete
 	songIDs := make([]int, 0, len(songLyricsMap))
 	for songID := range songLyricsMap {
 		songIDs = append(songIDs, songID)
 	}
 
-	// Bulk delete existing lyrics for all songs
 	deleteQuery := "DELETE FROM lyrics WHERE song_id = ANY($1)"
 	_, err := tx.Exec(ctx, deleteQuery, songIDs)
 	if err != nil {
 		return fmt.Errorf("failed to bulk delete existing lyrics: %w", err)
 	}
 
-	// Count total lyrics for capacity
 	totalLyrics := 0
 	for _, lyrics := range songLyricsMap {
 		totalLyrics += len(lyrics)
@@ -511,7 +493,6 @@ func (bms *BatchMetadataService) bulkStoreLyrics(ctx context.Context, tx pgx.Tx,
 
 	log.Printf("💾 Bulk inserting %d lyrics entries for %d songs", totalLyrics, len(songLyricsMap))
 
-	// Build bulk insert query for ALL lyrics
 	valueStrings := make([]string, 0, totalLyrics)
 	valueArgs := make([]interface{}, 0, totalLyrics*5)
 	paramIdx := 1

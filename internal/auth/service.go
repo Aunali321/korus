@@ -24,7 +24,6 @@ func NewService(db *database.DB, tokenManager *TokenManager) *Service {
 }
 
 func (s *Service) Login(ctx context.Context, username, password string) (*TokenPair, *models.User, error) {
-	// Get user by username
 	user, err := s.getUserByUsername(ctx, username)
 	if err != nil {
 		if err == pgx.ErrNoRows {
@@ -33,27 +32,22 @@ func (s *Service) Login(ctx context.Context, username, password string) (*TokenP
 		return nil, nil, fmt.Errorf("failed to get user: %w", err)
 	}
 
-	// Verify password
 	if !VerifyPassword(user.PasswordHash, password) {
 		return nil, nil, fmt.Errorf("invalid credentials")
 	}
 
-	// Generate token pair
 	tokens, err := s.tokenManager.GenerateTokenPair(user)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to generate tokens: %w", err)
 	}
 
-	// Store refresh token
 	err = s.storeRefreshToken(ctx, user.ID, tokens.RefreshToken, s.tokenManager.GetRefreshTokenExpiry())
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to store refresh token: %w", err)
 	}
 
-	// Update last login
 	err = s.updateLastLogin(ctx, user.ID)
 	if err != nil {
-		// Log error but don't fail the login
 		fmt.Printf("Warning: failed to update last login for user %d: %v\n", user.ID, err)
 	}
 
@@ -61,7 +55,6 @@ func (s *Service) Login(ctx context.Context, username, password string) (*TokenP
 }
 
 func (s *Service) RefreshToken(ctx context.Context, refreshToken string) (*TokenPair, error) {
-	// Validate refresh token
 	session, err := s.getSessionByRefreshToken(ctx, refreshToken)
 	if err != nil {
 		if err == pgx.ErrNoRows {
@@ -70,20 +63,16 @@ func (s *Service) RefreshToken(ctx context.Context, refreshToken string) (*Token
 		return nil, fmt.Errorf("failed to get session: %w", err)
 	}
 
-	// Check if token is expired
 	if time.Now().After(session.ExpiresAt) {
-		// Clean up expired token
 		s.deleteSession(ctx, session.ID)
 		return nil, fmt.Errorf("refresh token expired")
 	}
 
-	// Get user
 	user, err := s.getUserByID(ctx, session.UserID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get user: %w", err)
 	}
 
-	// Generate new access token only
 	accessToken, expiresAt, err := s.tokenManager.GenerateAccessToken(user)
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate access token: %w", err)
@@ -91,7 +80,7 @@ func (s *Service) RefreshToken(ctx context.Context, refreshToken string) (*Token
 
 	return &TokenPair{
 		AccessToken:  accessToken,
-		RefreshToken: refreshToken, // Keep same refresh token
+		RefreshToken: refreshToken,
 		ExpiresAt:    expiresAt,
 	}, nil
 }
@@ -101,18 +90,15 @@ func (s *Service) Logout(ctx context.Context, refreshToken string) error {
 }
 
 func (s *Service) CreateUser(ctx context.Context, username, email, password string) (*models.User, error) {
-	// Validate password strength
 	if err := ValidatePasswordStrength(password); err != nil {
 		return nil, err
 	}
 
-	// Hash password
 	hashedPassword, err := HashPassword(password)
 	if err != nil {
 		return nil, fmt.Errorf("failed to hash password: %w", err)
 	}
 
-	// Create user
 	query := `
 		INSERT INTO users (username, email, password_hash, role)
 		VALUES ($1, $2, $3, $4)
@@ -136,13 +122,11 @@ func (s *Service) CreateUser(ctx context.Context, username, email, password stri
 }
 
 func (s *Service) CreateAdminUser(ctx context.Context, username, password string) (*models.User, error) {
-	// Hash password
 	hashedPassword, err := HashPassword(password)
 	if err != nil {
 		return nil, fmt.Errorf("failed to hash password: %w", err)
 	}
 
-	// Create admin user
 	query := `
 		INSERT INTO users (username, password_hash, role)
 		VALUES ($1, $2, 'admin')
@@ -169,7 +153,6 @@ func (s *Service) ValidateToken(ctx context.Context, tokenString string) (*model
 		return nil, err
 	}
 
-	// Get fresh user data to ensure user still exists and is active
 	user, err := s.getUserByID(ctx, claims.UserID)
 	if err != nil {
 		return nil, fmt.Errorf("user not found")
@@ -186,8 +169,6 @@ func (s *Service) HasUsers(ctx context.Context) (bool, error) {
 	}
 	return count > 0, nil
 }
-
-// Private helper methods
 
 func (s *Service) getUserByUsername(ctx context.Context, username string) (*models.User, error) {
 	query := `

@@ -79,7 +79,7 @@ func (w *Worker) run(ctx context.Context) {
 	log.Printf("Worker %d started", w.id)
 	defer log.Printf("Worker %d stopped", w.id)
 
-	ticker := time.NewTicker(5 * time.Second) // Check for jobs every 5 seconds
+	ticker := time.NewTicker(5 * time.Second)
 	defer ticker.Stop()
 
 	for {
@@ -97,35 +97,31 @@ func (w *Worker) run(ctx context.Context) {
 }
 
 func (w *Worker) processJob(ctx context.Context) error {
-	// Get supported job types
 	var jobTypes []string
 	for jobType := range w.handlers {
 		jobTypes = append(jobTypes, jobType)
 	}
 
 	if len(jobTypes) == 0 {
-		return nil // No handlers registered
+		return nil
 	}
 
-	// Dequeue job
 	job, err := w.queue.Dequeue(ctx, jobTypes)
 	if err != nil {
 		return fmt.Errorf("failed to dequeue job: %w", err)
 	}
 
 	if job == nil {
-		return nil // No jobs available
+		return nil
 	}
 
 	log.Printf("Worker %d processing job %d (type: %s)", w.id, job.ID, job.JobType)
 
-	// Get handler
 	handler, exists := w.handlers[job.JobType]
 	if !exists {
 		return w.queue.Fail(ctx, job.ID, fmt.Sprintf("no handler for job type: %s", job.JobType))
 	}
 
-	// Process job with timeout
 	jobCtx, cancel := context.WithTimeout(ctx, 30*time.Minute) // 30 minute timeout
 	defer cancel()
 
@@ -136,7 +132,6 @@ func (w *Worker) processJob(ctx context.Context) error {
 	if err != nil {
 		log.Printf("Worker %d job %d failed after %v: %v", w.id, job.ID, duration, err)
 
-		// Retry job up to 3 times
 		if job.Attempts < 3 {
 			return w.queue.Retry(ctx, job.ID, 3)
 		}
@@ -155,11 +150,9 @@ func (wp *WorkerPool) RegisterHandler(jobType string, handler JobHandler) {
 func (wp *WorkerPool) Start(ctx context.Context) error {
 	log.Printf("Starting worker pool with %d workers", wp.workerCount)
 
-	// Create and start workers
 	for i := 0; i < wp.workerCount; i++ {
 		worker := NewWorker(i+1, wp.queue)
 
-		// Register all handlers with each worker
 		for jobType, handler := range wp.handlers {
 			worker.RegisterHandler(jobType, handler)
 		}
@@ -168,7 +161,6 @@ func (wp *WorkerPool) Start(ctx context.Context) error {
 		worker.Start(ctx)
 	}
 
-	// Start cleanup routine
 	wp.wg.Add(1)
 	go wp.cleanupRoutine(ctx)
 
@@ -180,7 +172,6 @@ func (wp *WorkerPool) Stop() {
 
 	close(wp.stopCh)
 
-	// Stop all workers
 	for _, worker := range wp.workers {
 		worker.Stop()
 	}
@@ -200,7 +191,7 @@ func (wp *WorkerPool) GetQueue() *Queue {
 func (wp *WorkerPool) cleanupRoutine(ctx context.Context) {
 	defer wp.wg.Done()
 
-	ticker := time.NewTicker(1 * time.Hour) // Cleanup every hour
+	ticker := time.NewTicker(1 * time.Hour)
 	defer ticker.Stop()
 
 	for {
@@ -210,7 +201,6 @@ func (wp *WorkerPool) cleanupRoutine(ctx context.Context) {
 		case <-wp.stopCh:
 			return
 		case <-ticker.C:
-			// Cleanup completed jobs older than 24 hours
 			olderThan := time.Now().Add(-24 * time.Hour)
 			count, err := wp.queue.CleanupCompletedJobs(ctx, olderThan)
 			if err != nil {
@@ -243,7 +233,6 @@ func (wp *WorkerPool) listenForJobNotifications(ctx context.Context, db *databas
 	}
 	defer conn.Release()
 
-	// Listen for job notifications
 	_, err = conn.Exec(ctx, "LISTEN new_job")
 	if err != nil {
 		return fmt.Errorf("failed to listen for notifications: %w", err)
@@ -258,10 +247,8 @@ func (wp *WorkerPool) listenForJobNotifications(ctx context.Context, db *databas
 		case <-wp.stopCh:
 			return nil
 		default:
-			// Wait for notification with timeout
 			notification, err := conn.Conn().WaitForNotification(ctx)
 			if err != nil {
-				// Check if context was cancelled
 				if ctx.Err() != nil {
 					return nil
 				}
@@ -271,13 +258,11 @@ func (wp *WorkerPool) listenForJobNotifications(ctx context.Context, db *databas
 
 			if notification.Channel == "new_job" {
 				log.Printf("Received job notification: %s", notification.Payload)
-				// Notification received, workers will pick up jobs on their next tick
 			}
 		}
 	}
 }
 
-// Helper function to trigger job notifications
 func (wp *WorkerPool) NotifyNewJob(ctx context.Context, db *database.DB, jobType string) error {
 	_, err := db.ExecContext(ctx, "NOTIFY new_job, $1", jobType)
 	return err

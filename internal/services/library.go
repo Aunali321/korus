@@ -19,25 +19,21 @@ func NewLibraryService(db *database.DB) *LibraryService {
 func (ls *LibraryService) GetStats(ctx context.Context) (*models.LibraryStats, error) {
 	stats := &models.LibraryStats{}
 
-	// Get total songs
 	err := ls.db.QueryRowContext(ctx, "SELECT COUNT(*) FROM songs").Scan(&stats.TotalSongs)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get song count: %w", err)
 	}
 
-	// Get total artists
 	err = ls.db.QueryRowContext(ctx, "SELECT COUNT(*) FROM artists").Scan(&stats.TotalArtists)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get artist count: %w", err)
 	}
 
-	// Get total albums
 	err = ls.db.QueryRowContext(ctx, "SELECT COUNT(*) FROM albums").Scan(&stats.TotalAlbums)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get album count: %w", err)
 	}
 
-	// Get total duration
 	err = ls.db.QueryRowContext(ctx, "SELECT COALESCE(SUM(duration), 0) FROM songs").Scan(&stats.TotalDuration)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get total duration: %w", err)
@@ -57,7 +53,6 @@ func (ls *LibraryService) GetArtists(ctx context.Context, limit, offset int, sor
 		GROUP BY a.id, a.name, a.sort_name, a.musicbrainz_id
 	`
 
-	// Add sorting
 	switch sort {
 	case "name":
 		query += " ORDER BY a.name"
@@ -113,14 +108,12 @@ func (ls *LibraryService) GetArtist(ctx context.Context, id int) (*models.Artist
 		return nil, fmt.Errorf("failed to get artist: %w", err)
 	}
 
-	// Get artist albums
 	albums, err := ls.GetArtistAlbums(ctx, id)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get artist albums: %w", err)
 	}
 	artist.Albums = albums
 
-	// Get top tracks
 	topTracks, err := ls.GetArtistTopTracks(ctx, id)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get artist top tracks: %w", err)
@@ -145,7 +138,6 @@ func (ls *LibraryService) GetAlbums(ctx context.Context, limit, offset int, sort
 	args := []interface{}{}
 	argCount := 0
 
-	// Add year filter if specified
 	if year != nil {
 		query += " WHERE a.year = $1"
 		args = append(args, *year)
@@ -154,7 +146,6 @@ func (ls *LibraryService) GetAlbums(ctx context.Context, limit, offset int, sort
 
 	query += " GROUP BY a.id, a.name, a.artist_id, a.album_artist_id, a.year, a.musicbrainz_id, a.cover_path, a.date_added, ar.name"
 
-	// Add sorting
 	switch sort {
 	case "name":
 		query += " ORDER BY a.name"
@@ -192,7 +183,6 @@ func (ls *LibraryService) GetAlbums(ctx context.Context, limit, offset int, sort
 			return nil, fmt.Errorf("failed to scan album: %w", err)
 		}
 
-		// Set artist info if available
 		if album.ArtistID != nil && artistName != nil {
 			album.Artist = &models.Artist{
 				ID:   *album.ArtistID,
@@ -233,7 +223,6 @@ func (ls *LibraryService) GetAlbum(ctx context.Context, id int) (*models.Album, 
 		return nil, fmt.Errorf("failed to get album: %w", err)
 	}
 
-	// Set artist info
 	if album.ArtistID != nil && artistName != nil {
 		album.Artist = &models.Artist{
 			ID:   *album.ArtistID,
@@ -248,7 +237,6 @@ func (ls *LibraryService) GetAlbum(ctx context.Context, id int) (*models.Album, 
 		}
 	}
 
-	// Get album songs
 	songs, err := ls.GetAlbumSongs(ctx, id)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get album songs: %w", err)
@@ -429,7 +417,6 @@ func (ls *LibraryService) GetArtistTopTracks(ctx context.Context, artistID int) 
 			return nil, fmt.Errorf("failed to scan song: %w", err)
 		}
 
-		// Set album info if available
 		if albumID != nil && albumName != nil {
 			song.Album = &models.Album{
 				ID:   *albumID,
@@ -455,7 +442,6 @@ func (ls *LibraryService) GetAllSongs(ctx context.Context, limit, offset int, so
 		LEFT JOIN albums a ON s.album_id = a.id
 	`
 
-	// Add sorting
 	switch sort {
 	case "title":
 		query += " ORDER BY s.title"
@@ -480,13 +466,11 @@ func (ls *LibraryService) GetAllSongs(ctx context.Context, limit, offset int, so
 	return ls.querySongs(ctx, query, limit, offset)
 }
 
-// loadSongsLyrics loads lyrics for multiple songs in batch
 func (ls *LibraryService) loadSongsLyrics(ctx context.Context, songs []models.Song) error {
 	if len(songs) == 0 {
 		return nil
 	}
 
-	// Collect all song IDs
 	songIDs := make([]interface{}, len(songs))
 	songMap := make(map[int]*models.Song)
 	for i, song := range songs {
@@ -494,7 +478,6 @@ func (ls *LibraryService) loadSongsLyrics(ctx context.Context, songs []models.So
 		songMap[song.ID] = &songs[i]
 	}
 
-	// Build IN clause
 	placeholders := ""
 	for i := range songIDs {
 		if i > 0 {
@@ -503,7 +486,6 @@ func (ls *LibraryService) loadSongsLyrics(ctx context.Context, songs []models.So
 		placeholders += fmt.Sprintf("$%d", i+1)
 	}
 
-	// Query all lyrics
 	query := fmt.Sprintf(`
 		SELECT song_id, id, content, type, source, language, created_at 
 		FROM lyrics 
@@ -516,7 +498,6 @@ func (ls *LibraryService) loadSongsLyrics(ctx context.Context, songs []models.So
 	}
 	defer rows.Close()
 
-	// Group lyrics by song
 	for rows.Next() {
 		var lyrics models.Lyrics
 		var songID int

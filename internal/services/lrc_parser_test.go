@@ -6,7 +6,6 @@ import (
 )
 
 func TestLRCParser_Parse(t *testing.T) {
-	// Sample LRC content
 	lrcContent := `[ti:Test Song]
 [ar:Test Artist]
 [al:Test Album]
@@ -27,7 +26,6 @@ func TestLRCParser_Parse(t *testing.T) {
 		t.Fatalf("Failed to parse LRC: %v", err)
 	}
 
-	// Test metadata
 	if doc.Metadata.Title != "Test Song" {
 		t.Errorf("Expected title 'Test Song', got '%s'", doc.Metadata.Title)
 	}
@@ -50,7 +48,6 @@ func TestLRCParser_Parse(t *testing.T) {
 		t.Errorf("Expected language 'en', got '%s'", doc.Metadata.Language)
 	}
 
-	// Test lines
 	expectedLines := []struct {
 		time int
 		text string
@@ -120,7 +117,6 @@ func TestLRCParser_ToJSON(t *testing.T) {
 		t.Fatalf("Failed to convert to JSON: %v", err)
 	}
 
-	// Check that JSON contains expected elements
 	expectedElements := []string{
 		`"title":"Test Song"`,
 		`"artist":"Test Artist"`,

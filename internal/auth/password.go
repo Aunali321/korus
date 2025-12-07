@@ -48,7 +48,6 @@ func ValidatePasswordStrength(password string) error {
 		return fmt.Errorf("password must be no more than 128 characters long")
 	}
 
-	// Check for at least one lowercase letter
 	hasLower := false
 	hasUpper := false
 	hasDigit := false

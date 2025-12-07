@@ -56,7 +56,6 @@ type LibraryIndexerStatus struct {
 	LastError string             `json:"lastError,omitempty"`
 }
 
-// TriggerLibraryScan starts an async scan and returns a job ID for tracking
 func (as *AdminService) TriggerLibraryScan(ctx context.Context, force bool) (string, error) {
 	if as.indexer == nil {
 		return "", fmt.Errorf("indexer not configured")
@@ -65,7 +64,6 @@ func (as *AdminService) TriggerLibraryScan(ctx context.Context, force bool) (str
 	return as.indexer.StartScanAsync(ctx, force)
 }
 
-// GetScanJob retrieves the status of a scan job by ID
 func (as *AdminService) GetScanJob(jobID string) (*LibraryScanJob, error) {
 	if as.indexer == nil {
 		return nil, fmt.Errorf("indexer not configured")
@@ -74,14 +72,11 @@ func (as *AdminService) GetScanJob(jobID string) (*LibraryScanJob, error) {
 	return as.indexer.GetJob(jobID)
 }
 
-// GetSystemStatus returns system status information
 func (as *AdminService) GetSystemStatus(ctx context.Context) (map[string]interface{}, error) {
 	status := make(map[string]interface{})
 
-	// Get library statistics
 	libraryStats := make(map[string]interface{})
 
-	// Get total counts
 	countsQuery := `
 		SELECT 
 			(SELECT COUNT(*) FROM songs) as song_count,
@@ -103,7 +98,6 @@ func (as *AdminService) GetSystemStatus(ctx context.Context) (map[string]interfa
 	libraryStats["users"] = userCount
 	libraryStats["playlists"] = playlistCount
 
-	// Get total duration
 	var totalDuration int64
 	durationQuery := `SELECT COALESCE(SUM(duration), 0) FROM songs`
 	err = as.db.QueryRowContext(ctx, durationQuery).Scan(&totalDuration)
@@ -114,7 +108,6 @@ func (as *AdminService) GetSystemStatus(ctx context.Context) (map[string]interfa
 
 	status["library"] = libraryStats
 
-	// Get recent scan history
 	scanHistory, err := as.GetRecentScanHistory(ctx, 5)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get scan history: %w", err)
@@ -135,7 +128,6 @@ func (as *AdminService) GetSystemStatus(ctx context.Context) (map[string]interfa
 	return status, nil
 }
 
-// GetRecentScanHistory returns recent scan history
 func (as *AdminService) GetRecentScanHistory(ctx context.Context, limit int) ([]models.ScanHistory, error) {
 	query := `
 		SELECT id, started_at, completed_at, songs_added, songs_updated, songs_removed
@@ -164,11 +156,9 @@ func (as *AdminService) GetRecentScanHistory(ctx context.Context, limit int) ([]
 	return history, rows.Err()
 }
 
-// getActivityStats returns activity statistics
 func (as *AdminService) getActivityStats(ctx context.Context) (map[string]interface{}, error) {
 	stats := make(map[string]interface{})
 
-	// Get play counts for different time periods
 	periodsQuery := `
 		SELECT 
 			COUNT(CASE WHEN played_at > NOW() - INTERVAL '24 hours' THEN 1 END) as plays_24h,
@@ -190,7 +180,6 @@ func (as *AdminService) getActivityStats(ctx context.Context) (map[string]interf
 	stats["plays30d"] = plays30d
 	stats["totalPlays"] = totalPlays
 
-	// Get active users (users who played something in the last 30 days)
 	activeUsersQuery := `
 		SELECT COUNT(DISTINCT user_id)
 		FROM play_history
@@ -207,7 +196,6 @@ func (as *AdminService) getActivityStats(ctx context.Context) (map[string]interf
 	return stats, nil
 }
 
-// CleanupOldSessions removes expired user sessions
 func (as *AdminService) CleanupOldSessions(ctx context.Context) (int, error) {
 	query := `DELETE FROM user_sessions WHERE expires_at < NOW()`
 

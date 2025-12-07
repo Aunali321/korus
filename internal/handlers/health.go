@@ -26,7 +26,6 @@ func (h *HealthHandler) Ping(c *gin.Context) {
 func (h *HealthHandler) Health(c *gin.Context) {
 	ctx := c.Request.Context()
 
-	// Check database health
 	dbHealthy := true
 	var dbError string
 	if err := h.db.Health(ctx); err != nil {
@@ -60,7 +59,6 @@ func (h *HealthHandler) Health(c *gin.Context) {
 		response["checks"].(gin.H)["database"].(gin.H)["error"] = dbError
 	}
 
-	// Add database stats if healthy
 	if dbHealthy {
 		stats := h.db.Stats()
 		response["checks"].(gin.H)["database"].(gin.H)["stats"] = gin.H{
