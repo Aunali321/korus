@@ -10,12 +10,15 @@ import (
 	"strings"
 	"time"
 
-	"github.com/gin-gonic/gin"
 	"korus/internal/services"
+	"korus/internal/transcoding"
+
+	"github.com/gin-gonic/gin"
 )
 
 type StreamingService struct {
 	libraryService *services.LibraryService
+	transcoder     *transcoding.Transcoder
 }
 
 type rangeSpec struct {
@@ -23,9 +26,10 @@ type rangeSpec struct {
 	end   int64
 }
 
-func NewStreamingService(libraryService *services.LibraryService) *StreamingService {
+func NewStreamingService(libraryService *services.LibraryService, transcoder *transcoding.Transcoder) *StreamingService {
 	return &StreamingService{
 		libraryService: libraryService,
+		transcoder:     transcoder,
 	}
 }
 
@@ -57,6 +61,18 @@ func (s *StreamingService) StreamSong(c *gin.Context) {
 		})
 		return
 	}
+
+	// Check for transcoding request
+	format := c.Query("format")
+	bitrateStr := c.Query("bitrate")
+
+	if format != "" {
+		// Transcoding requested
+		s.handleTranscode(c, song.FilePath, format, bitrateStr)
+		return
+	}
+
+	// Serve original file (existing logic)
 
 	// Open file
 	file, err := os.Open(song.FilePath)
@@ -142,6 +158,48 @@ func (s *StreamingService) StreamSong(c *gin.Context) {
 
 	// Copy the requested range
 	io.CopyN(c.Writer, file, contentLength)
+}
+
+// handleTranscode validates params and streams transcoded audio
+func (s *StreamingService) handleTranscode(c *gin.Context, filePath, format, bitrateStr string) {
+	// Check if transcoder is available
+	if s.transcoder == nil || !s.transcoder.IsAvailable() {
+		c.JSON(http.StatusServiceUnavailable, gin.H{
+			"error":   "transcoding_unavailable",
+			"message": "Transcoding is not available (FFmpeg not installed)",
+		})
+		return
+	}
+
+	// Validate format and bitrate
+	bitrate, err := transcoding.ValidateParams(format, bitrateStr)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error":   "invalid_transcode_params",
+			"message": err.Error(),
+		})
+		return
+	}
+
+	// Set headers for transcoded stream
+	c.Header("Content-Type", transcoding.GetContentType(format))
+	c.Header("Accept-Ranges", "none")     // Cannot seek in transcoded stream
+	c.Header("Cache-Control", "no-cache") // Don't cache transcoded streams
+	c.Status(http.StatusOK)
+
+	// Stream transcoded audio
+	if err := s.transcoder.Stream(c.Request.Context(), filePath, format, bitrate, c.Writer); err != nil {
+		// If we haven't written anything yet, we can still send error
+		// Otherwise the error is logged but client already received partial data
+		if c.Writer.Written() {
+			// Already started writing, just log
+			fmt.Printf("Transcoding error (partial response sent): %v\n", err)
+		}
+		// Context cancelled (client disconnected) is not an error
+		if c.Request.Context().Err() == nil {
+			fmt.Printf("Transcoding error: %v\n", err)
+		}
+	}
 }
 
 func getContentType(filePath string) string {

@@ -574,6 +574,34 @@ Content-Range: bytes 0-1023/6234567
 Content-Length: 1024
 ```
 
+### Transcoding (Optional)
+
+Request a transcoded stream by specifying format and bitrate query parameters:
+
+```
+GET /songs/{id}/stream?format=mp3&bitrate=320
+GET /songs/{id}/stream?format=aac&bitrate=256
+GET /songs/{id}/stream?format=opus&bitrate=128
+```
+
+**Supported Formats:**
+
+| Format | Valid Bitrates (kbps) | Content-Type |
+|--------|----------------------|--------------|
+| `mp3` | 128, 192, 256, 320 | audio/mpeg |
+| `aac` | 128, 192, 256 | audio/mp4 |
+| `opus` | 64, 96, 128, 192 | audio/ogg |
+
+**Notes:**
+- No params = serve original file (no transcoding)
+- `format` is required if transcoding, `bitrate` is optional (uses highest for format)
+- Range requests not supported for transcoded streams
+- Requires FFmpeg installed on server
+
+**Error Responses:**
+- `400` — Invalid format or bitrate
+- `503` — FFmpeg not available
+
 ## 🎵 Lyrics System
 
 Korus automatically extracts and serves lyrics for songs from multiple sources. Lyrics are included directly in song API responses and available through dedicated endpoints.

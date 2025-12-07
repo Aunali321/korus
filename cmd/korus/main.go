@@ -21,6 +21,7 @@ import (
 	"korus/internal/search"
 	"korus/internal/services"
 	"korus/internal/streaming"
+	"korus/internal/transcoding"
 	"korus/migrations"
 
 	"github.com/gin-gonic/gin"
@@ -143,7 +144,12 @@ func main() {
 	}
 	defer searchService.Close()
 
-	streamingService := streaming.NewStreamingService(libraryService)
+	streamingService := streaming.NewStreamingService(libraryService, transcoding.New())
+
+	// Check FFmpeg availability
+	if tc := transcoding.New(); !tc.IsAvailable() {
+		log.Println("Warning: FFmpeg not found, transcoding will be disabled")
+	}
 
 	batchMetadataService := services.NewBatchMetadataService(db, cfg.Library.ExtractLyrics)
 	indexerService := indexer.NewService(db, &cfg.Library, batchMetadataService)
