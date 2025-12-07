@@ -13,15 +13,12 @@ import (
 )
 
 const (
-	JobTypeScan                  = "scan"
-	JobTypeMetadataExtract       = "metadata_extract"
-	JobTypeMetadataExtractBatch  = "metadata_extract_batch"
-	JobTypeTranscode             = "transcode"
-	JobTypeCleanup               = "cleanup"
-	JobTypeStatsUpdate           = "stats_update"
-	JobTypeEmbeddingExtract      = "embedding_extract"
-	JobTypeEmbeddingExtractBatch = "embedding_extract_batch"
-	JobTypeEmbeddingBatchCreator = "embedding_batch_creator"
+	JobTypeScan                 = "scan"
+	JobTypeMetadataExtract      = "metadata_extract"
+	JobTypeMetadataExtractBatch = "metadata_extract_batch"
+	JobTypeTranscode            = "transcode"
+	JobTypeCleanup              = "cleanup"
+	JobTypeStatsUpdate          = "stats_update"
 )
 
 const (
@@ -53,25 +50,6 @@ type MetadataExtractJobPayload struct {
 
 type BatchMetadataExtractJobPayload struct {
 	FilePaths []string `json:"file_paths"`
-}
-
-type EmbeddingExtractJobPayload struct {
-	FilePath string `json:"file_path"`
-	SongID   *int   `json:"song_id,omitempty"`
-}
-
-type BatchEmbeddingExtractJobPayload struct {
-	Entries []BatchEmbeddingEntry `json:"entries"`
-}
-
-type BatchEmbeddingEntry struct {
-	FilePath string `json:"file_path"`
-	SongID   *int   `json:"song_id,omitempty"`
-}
-
-type EmbeddingBatchJobPayload struct {
-	MaxSongsPerBatch int   `json:"max_songs_per_batch"`
-	ScanStartTime    int64 `json:"scan_start_time"` // Unix timestamp to identify newly processed songs
 }
 
 type TranscodeJobPayload struct {
@@ -367,27 +345,6 @@ func (q *Queue) unmarshalPayload(job *Job) error {
 
 	case JobTypeStatsUpdate:
 		var payload StatsUpdateJobPayload
-		if err := json.Unmarshal(job.Payload, &payload); err != nil {
-			return err
-		}
-		job.PayloadData = payload
-
-	case JobTypeEmbeddingExtract:
-		var payload EmbeddingExtractJobPayload
-		if err := json.Unmarshal(job.Payload, &payload); err != nil {
-			return err
-		}
-		job.PayloadData = payload
-
-	case JobTypeEmbeddingExtractBatch:
-		var payload BatchEmbeddingExtractJobPayload
-		if err := json.Unmarshal(job.Payload, &payload); err != nil {
-			return err
-		}
-		job.PayloadData = payload
-
-	case JobTypeEmbeddingBatchCreator:
-		var payload EmbeddingBatchJobPayload
 		if err := json.Unmarshal(job.Payload, &payload); err != nil {
 			return err
 		}

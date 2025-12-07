@@ -2,9 +2,11 @@ package services
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log"
 	"strings"
+	"sync"
 	"time"
 
 	"korus/internal/database"
@@ -31,34 +33,96 @@ type ProcessedSong struct {
 	FilePath string
 }
 
-func NewBatchMetadataService(db *database.DB) *BatchMetadataService {
+type BatchOptions struct {
+	Workers int
+}
+
+func NewBatchMetadataService(db *database.DB, lyricsEnabled bool) *BatchMetadataService {
 	return &BatchMetadataService{
 		db:              db,
-		metadataService: NewMetadataService(db),
+		metadataService: NewMetadataService(db, lyricsEnabled),
 	}
 }
 
 func (bms *BatchMetadataService) ProcessBatch(ctx context.Context, filePaths []string) (*BatchResult, error) {
+	return bms.ProcessBatchWithOptions(ctx, filePaths, BatchOptions{})
+}
+
+func (bms *BatchMetadataService) ProcessBatchWithOptions(ctx context.Context, filePaths []string, opts BatchOptions) (*BatchResult, error) {
 	start := time.Now()
 	result := &BatchResult{
 		ProcessedCount: len(filePaths),
 		SuccessFiles:   make([]ProcessedSong, 0, len(filePaths)),
 	}
 
+	if len(filePaths) == 0 {
+		return result, nil
+	}
+
+	workers := opts.Workers
+	if workers <= 0 {
+		workers = 1
+	}
+
 	log.Printf("🚀 Starting batch processing of %d files", len(filePaths))
 
-	// Phase 1: Extract metadata from all files (parallel, no DB)
-	log.Printf("📖 Phase 1: Extracting metadata from %d files", len(filePaths))
+	type metaOutput struct {
+		metadata *ExtractedMetadata
+		err      error
+		path     string
+	}
+
+	jobs := make(chan string)
+	outputs := make(chan metaOutput)
+
+	var wg sync.WaitGroup
+	for i := 0; i < workers; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for path := range jobs {
+				if ctx.Err() != nil {
+					return
+				}
+				metadata, err := bms.metadataService.extractMetadata(path)
+				outputs <- metaOutput{metadata: metadata, err: err, path: path}
+			}
+		}()
+	}
+
+	go func() {
+		defer close(jobs)
+		for _, path := range filePaths {
+			if ctx.Err() != nil {
+				return
+			}
+			jobs <- path
+		}
+	}()
+
+	go func() {
+		wg.Wait()
+		close(outputs)
+	}()
+
+	log.Printf("📖 Phase 1: Extracting metadata from %d files (workers=%d)", len(filePaths), workers)
+
 	metadataList := make([]*ExtractedMetadata, 0, len(filePaths))
-	for _, filePath := range filePaths {
-		metadata, err := bms.metadataService.extractMetadata(filePath)
-		if err != nil {
-			log.Printf("❌ Failed to extract metadata from %s: %v", filePath, err)
-			result.Errors = append(result.Errors, fmt.Errorf("failed to extract metadata from %s: %w", filePath, err))
+	for output := range outputs {
+		if output.err != nil {
+			if errors.Is(output.err, context.Canceled) || errors.Is(output.err, context.DeadlineExceeded) {
+				return nil, output.err
+			}
+			log.Printf("❌ Failed to extract metadata from %s: %v", output.path, output.err)
+			result.Errors = append(result.Errors, fmt.Errorf("failed to extract metadata from %s: %w", output.path, output.err))
 			result.ErrorCount++
 			continue
 		}
-		metadataList = append(metadataList, metadata)
+		metadataList = append(metadataList, output.metadata)
+	}
+
+	if err := ctx.Err(); err != nil {
+		return nil, err
 	}
 
 	log.Printf("📖 Phase 1 complete: %d metadata extracted, %d errors", len(metadataList), result.ErrorCount)
@@ -151,8 +215,11 @@ func (bms *BatchMetadataService) storeBatchMetadata(ctx context.Context, metadat
 				result.ErrorCount++
 				continue
 			}
+			result.SuccessFiles = append(result.SuccessFiles, ProcessedSong{
+				SongID:   songID,
+				FilePath: metadata.FilePath,
+			})
 			successCount++
-			result.SuccessFiles = append(result.SuccessFiles, ProcessedSong{SongID: songID, FilePath: metadata.FilePath})
 		}
 
 		log.Printf("✅ Successfully inserted %d/%d songs", successCount, len(metadataList))

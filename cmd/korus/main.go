@@ -10,27 +10,100 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/gin-gonic/gin"
 	"korus/internal/auth"
 	"korus/internal/config"
 	"korus/internal/database"
 	"korus/internal/handlers"
-	"korus/internal/jobs"
+	"korus/internal/indexer"
 	"korus/internal/middleware"
-	"korus/internal/scanner"
 	"korus/internal/search"
 	"korus/internal/services"
 	"korus/internal/streaming"
 	"korus/migrations"
+
+	"github.com/gin-gonic/gin"
 )
 
-// queueAdapter adapts jobs.Queue to scanner.JobQueue interface
-type queueAdapter struct {
-	queue *jobs.Queue
+type indexerAdapter struct {
+	svc *indexer.Service
 }
 
-func (qa *queueAdapter) Enqueue(ctx context.Context, jobType string, payload interface{}) (interface{}, error) {
-	return qa.queue.Enqueue(ctx, jobType, payload)
+func (a *indexerAdapter) StartScanAsync(ctx context.Context, force bool) (string, error) {
+	if a == nil || a.svc == nil {
+		return "", fmt.Errorf("indexer not available")
+	}
+	return a.svc.StartScanAsync(ctx, indexer.Options{Force: force})
+}
+
+func (a *indexerAdapter) GetJob(jobID string) (*services.LibraryScanJob, error) {
+	if a == nil || a.svc == nil {
+		return nil, fmt.Errorf("indexer not available")
+	}
+
+	job, err := a.svc.GetJob(jobID)
+	if err != nil {
+		return nil, err
+	}
+
+	return toLibraryScanJob(job), nil
+}
+
+func (a *indexerAdapter) Status() services.LibraryIndexerStatus {
+	status := a.svc.Status()
+	converted := services.LibraryIndexerStatus{
+		Running:   status.Running,
+		LastError: status.LastError,
+	}
+	if status.LastRun != nil {
+		converted.LastRun = toLibraryScanResult(status.LastRun)
+	}
+	return converted
+}
+
+func toLibraryScanJob(job *indexer.Job) *services.LibraryScanJob {
+	if job == nil {
+		return nil
+	}
+	result := &services.LibraryScanJob{
+		ID:        job.ID,
+		Status:    string(job.Status),
+		Phase:     job.Phase,
+		Progress:  job.Progress,
+		Total:     job.Total,
+		Force:     job.Force,
+		StartedAt: job.StartedAt,
+	}
+	if job.CompletedAt != nil {
+		result.CompletedAt = job.CompletedAt
+	}
+	if job.Result != nil {
+		result.Result = toLibraryScanResult(job.Result)
+	}
+	if job.Error != "" {
+		result.Error = job.Error
+	}
+	return result
+}
+
+func toLibraryScanResult(res *indexer.Result) *services.LibraryScanResult {
+	if res == nil {
+		return nil
+	}
+	copy := &services.LibraryScanResult{
+		StartedAt:       res.StartedAt,
+		CompletedAt:     res.CompletedAt,
+		Duration:        res.Duration,
+		FilesDiscovered: res.FilesDiscovered,
+		FilesQueued:     res.FilesQueued,
+		FilesNew:        res.FilesNew,
+		FilesUpdated:    res.FilesUpdated,
+		FilesRemoved:    res.FilesRemoved,
+		Ingested:        res.Ingested,
+	}
+	if len(res.Errors) > 0 {
+		copy.Errors = append([]error(nil), res.Errors...)
+	}
+	return copy
 }
 
 func main() {
@@ -62,15 +135,6 @@ func main() {
 	tokenManager := auth.NewTokenManager(&cfg.Auth)
 	authService := auth.NewService(db, tokenManager)
 	libraryService := services.NewLibraryService(db)
-	metadataService := services.NewMetadataService(db)
-	embeddingService, err := services.NewEmbeddingService(db, &cfg.Recommender)
-	if err != nil {
-		log.Fatal("Failed to initialize embedding service:", err)
-	}
-	recommenderService, err := services.NewRecommenderService(db, &cfg.Recommender)
-	if err != nil {
-		log.Fatal("Failed to initialize recommender service:", err)
-	}
 	searchService, err := search.NewSearchService(db, &cfg.Library)
 	if err != nil {
 		log.Fatal("Failed to initialize search service:", err)
@@ -79,41 +143,8 @@ func main() {
 
 	streamingService := streaming.NewStreamingService(libraryService)
 
-	// Initialize job system
-	workerPool := jobs.NewWorkerPool(cfg.Library.ScanWorkers, db)
-
-	// Create queue adapter inline to avoid import cycles
-	queueAdapter := &queueAdapter{queue: workerPool.GetQueue()}
-	scannerInstance, err := scanner.NewScanner(db, queueAdapter, &cfg.Library)
-	if err != nil {
-		log.Fatal("Failed to initialize scanner:", err)
-	}
-
-	// Register job handlers
-	scannerAdapter := jobs.NewScannerAdapter(scannerInstance)
-	batchMetadataService := services.NewBatchMetadataService(db)
-
-	queue := workerPool.GetQueue()
-	workerPool.RegisterHandler(jobs.JobTypeMetadataExtract, jobs.NewMetadataExtractionHandler(metadataService))
-	workerPool.RegisterHandler(jobs.JobTypeMetadataExtractBatch, jobs.NewBatchMetadataExtractionHandler(batchMetadataService))
-	workerPool.RegisterHandler(jobs.JobTypeEmbeddingExtract, jobs.NewEmbeddingExtractionHandler(embeddingService, recommenderService))
-	workerPool.RegisterHandler(jobs.JobTypeEmbeddingExtractBatch, jobs.NewBatchEmbeddingExtractionHandler(embeddingService, recommenderService))
-	workerPool.RegisterHandler(jobs.JobTypeEmbeddingBatchCreator, jobs.NewEmbeddingBatchHandler(db, queue, cfg.Recommender.CleanupBatchSize, embeddingService, recommenderService))
-	workerPool.RegisterHandler(jobs.JobTypeScan, jobs.NewScanHandler(scannerAdapter, queue, embeddingService.Enabled(), cfg.Recommender.CleanupBatchSize))
-	workerPool.RegisterHandler(jobs.JobTypeCleanup, jobs.NewCleanupHandler())
-	workerPool.RegisterHandler(jobs.JobTypeStatsUpdate, jobs.NewStatsUpdateHandler())
-
-	// Start worker pool and scanner
-	ctx := context.Background()
-	if err := workerPool.Start(ctx); err != nil {
-		log.Fatal("Failed to start worker pool:", err)
-	}
-	defer workerPool.Stop()
-
-	if err := scannerInstance.Start(ctx); err != nil {
-		log.Fatal("Failed to start file scanner:", err)
-	}
-	defer scannerInstance.Stop()
+	batchMetadataService := services.NewBatchMetadataService(db, cfg.Library.ExtractLyrics)
+	indexerService := indexer.NewService(db, &cfg.Library, batchMetadataService)
 
 	// Create initial admin user if no users exist
 	if err := createInitialAdminUser(authService, cfg); err != nil {
@@ -124,7 +155,7 @@ func main() {
 	playlistService := services.NewPlaylistService(db)
 	userLibraryService := services.NewUserLibraryService(db)
 	historyService := services.NewHistoryService(db)
-	adminService := services.NewAdminService(db)
+	adminService := services.NewAdminService(db, &indexerAdapter{svc: indexerService})
 
 	// Initialize handlers
 	healthHandler := handlers.NewHealthHandler(db)
@@ -134,10 +165,9 @@ func main() {
 	userLibraryHandler := handlers.NewUserLibraryHandler(userLibraryService)
 	historyHandler := handlers.NewHistoryHandler(historyService)
 	adminHandler := handlers.NewAdminHandler(adminService)
-	recommendHandler := handlers.NewRecommendHandler(recommenderService, &cfg.Recommender)
 
 	// Setup router
-	router := setupRouter(cfg, authService, healthHandler, authHandler, libraryHandler, playlistHandler, userLibraryHandler, historyHandler, adminHandler, recommendHandler, streamingService)
+	router := setupRouter(cfg, authService, healthHandler, authHandler, libraryHandler, playlistHandler, userLibraryHandler, historyHandler, adminHandler, streamingService)
 
 	// Setup HTTP server
 	server := &http.Server{
@@ -176,7 +206,7 @@ func main() {
 	fmt.Println("✅ Server shutdown complete")
 }
 
-func setupRouter(cfg *config.Config, authService *auth.Service, healthHandler *handlers.HealthHandler, authHandler *handlers.AuthHandler, libraryHandler *handlers.LibraryHandler, playlistHandler *handlers.PlaylistHandler, userLibraryHandler *handlers.UserLibraryHandler, historyHandler *handlers.HistoryHandler, adminHandler *handlers.AdminHandler, recommendHandler *handlers.RecommendHandler, streamingService *streaming.StreamingService) *gin.Engine {
+func setupRouter(cfg *config.Config, authService *auth.Service, healthHandler *handlers.HealthHandler, authHandler *handlers.AuthHandler, libraryHandler *handlers.LibraryHandler, playlistHandler *handlers.PlaylistHandler, userLibraryHandler *handlers.UserLibraryHandler, historyHandler *handlers.HistoryHandler, adminHandler *handlers.AdminHandler, streamingService *streaming.StreamingService) *gin.Engine {
 	router := gin.New()
 
 	// Global middleware
@@ -247,19 +277,14 @@ func setupRouter(cfg *config.Config, authService *auth.Service, healthHandler *h
 			protected.GET("/me/stats", historyHandler.GetUserStats)
 			protected.GET("/me/home", historyHandler.GetHomeData)
 
-			protected.GET("/songs/:id/similar", recommendHandler.SimilarSongs)
-			protected.GET("/me/recommendations", recommendHandler.UserRecommendations)
-			protected.POST("/radio", recommendHandler.Radio)
-
 			// Admin endpoints
 			admin := protected.Group("")
 			admin.Use(middleware.AdminRequired())
 			{
 				admin.POST("/library/scan", adminHandler.TriggerLibraryScan)
+				admin.GET("/library/scan/:id", adminHandler.GetScanJob)
 				admin.GET("/admin/status", adminHandler.GetSystemStatus)
 				admin.GET("/admin/scans", adminHandler.GetScanHistory)
-				admin.GET("/admin/jobs", adminHandler.GetPendingJobs)
-				admin.DELETE("/admin/jobs/cleanup", adminHandler.CleanupJobs)
 				admin.DELETE("/admin/sessions/cleanup", adminHandler.CleanupSessions)
 			}
 		}

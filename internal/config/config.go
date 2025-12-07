@@ -9,12 +9,11 @@ import (
 )
 
 type Config struct {
-	Database    DatabaseConfig
-	Server      ServerConfig
-	Auth        AuthConfig
-	Library     LibraryConfig
-	Cache       CacheConfig
-	Recommender RecommenderConfig
+	Database DatabaseConfig
+	Server   ServerConfig
+	Auth     AuthConfig
+	Library  LibraryConfig
+	Cache    CacheConfig
 }
 
 type DatabaseConfig struct {
@@ -44,30 +43,19 @@ type AuthConfig struct {
 }
 
 type LibraryConfig struct {
-	MusicDir    string
-	CacheDir    string
-	ScanWorkers int
-	FileTypes   []string
+	MusicDir        string
+	CacheDir        string
+	ScanWorkers     int
+	IngestWorkers   int
+	IngestBatchSize int
+	ExtractLyrics   bool
+	FileTypes       []string
 }
 
 type CacheConfig struct {
 	ArtworkMaxSize   int64
 	MetadataMaxItems int
 	MetadataTTL      time.Duration
-}
-
-type RecommenderConfig struct {
-	Enabled              bool
-	PythonRunner         string
-	ProjectDir           string
-	EncoderConfigPath    string
-	BatchSize            int
-	CleanupBatchSize     int
-	IndexRefreshInterval time.Duration
-	Segments             int
-	ProjectDim           int
-	SimilarityLimit      int
-	ColdStartPolicy      string
 }
 
 func Load() (*Config, error) {
@@ -96,34 +84,19 @@ func Load() (*Config, error) {
 			AdminPassword:      getEnv("ADMIN_PASSWORD", ""),
 		},
 		Library: LibraryConfig{
-			MusicDir:    getEnv("MUSIC_DIR", "./music"),
-			CacheDir:    getEnv("CACHE_DIR", "./cache"),
-			ScanWorkers: getEnvInt("SCAN_WORKERS", 4),
-			FileTypes:   []string{"mp3", "flac", "m4a", "ogg", "wav", "aac", "opus"},
+			MusicDir:        getEnv("MUSIC_DIR", "./music"),
+			CacheDir:        getEnv("CACHE_DIR", "./cache"),
+			ScanWorkers:     getEnvInt("SCAN_WORKERS", 4),
+			IngestWorkers:   getEnvInt("INGEST_WORKERS", 4),
+			IngestBatchSize: getEnvInt("INGEST_BATCH_SIZE", 300),
+			ExtractLyrics:   getEnvBool("EXTRACT_LYRICS", true),
+			FileTypes:       []string{"mp3", "flac", "m4a", "ogg", "wav", "aac", "opus"},
 		},
 		Cache: CacheConfig{
 			ArtworkMaxSize:   getEnvInt64("ARTWORK_MAX_SIZE", 100*1024*1024), // 100MB
 			MetadataMaxItems: getEnvInt("METADATA_MAX_ITEMS", 10000),
 			MetadataTTL:      getEnvDuration("METADATA_TTL", 24*time.Hour),
 		},
-		Recommender: RecommenderConfig{},
-	}
-
-	recommenderProjectDir := getEnv("RECOMMENDER_PROJECT_DIR", "./context/LongCat-Audio-Codec")
-	recommenderEncoderConfig := getEnv("RECOMMENDER_ENCODER_CONFIG", "configs/LongCatAudioCodec_encoder.yaml")
-
-	cfg.Recommender = RecommenderConfig{
-		Enabled:              getEnvBool("RECOMMENDER_ENABLED", true),
-		PythonRunner:         getEnv("RECOMMENDER_PYTHON_RUNNER", "uv run"),
-		ProjectDir:           recommenderProjectDir,
-		EncoderConfigPath:    recommenderEncoderConfig,
-		BatchSize:            getEnvInt("RECOMMENDER_BATCH_SIZE", 4),
-		CleanupBatchSize:     getEnvInt("RECOMMENDER_CLEANUP_BATCH_SIZE", 20),
-		IndexRefreshInterval: getEnvDuration("RECOMMENDER_INDEX_REFRESH_INTERVAL", 5*time.Minute),
-		Segments:             getEnvInt("RECOMMENDER_SEGMENTS", 6),
-		ProjectDim:           getEnvInt("RECOMMENDER_PROJECT_DIM", 256),
-		SimilarityLimit:      getEnvInt("RECOMMENDER_SIMILARITY_LIMIT", 50),
-		ColdStartPolicy:      getEnv("RECOMMENDER_COLD_START_POLICY", "random_diverse"),
 	}
 
 	if err := cfg.validate(); err != nil {
@@ -150,44 +123,12 @@ func (c *Config) validate() error {
 		return fmt.Errorf("SERVER_PORT must be between 1 and 65535")
 	}
 
-	if c.Recommender.Enabled {
-		if c.Recommender.PythonRunner == "" {
-			return fmt.Errorf("RECOMMENDER_PYTHON_RUNNER is required when recommender is enabled")
-		}
+	if c.Library.IngestWorkers <= 0 {
+		return fmt.Errorf("INGEST_WORKERS must be positive")
+	}
 
-		if c.Recommender.ProjectDir == "" {
-			return fmt.Errorf("RECOMMENDER_PROJECT_DIR is required when recommender is enabled")
-		}
-
-		if c.Recommender.EncoderConfigPath == "" {
-			return fmt.Errorf("RECOMMENDER_ENCODER_CONFIG is required when recommender is enabled")
-		}
-
-		if c.Recommender.Segments < 1 {
-			return fmt.Errorf("RECOMMENDER_SEGMENTS must be at least 1")
-		}
-
-		if c.Recommender.ProjectDim < 0 {
-			return fmt.Errorf("RECOMMENDER_PROJECT_DIM cannot be negative")
-		}
-
-		if c.Recommender.BatchSize <= 0 {
-			return fmt.Errorf("RECOMMENDER_BATCH_SIZE must be positive")
-		}
-
-		if c.Recommender.CleanupBatchSize <= 0 {
-			return fmt.Errorf("RECOMMENDER_CLEANUP_BATCH_SIZE must be positive")
-		}
-
-		if c.Recommender.SimilarityLimit <= 0 {
-			return fmt.Errorf("RECOMMENDER_SIMILARITY_LIMIT must be positive")
-		}
-
-		switch c.Recommender.ColdStartPolicy {
-		case "random_diverse", "empty":
-		default:
-			return fmt.Errorf("RECOMMENDER_COLD_START_POLICY must be 'random_diverse' or 'empty'")
-		}
+	if c.Library.IngestBatchSize <= 0 {
+		return fmt.Errorf("INGEST_BATCH_SIZE must be positive")
 	}
 
 	return nil

@@ -1205,15 +1205,92 @@ Get personalized home data.
 All admin endpoints require admin role.
 
 #### POST /library/scan
-Trigger library scan.
+Trigger an asynchronous library scan. Returns immediately with a job ID for tracking.
 
 **Headers:** `Authorization: Bearer <token>` (admin required)
 
-**Success Response (202):**
+**Query Parameters:**
+- `force` (default: false) - Force re-scan of all files even if unchanged
+
+**Success Response (202 Accepted):**
 ```json
 {
   "message": "Library scan started",
-  "job_id": "scan_20250801_160000"
+  "job_id": "550e8400-e29b-41d4-a716-446655440000",
+  "force": false
+}
+```
+
+**Error Response (409 Conflict):**
+```json
+{
+  "error": "scan_in_progress",
+  "message": "A library scan is already running"
+}
+```
+
+#### GET /library/scan/{id}
+Get the status of a library scan job by ID.
+
+**Headers:** `Authorization: Bearer <token>` (admin required)
+
+**Success Response (200):**
+```json
+{
+  "id": "550e8400-e29b-41d4-a716-446655440000",
+  "status": "running",
+  "phase": "ingesting",
+  "progress": 150,
+  "total": 500,
+  "force": false,
+  "started_at": "2025-08-01T16:00:00Z"
+}
+```
+
+**Completed Response (200):**
+```json
+{
+  "id": "550e8400-e29b-41d4-a716-446655440000",
+  "status": "completed",
+  "phase": "complete",
+  "progress": 500,
+  "total": 500,
+  "force": false,
+  "started_at": "2025-08-01T16:00:00Z",
+  "completed_at": "2025-08-01T16:05:30Z",
+  "result": {
+    "started_at": "2025-08-01T16:00:00Z",
+    "completed_at": "2025-08-01T16:05:30Z",
+    "duration": "5m30s",
+    "files_discovered": 1250,
+    "files_queued": 500,
+    "files_new": 25,
+    "files_updated": 5,
+    "files_removed": 2,
+    "ingested": 30,
+    "errors": []
+  }
+}
+```
+
+**Job Status Values:**
+- `pending` - Job created but not yet started
+- `running` - Scan in progress
+- `completed` - Scan finished successfully
+- `failed` - Scan failed with error
+
+**Phase Values:**
+- `initializing` - Job starting
+- `discovering` - Walking file system
+- `analyzing` - Comparing with existing songs
+- `ingesting` - Processing new/updated files
+- `complete` - Scan finished
+
+**Error Response (404):**
+```json
+{
+  "error": "job_not_found",
+  "message": "Scan job not found"
 }
 ```
 
@@ -1225,25 +1302,32 @@ Get system status.
 **Success Response (200):**
 ```json
 {
-  "system": {
-    "uptime": 86400,
-    "go_version": "go1.21.5",
-    "goroutines": 25
-  },
-  "database": {
-    "status": "healthy",
-    "total_connections": 20,
-    "idle_connections": 15
-  },
-  "job_queue": {
-    "pending_jobs": 0,
-    "active_workers": 3
-  },
   "library": {
-    "total_songs": 1250,
-    "total_artists": 89,
-    "total_albums": 156,
-    "last_scan": "2025-08-01T10:00:00Z"
+    "songs": 1250,
+    "albums": 156,
+    "artists": 89,
+    "users": 5,
+    "playlists": 12,
+    "total_duration": 18750
+  },
+  "indexer": {
+    "running": false,
+    "last_run": {
+      "started_at": "2025-08-01T10:00:00Z",
+      "completed_at": "2025-08-01T10:05:30Z",
+      "duration": "5m30s",
+      "files_discovered": 1250,
+      "ingested": 30
+    },
+    "last_error": null
+  },
+  "recent_scans": [...],
+  "activity": {
+    "plays_24h": 150,
+    "plays_7d": 892,
+    "plays_30d": 3200,
+    "total_plays": 12500,
+    "active_users_30d": 3
   }
 }
 ```
@@ -1254,16 +1338,15 @@ Get recent scan history.
 **Headers:** `Authorization: Bearer <token>` (admin required)
 
 **Query Parameters:**
-- `limit` (default: 10) - Number of results
+- `limit` (default: 10, max: 50) - Number of results
 
 **Success Response (200):**
 ```json
 [
   {
-    "id": "scan_20250801_100000",
+    "id": 15,
     "started_at": "2025-08-01T10:00:00Z",
     "completed_at": "2025-08-01T10:05:30Z",
-    "status": "completed",
     "songs_added": 25,
     "songs_updated": 5,
     "songs_removed": 2
@@ -1271,47 +1354,8 @@ Get recent scan history.
 ]
 ```
 
-#### GET /admin/jobs
-Get pending jobs in the queue.
-
-**Headers:** `Authorization: Bearer <token>` (admin required)
-
-**Query Parameters:**
-- `limit` (default: 20) - Number of results
-- `status` - Filter by status: `pending`, `processing`, `completed`, `failed`
-
-**Success Response (200):**
-```json
-[
-  {
-    "id": 123,
-    "type": "metadata_extract",
-    "status": "pending",
-    "payload": {
-      "file_path": "/music/artist/album/song.mp3"
-    },
-    "created_at": "2025-08-01T16:00:00Z",
-    "attempts": 0
-  }
-]
-```
-
-#### DELETE /admin/jobs/cleanup
-Clean up old jobs.
-
-**Headers:** `Authorization: Bearer <token>` (admin required)
-
-**Success Response (200):**
-```json
-{
-  "message": "Jobs cleanup completed",
-  "deleted_count": 150,
-  "older_than_days": 7
-}
-```
-
 #### DELETE /admin/sessions/cleanup
-Clean up old sessions.
+Clean up expired user sessions.
 
 **Headers:** `Authorization: Bearer <token>` (admin required)
 

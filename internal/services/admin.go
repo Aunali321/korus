@@ -2,48 +2,76 @@ package services
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
+	"time"
 
 	"korus/internal/database"
 	"korus/internal/models"
 )
 
 type AdminService struct {
-	db *database.DB
+	db      *database.DB
+	indexer LibraryIndexer
 }
 
-func NewAdminService(db *database.DB) *AdminService {
-	return &AdminService{db: db}
+func NewAdminService(db *database.DB, indexer LibraryIndexer) *AdminService {
+	return &AdminService{db: db, indexer: indexer}
 }
 
-// TriggerLibraryScan triggers a full library scan by creating a job in the queue
-func (as *AdminService) TriggerLibraryScan(ctx context.Context) (int, error) {
-	// Create a scan job payload
-	payload := map[string]interface{}{
-		"type":      "full_scan",
-		"recursive": true,
+type LibraryIndexer interface {
+	StartScanAsync(ctx context.Context, force bool) (string, error)
+	GetJob(jobID string) (*LibraryScanJob, error)
+	Status() LibraryIndexerStatus
+}
+
+type LibraryScanJob struct {
+	ID          string             `json:"id"`
+	Status      string             `json:"status"`
+	Phase       string             `json:"phase"`
+	Progress    int                `json:"progress"`
+	Total       int                `json:"total"`
+	Force       bool               `json:"force"`
+	StartedAt   time.Time          `json:"started_at"`
+	CompletedAt *time.Time         `json:"completed_at,omitempty"`
+	Result      *LibraryScanResult `json:"result,omitempty"`
+	Error       string             `json:"error,omitempty"`
+}
+
+type LibraryScanResult struct {
+	StartedAt       time.Time
+	CompletedAt     time.Time
+	Duration        time.Duration
+	FilesDiscovered int
+	FilesQueued     int
+	FilesNew        int
+	FilesUpdated    int
+	FilesRemoved    int
+	Ingested        int
+	Errors          []error `json:"-"`
+}
+
+type LibraryIndexerStatus struct {
+	Running   bool               `json:"running"`
+	LastRun   *LibraryScanResult `json:"last_run,omitempty"`
+	LastError string             `json:"last_error,omitempty"`
+}
+
+// TriggerLibraryScan starts an async scan and returns a job ID for tracking
+func (as *AdminService) TriggerLibraryScan(ctx context.Context, force bool) (string, error) {
+	if as.indexer == nil {
+		return "", fmt.Errorf("indexer not configured")
 	}
 
-	payloadBytes, err := json.Marshal(payload)
-	if err != nil {
-		return 0, fmt.Errorf("failed to marshal scan payload: %w", err)
+	return as.indexer.StartScanAsync(ctx, force)
+}
+
+// GetScanJob retrieves the status of a scan job by ID
+func (as *AdminService) GetScanJob(jobID string) (*LibraryScanJob, error) {
+	if as.indexer == nil {
+		return nil, fmt.Errorf("indexer not configured")
 	}
 
-	// Insert job into queue
-	query := `
-		INSERT INTO job_queue (job_type, payload, status, created_at)
-		VALUES ($1, $2, 'pending', NOW())
-		RETURNING id
-	`
-
-	var jobID int
-	err = as.db.QueryRowContext(ctx, query, "scan", payloadBytes).Scan(&jobID)
-	if err != nil {
-		return 0, fmt.Errorf("failed to create scan job: %w", err)
-	}
-
-	return jobID, nil
+	return as.indexer.GetJob(jobID)
 }
 
 // GetSystemStatus returns system status information
@@ -93,12 +121,9 @@ func (as *AdminService) GetSystemStatus(ctx context.Context) (map[string]interfa
 	}
 	status["recent_scans"] = scanHistory
 
-	// Get job queue status
-	jobStats, err := as.getJobQueueStats(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get job queue stats: %w", err)
+	if as.indexer != nil {
+		status["indexer"] = as.indexer.Status()
 	}
-	status["job_queue"] = jobStats
 
 	// Get recent activity (play counts for last 24 hours, 7 days, 30 days)
 	activityStats, err := as.getActivityStats(ctx)
@@ -137,93 +162,6 @@ func (as *AdminService) GetRecentScanHistory(ctx context.Context, limit int) ([]
 	}
 
 	return history, rows.Err()
-}
-
-// GetPendingJobs returns jobs that are currently pending or processing
-func (as *AdminService) GetPendingJobs(ctx context.Context) ([]models.Job, error) {
-	query := `
-		SELECT id, job_type, payload, status, created_at, processed_at, attempts, last_error
-		FROM job_queue
-		WHERE status IN ('pending', 'processing')
-		ORDER BY created_at DESC
-	`
-
-	rows, err := as.db.QueryContext(ctx, query)
-	if err != nil {
-		return nil, fmt.Errorf("failed to query pending jobs: %w", err)
-	}
-	defer rows.Close()
-
-	jobs := make([]models.Job, 0)
-	for rows.Next() {
-		var job models.Job
-		err := rows.Scan(&job.ID, &job.JobType, &job.Payload, &job.Status,
-			&job.CreatedAt, &job.ProcessedAt, &job.Attempts, &job.LastError)
-		if err != nil {
-			return nil, fmt.Errorf("failed to scan job: %w", err)
-		}
-		jobs = append(jobs, job)
-	}
-
-	return jobs, rows.Err()
-}
-
-// getJobQueueStats returns job queue statistics
-func (as *AdminService) getJobQueueStats(ctx context.Context) (map[string]interface{}, error) {
-	stats := make(map[string]interface{})
-
-	// Get job counts by status
-	statusQuery := `
-		SELECT status, COUNT(*) as count
-		FROM job_queue
-		GROUP BY status
-	`
-
-	rows, err := as.db.QueryContext(ctx, statusQuery)
-	if err != nil {
-		return nil, fmt.Errorf("failed to query job status counts: %w", err)
-	}
-	defer rows.Close()
-
-	statusCounts := make(map[string]int)
-	for rows.Next() {
-		var status string
-		var count int
-		err := rows.Scan(&status, &count)
-		if err != nil {
-			return nil, fmt.Errorf("failed to scan job status: %w", err)
-		}
-		statusCounts[status] = count
-	}
-	stats["by_status"] = statusCounts
-
-	// Get job counts by type
-	typeQuery := `
-		SELECT job_type, COUNT(*) as count
-		FROM job_queue
-		WHERE created_at > NOW() - INTERVAL '24 hours'
-		GROUP BY job_type
-	`
-
-	rows2, err := as.db.QueryContext(ctx, typeQuery)
-	if err != nil {
-		return nil, fmt.Errorf("failed to query job type counts: %w", err)
-	}
-	defer rows2.Close()
-
-	typeCounts := make(map[string]int)
-	for rows2.Next() {
-		var jobType string
-		var count int
-		err := rows2.Scan(&jobType, &count)
-		if err != nil {
-			return nil, fmt.Errorf("failed to scan job type: %w", err)
-		}
-		typeCounts[jobType] = count
-	}
-	stats["by_type_24h"] = typeCounts
-
-	return stats, nil
 }
 
 // getActivityStats returns activity statistics
@@ -267,23 +205,6 @@ func (as *AdminService) getActivityStats(ctx context.Context) (map[string]interf
 	stats["active_users_30d"] = activeUsers
 
 	return stats, nil
-}
-
-// CleanupOldJobs removes completed and failed jobs older than specified days
-func (as *AdminService) CleanupOldJobs(ctx context.Context, olderThanDays int) (int, error) {
-	query := `
-		DELETE FROM job_queue
-		WHERE status IN ('completed', 'failed') 
-		AND created_at < NOW() - INTERVAL '%d days'
-	`
-
-	result, err := as.db.ExecContext(ctx, fmt.Sprintf(query, olderThanDays))
-	if err != nil {
-		return 0, fmt.Errorf("failed to cleanup old jobs: %w", err)
-	}
-
-	rowsAffected := int(result.RowsAffected())
-	return rowsAffected, nil
 }
 
 // CleanupOldSessions removes expired user sessions

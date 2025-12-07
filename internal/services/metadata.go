@@ -20,6 +20,7 @@ import (
 type MetadataService struct {
 	db             *database.DB
 	coverExtractor *CoverExtractor
+	lyricsEnabled  bool
 }
 
 type ExtractedMetadata struct {
@@ -47,11 +48,12 @@ type ExtractedLyrics struct {
 	Language string // ISO 639-2 language codes
 }
 
-func NewMetadataService(db *database.DB) *MetadataService {
+func NewMetadataService(db *database.DB, lyricsEnabled bool) *MetadataService {
 	coverExtractor := NewCoverExtractor("./static/covers")
 	return &MetadataService{
 		db:             db,
 		coverExtractor: coverExtractor,
+		lyricsEnabled:  lyricsEnabled,
 	}
 }
 
@@ -136,7 +138,9 @@ func (ms *MetadataService) extractMetadata(filePath string) (*ExtractedMetadata,
 	result.CoverURL = ms.extractCoverArt(filePath)
 
 	// Extract lyrics (try multiple methods in order of preference)
-	result.Lyrics = ms.extractLyrics(filePath, metadata)
+	if ms.lyricsEnabled {
+		result.Lyrics = ms.extractLyrics(filePath, metadata)
+	}
 
 	return result, nil
 }

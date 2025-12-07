@@ -2,9 +2,11 @@ package handlers
 
 import (
 	"net/http"
+	"strings"
+
+	"korus/internal/services"
 
 	"github.com/gin-gonic/gin"
-	"korus/internal/services"
 )
 
 type AdminHandler struct {
@@ -17,21 +19,61 @@ func NewAdminHandler(adminService *services.AdminService) *AdminHandler {
 	}
 }
 
-// TriggerLibraryScan triggers a full library scan
+// TriggerLibraryScan triggers a full library scan (async)
 func (h *AdminHandler) TriggerLibraryScan(c *gin.Context) {
-	jobID, err := h.adminService.TriggerLibraryScan(c.Request.Context())
+	force := parseBoolQuery(c, "force")
+
+	jobID, err := h.adminService.TriggerLibraryScan(c.Request.Context(), force)
 	if err != nil {
+		if err.Error() == "indexer already running" {
+			c.JSON(http.StatusConflict, gin.H{
+				"error":   "scan_in_progress",
+				"message": "A library scan is already running",
+			})
+			return
+		}
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"error":   "internal_error",
-			"message": "Failed to trigger library scan",
+			"message": "Failed to start library scan",
 		})
 		return
 	}
 
 	c.JSON(http.StatusAccepted, gin.H{
-		"message": "Library scan triggered successfully",
+		"message": "Library scan started",
 		"job_id":  jobID,
+		"force":   force,
 	})
+}
+
+// GetScanJob returns the status of a scan job
+func (h *AdminHandler) GetScanJob(c *gin.Context) {
+	jobID := c.Param("id")
+	if jobID == "" {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error":   "missing_job_id",
+			"message": "Job ID is required",
+		})
+		return
+	}
+
+	job, err := h.adminService.GetScanJob(jobID)
+	if err != nil {
+		if err.Error() == "job not found" {
+			c.JSON(http.StatusNotFound, gin.H{
+				"error":   "job_not_found",
+				"message": "Scan job not found",
+			})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error":   "internal_error",
+			"message": "Failed to get scan job status",
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, mapScanJob(job))
 }
 
 // GetSystemStatus returns comprehensive system status
@@ -67,47 +109,6 @@ func (h *AdminHandler) GetScanHistory(c *gin.Context) {
 	c.JSON(http.StatusOK, history)
 }
 
-// GetPendingJobs returns currently pending/processing jobs
-func (h *AdminHandler) GetPendingJobs(c *gin.Context) {
-	jobs, err := h.adminService.GetPendingJobs(c.Request.Context())
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"error":   "internal_error",
-			"message": "Failed to get pending jobs",
-		})
-		return
-	}
-
-	c.JSON(http.StatusOK, jobs)
-}
-
-// CleanupJobs removes old completed/failed jobs
-func (h *AdminHandler) CleanupJobs(c *gin.Context) {
-	// Default to cleaning up jobs older than 7 days
-	days := parseIntParam(c, "days", 7)
-	if days < 1 {
-		days = 1
-	}
-	if days > 365 {
-		days = 365 // Cap at 1 year
-	}
-
-	deletedCount, err := h.adminService.CleanupOldJobs(c.Request.Context(), days)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"error":   "internal_error",
-			"message": "Failed to cleanup jobs",
-		})
-		return
-	}
-
-	c.JSON(http.StatusOK, gin.H{
-		"message":         "Jobs cleanup completed",
-		"deleted_count":   deletedCount,
-		"older_than_days": days,
-	})
-}
-
 // CleanupSessions removes expired user sessions
 func (h *AdminHandler) CleanupSessions(c *gin.Context) {
 	deletedCount, err := h.adminService.CleanupOldSessions(c.Request.Context())
@@ -123,4 +124,61 @@ func (h *AdminHandler) CleanupSessions(c *gin.Context) {
 		"message":       "Sessions cleanup completed",
 		"deleted_count": deletedCount,
 	})
+}
+
+func parseBoolQuery(c *gin.Context, key string) bool {
+	value := strings.ToLower(c.DefaultQuery(key, "false"))
+	switch value {
+	case "1", "true", "yes", "on":
+		return true
+	default:
+		return false
+	}
+}
+
+func mapIndexerResult(res *services.LibraryScanResult) gin.H {
+	if res == nil {
+		return gin.H{}
+	}
+	errors := make([]string, 0, len(res.Errors))
+	for _, err := range res.Errors {
+		errors = append(errors, err.Error())
+	}
+	return gin.H{
+		"started_at":       res.StartedAt,
+		"completed_at":     res.CompletedAt,
+		"duration":         res.Duration.String(),
+		"files_discovered": res.FilesDiscovered,
+		"files_queued":     res.FilesQueued,
+		"files_new":        res.FilesNew,
+		"files_updated":    res.FilesUpdated,
+		"files_removed":    res.FilesRemoved,
+		"ingested":         res.Ingested,
+		"errors":           errors,
+	}
+}
+
+func mapScanJob(job *services.LibraryScanJob) gin.H {
+	if job == nil {
+		return gin.H{}
+	}
+	response := gin.H{
+		"id":         job.ID,
+		"status":     job.Status,
+		"phase":      job.Phase,
+		"progress":   job.Progress,
+		"total":      job.Total,
+		"force":      job.Force,
+		"started_at": job.StartedAt,
+	}
+	if job.CompletedAt != nil {
+		response["completed_at"] = job.CompletedAt
+	}
+	if job.Result != nil {
+		response["result"] = mapIndexerResult(job.Result)
+	}
+	if job.Error != "" {
+		response["error"] = job.Error
+	}
+	return response
 }
