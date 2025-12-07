@@ -10,11 +10,12 @@ import (
 	"strings"
 	"time"
 
+	"korus/internal/database"
+	"korus/internal/models"
+
 	"github.com/dhowden/tag"
 	"github.com/jackc/pgx/v5"
 	"gopkg.in/vansante/go-ffprobe.v2"
-	"korus/internal/database"
-	"korus/internal/models"
 )
 
 type MetadataService struct {
@@ -312,8 +313,12 @@ func (ms *MetadataService) insertOrUpdateSong(ctx context.Context, tx pgx.Tx, me
 	return &song, nil
 }
 
-// storeLyrics stores lyrics data for a song
+// storeLyrics stores lyrics data for a song using bulk insert
 func (ms *MetadataService) storeLyrics(ctx context.Context, tx pgx.Tx, songID int, lyrics []ExtractedLyrics) error {
+	if len(lyrics) == 0 {
+		return nil
+	}
+
 	// First, delete any existing lyrics for this song
 	deleteQuery := "DELETE FROM lyrics WHERE song_id = $1"
 	_, err := tx.Exec(ctx, deleteQuery, songID)
@@ -321,17 +326,26 @@ func (ms *MetadataService) storeLyrics(ctx context.Context, tx pgx.Tx, songID in
 		return fmt.Errorf("failed to delete existing lyrics: %w", err)
 	}
 
-	// Insert new lyrics
+	// Build bulk insert query
+	valueStrings := make([]string, 0, len(lyrics))
+	valueArgs := make([]interface{}, 0, len(lyrics)*5)
+	paramIdx := 1
+
 	for _, lyric := range lyrics {
-		insertQuery := `
-			INSERT INTO lyrics (song_id, content, type, source, language, created_at)
-			VALUES ($1, $2, $3, $4, $5, NOW())
-		`
-		_, err = tx.Exec(ctx, insertQuery,
-			songID, lyric.Content, lyric.Type, lyric.Source, lyric.Language)
-		if err != nil {
-			return fmt.Errorf("failed to insert lyrics: %w", err)
-		}
+		valueStrings = append(valueStrings, fmt.Sprintf("($%d, $%d, $%d, $%d, $%d, NOW())",
+			paramIdx, paramIdx+1, paramIdx+2, paramIdx+3, paramIdx+4))
+		valueArgs = append(valueArgs, songID, lyric.Content, lyric.Type, lyric.Source, lyric.Language)
+		paramIdx += 5
+	}
+
+	insertQuery := fmt.Sprintf(`
+		INSERT INTO lyrics (song_id, content, type, source, language, created_at)
+		VALUES %s
+	`, strings.Join(valueStrings, ", "))
+
+	_, err = tx.Exec(ctx, insertQuery, valueArgs...)
+	if err != nil {
+		return fmt.Errorf("failed to bulk insert lyrics: %w", err)
 	}
 
 	return nil

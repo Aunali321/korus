@@ -16,6 +16,7 @@ import (
 	"korus/internal/handlers"
 	"korus/internal/indexer"
 	"korus/internal/middleware"
+	"korus/internal/scanner"
 	"korus/internal/search"
 	"korus/internal/services"
 	"korus/internal/streaming"
@@ -149,6 +150,17 @@ func main() {
 	// Create initial admin user if no users exist
 	if err := createInitialAdminUser(authService, cfg); err != nil {
 		log.Fatal("Failed to create initial admin user:", err)
+	}
+
+	// Initialize file watcher scanner
+	fileScanner, err := scanner.New(db, indexerService, &cfg.Library)
+	if err != nil {
+		log.Printf("Warning: Failed to create file watcher: %v", err)
+	} else {
+		if err := fileScanner.Start(context.Background()); err != nil {
+			log.Printf("Warning: Failed to start file watcher: %v", err)
+		}
+		defer fileScanner.Stop()
 	}
 
 	// Initialize additional services

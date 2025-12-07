@@ -98,13 +98,22 @@ korus/
 │   ├── indexer/            # Async scan + job tracking
 │   ├── middleware/         # Auth, CORS, rate limit
 │   ├── models/             # Domain types
+│   ├── scanner/            # Real-time file watcher (fsnotify)
 │   ├── search/             # Bleve integration
-│   ├── services/           # Business logic
+│   ├── services/           # Business logic + batch metadata
 │   └── streaming/          # Range requests
 ├── migrations/             # SQL schemas
 ├── docker-compose.yml
 └── Dockerfile
 ```
+
+### File Watcher
+
+The scanner automatically watches the music directory for changes:
+- Uses fsnotify for real-time file system events
+- Batches changes for 10 seconds before triggering scan (Gonic-style)
+- Automatically starts with the server
+- Detects CREATE, WRITE, and REMOVE events
 
 ---
 
