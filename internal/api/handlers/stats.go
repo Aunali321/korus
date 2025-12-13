@@ -126,7 +126,7 @@ func (h *Handler) Home(c echo.Context) error {
 	ctx := c.Request().Context()
 	recent, _ := h.recentPlays(ctx, user.ID, 10)
 	recommended := h.rankSongs(ctx, user.ID, time.Now().AddDate(0, -1, 0), time.Now(), 5)
-	newAdditions, _ := h.fetchSongs(ctx, 10, 0)
+	newAdditions, _ := h.fetchSongs(ctx, 10)
 	return c.JSON(http.StatusOK, map[string]interface{}{
 		"recent_plays":  recent,
 		"recommended":   recommended,

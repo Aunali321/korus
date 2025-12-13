@@ -15,16 +15,15 @@ import (
 // @Summary Get library overview
 // @Tags Library
 // @Produce json
-// @Param limit query int false "max songs (default 50, max 200)"
-// @Param offset query int false "song offset"
+// @Param limit query int false "max items (default: all)"
 // @Success 200 {object} map[string]interface{}
 // @Router /api/library [get]
 func (h *Handler) Library(c echo.Context) error {
 	ctx := c.Request().Context()
-	limit, offset := parseLimitOffset(c, 50, 200)
-	artists, _ := h.fetchArtists(ctx, 20, 0)
-	albums, _ := h.fetchAlbums(ctx, 20, 0)
-	songs, _ := h.fetchSongs(ctx, limit, offset)
+	limit := parseOptionalLimit(c)
+	artists, _ := h.fetchArtists(ctx, limit)
+	albums, _ := h.fetchAlbums(ctx, limit)
+	songs, _ := h.fetchSongs(ctx, limit)
 	return c.JSON(http.StatusOK, map[string]interface{}{
 		"artists": artists,
 		"albums":  albums,
@@ -150,8 +149,8 @@ func (h *Handler) Song(c echo.Context) error {
 }
 
 // helpers
-func (h *Handler) fetchArtists(ctx context.Context, limit, offset int) ([]models.Artist, error) {
-	rows, err := h.db.QueryContext(ctx, `SELECT id, name, bio, image_path, mbid, created_at FROM artists ORDER BY created_at DESC LIMIT ? OFFSET ?`, limit, offset)
+func (h *Handler) fetchArtists(ctx context.Context, limit int) ([]models.Artist, error) {
+	rows, err := h.db.QueryContext(ctx, `SELECT id, name, bio, image_path, mbid, created_at FROM artists ORDER BY created_at DESC LIMIT ?`, limit)
 	if err != nil {
 		return []models.Artist{}, err
 	}
@@ -159,8 +158,14 @@ func (h *Handler) fetchArtists(ctx context.Context, limit, offset int) ([]models
 	res := []models.Artist{}
 	for rows.Next() {
 		var a models.Artist
-		var mbid sql.NullString
-		if err := rows.Scan(&a.ID, &a.Name, &a.Bio, &a.ImagePath, &mbid, &a.CreatedAt); err == nil {
+		var mbid, bio, imagePath sql.NullString
+		if err := rows.Scan(&a.ID, &a.Name, &bio, &imagePath, &mbid, &a.CreatedAt); err == nil {
+			if bio.Valid {
+				a.Bio = bio.String
+			}
+			if imagePath.Valid {
+				a.ImagePath = imagePath.String
+			}
 			if mbid.Valid {
 				a.MBID = &mbid.String
 			}
@@ -170,8 +175,13 @@ func (h *Handler) fetchArtists(ctx context.Context, limit, offset int) ([]models
 	return res, nil
 }
 
-func (h *Handler) fetchAlbums(ctx context.Context, limit, offset int) ([]models.Album, error) {
-	rows, err := h.db.QueryContext(ctx, `SELECT id, artist_id, title, year, cover_path, mbid, created_at FROM albums ORDER BY created_at DESC LIMIT ? OFFSET ?`, limit, offset)
+func (h *Handler) fetchAlbums(ctx context.Context, limit int) ([]models.Album, error) {
+	rows, err := h.db.QueryContext(ctx, `
+		SELECT al.id, al.artist_id, al.title, al.year, al.cover_path, al.mbid, al.created_at,
+		       ar.id, ar.name, ar.bio, ar.image_path, ar.mbid
+		FROM albums al
+		LEFT JOIN artists ar ON ar.id = al.artist_id
+		ORDER BY al.created_at DESC LIMIT ?`, limit)
 	if err != nil {
 		return []models.Album{}, err
 	}
@@ -181,7 +191,10 @@ func (h *Handler) fetchAlbums(ctx context.Context, limit, offset int) ([]models.
 		var al models.Album
 		var mbid sql.NullString
 		var year sql.NullInt64
-		if err := rows.Scan(&al.ID, &al.ArtistID, &al.Title, &year, &al.CoverPath, &mbid, &al.CreatedAt); err == nil {
+		var artistID sql.NullInt64
+		var artistName, artistBio, artistImagePath, artistMBID sql.NullString
+		if err := rows.Scan(&al.ID, &al.ArtistID, &al.Title, &year, &al.CoverPath, &mbid, &al.CreatedAt,
+			&artistID, &artistName, &artistBio, &artistImagePath, &artistMBID); err == nil {
 			if year.Valid {
 				y := int(year.Int64)
 				al.Year = &y
@@ -189,14 +202,33 @@ func (h *Handler) fetchAlbums(ctx context.Context, limit, offset int) ([]models.
 			if mbid.Valid {
 				al.MBID = &mbid.String
 			}
+			if artistID.Valid {
+				artist := &models.Artist{ID: artistID.Int64, Name: artistName.String}
+				if artistBio.Valid {
+					artist.Bio = artistBio.String
+				}
+				if artistImagePath.Valid {
+					artist.ImagePath = artistImagePath.String
+				}
+				if artistMBID.Valid {
+					artist.MBID = &artistMBID.String
+				}
+				al.Artist = artist
+			}
 			res = append(res, al)
 		}
 	}
 	return res, nil
 }
 
-func (h *Handler) fetchSongs(ctx context.Context, limit, offset int) ([]models.Song, error) {
-	rows, err := h.db.QueryContext(ctx, `SELECT id, album_id, title, track_number, duration, file_path FROM songs ORDER BY id DESC LIMIT ? OFFSET ?`, limit, offset)
+func (h *Handler) fetchSongs(ctx context.Context, limit int) ([]models.Song, error) {
+	rows, err := h.db.QueryContext(ctx, `
+		SELECT s.id, s.album_id, s.title, s.track_number, s.duration, s.file_path,
+		       ar.id, ar.name, ar.bio, ar.image_path
+		FROM songs s
+		LEFT JOIN albums al ON al.id = s.album_id
+		LEFT JOIN artists ar ON ar.id = al.artist_id
+		ORDER BY s.id DESC LIMIT ?`, limit)
 	if err != nil {
 		return []models.Song{}, err
 	}
@@ -206,7 +238,10 @@ func (h *Handler) fetchSongs(ctx context.Context, limit, offset int) ([]models.S
 		var s models.Song
 		var track sql.NullInt64
 		var duration sql.NullInt64
-		if err := rows.Scan(&s.ID, &s.AlbumID, &s.Title, &track, &duration, &s.FilePath); err == nil {
+		var artistID sql.NullInt64
+		var artistName, artistBio, artistImagePath sql.NullString
+		if err := rows.Scan(&s.ID, &s.AlbumID, &s.Title, &track, &duration, &s.FilePath,
+			&artistID, &artistName, &artistBio, &artistImagePath); err == nil {
 			if track.Valid {
 				t := int(track.Int64)
 				s.TrackNumber = &t
@@ -214,6 +249,16 @@ func (h *Handler) fetchSongs(ctx context.Context, limit, offset int) ([]models.S
 			if duration.Valid {
 				d := int(duration.Int64)
 				s.Duration = &d
+			}
+			if artistID.Valid {
+				artist := &models.Artist{ID: artistID.Int64, Name: artistName.String}
+				if artistBio.Valid {
+					artist.Bio = artistBio.String
+				}
+				if artistImagePath.Valid {
+					artist.ImagePath = artistImagePath.String
+				}
+				s.Artist = artist
 			}
 			res = append(res, s)
 		}
@@ -309,11 +354,17 @@ func (h *Handler) fetchSongsByAlbum(ctx context.Context, albumID int64) ([]model
 
 func (h *Handler) fetchArtist(ctx context.Context, id int64) (*models.Artist, error) {
 	var a models.Artist
-	var mbid sql.NullString
+	var mbid, bio, imagePath sql.NullString
 	err := h.db.QueryRowContext(ctx, `SELECT id, name, bio, image_path, mbid, created_at FROM artists WHERE id = ?`, id).
-		Scan(&a.ID, &a.Name, &a.Bio, &a.ImagePath, &mbid, &a.CreatedAt)
+		Scan(&a.ID, &a.Name, &bio, &imagePath, &mbid, &a.CreatedAt)
 	if err != nil {
 		return nil, err
+	}
+	if bio.Valid {
+		a.Bio = bio.String
+	}
+	if imagePath.Valid {
+		a.ImagePath = imagePath.String
 	}
 	if mbid.Valid {
 		a.MBID = &mbid.String

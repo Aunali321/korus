@@ -27,6 +27,8 @@ type Config struct {
 	ScanWatch           bool
 	ScanExcludePattern  string
 	ScanEmbeddedCover   bool
+	ScanWorkers         int
+	CoverCachePath      string
 }
 
 // FromEnv builds Config from environment with sane defaults.
@@ -50,6 +52,8 @@ func FromEnv() (Config, error) {
 		ScanWatch:           boolEnv("SCAN_WATCH", false),
 		ScanExcludePattern:  getenv("SCAN_EXCLUDE_PATTERN", ""),
 		ScanEmbeddedCover:   boolEnv("SCAN_EMBEDDED_COVER", true),
+		ScanWorkers:         intEnv("SCAN_WORKERS", 4),
+		CoverCachePath:      getenv("COVER_CACHE_PATH", "./cache/covers"),
 	}
 	if cfg.JWTSecret == "" {
 		return cfg, errors.New("JWT_SECRET is required")

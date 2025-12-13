@@ -151,15 +151,15 @@ export const api = {
 
   me: () => request<User>("/auth/me"),
 
-  getLibrary: (limit = 50, offset = 0) =>
-    request<{ songs: Song[]; stats: LibraryStats }>(
-      `/library?limit=${limit}&offset=${offset}`,
+  getLibrary: () =>
+    request<{ songs: Song[]; albums: Album[]; artists: Artist[] }>(
+      `/library`,
     ),
 
   getSong: (id: number) => request<Song>(`/songs/${id}`),
 
   getAlbum: (id: number) =>
-    request<{ album: Album; songs: Song[] }>(`/albums/${id}`),
+    request<{ id: number; title: string; year?: number; cover_path?: string; mbid?: string; artist?: Artist; songs: Song[]; created_at?: string }>(`/albums/${id}`),
 
   getArtist: (id: number) =>
     request<{ artist: Artist; albums: Album[]; top_songs: Song[] }>(

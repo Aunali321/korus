@@ -17,14 +17,8 @@
     async function loadAlbums() {
         loaded = true;
         try {
-            const data = await api.getLibrary(200, 0);
-            const albumMap = new Map<number, Album>();
-            for (const song of data.songs) {
-                if (song.album && !albumMap.has(song.album.id)) {
-                    albumMap.set(song.album.id, song.album);
-                }
-            }
-            albums = Array.from(albumMap.values());
+            const data = await api.getLibrary();
+            albums = data.albums || [];
         } catch (e) {
             console.error("Failed to load albums:", e);
         } finally {

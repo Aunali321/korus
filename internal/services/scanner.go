@@ -14,6 +14,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -23,7 +24,7 @@ import (
 
 type ScanStatus struct {
 	Status      string     `json:"status"`
-	Progress    float64    `json:"progress"`
+	Progress    int        `json:"progress"`
 	StartedAt   time.Time  `json:"started_at"`
 	CompletedAt *time.Time `json:"completed_at,omitempty"`
 	CurrentFile string     `json:"current_file,omitempty"`
@@ -39,12 +40,21 @@ type ScannerService struct {
 	ffmpegPath     string
 	scanning       int32
 	watchEnabled   bool
+	workers        int
+	coverCachePath string
 }
 
-func NewScannerService(db *sql.DB, mediaRoot, ffprobePath, ffmpegPath, exclude string, scanEmbeddedCover bool, watch bool) *ScannerService {
+func NewScannerService(db *sql.DB, mediaRoot, ffprobePath, ffmpegPath, exclude string, scanEmbeddedCover bool, watch bool, workers int, coverCachePath string) *ScannerService {
 	var re *regexp.Regexp
 	if exclude != "" {
 		re = regexp.MustCompile(exclude)
+	}
+	if workers < 1 {
+		workers = 8
+	}
+	// Default cover cache path if not specified
+	if coverCachePath == "" {
+		coverCachePath = "./cache/covers"
 	}
 	return &ScannerService{
 		db:             db,
@@ -54,6 +64,8 @@ func NewScannerService(db *sql.DB, mediaRoot, ffprobePath, ffmpegPath, exclude s
 		ffprobePath:    ffprobePath,
 		ffmpegPath:     ffmpegPath,
 		watchEnabled:   watch,
+		workers:        workers,
+		coverCachePath: coverCachePath,
 	}
 }
 
@@ -94,25 +106,91 @@ func (s *ScannerService) StartScan(ctx context.Context) (int64, error) {
 	}
 	scanID, _ := res.LastInsertId()
 
+	var mu sync.Mutex
 	seenSongs := map[int64]struct{}{}
 	seenAlbums := map[int64]struct{}{}
 	seenArtists := map[int64]struct{}{}
 
-	for i, file := range files {
-		if err := s.ingestFile(ctx, file, seenSongs, seenAlbums, seenArtists); err != nil {
-			// continue but record error in status current_file
-			_, _ = s.db.ExecContext(ctx, `UPDATE scan_status SET current_file = ?, progress = ? WHERE id = ?`, fmt.Sprintf("error:%s", err.Error()), progress(i, len(files)), scanID)
-			continue
+	var processedCount int64
+	var currentFile atomic.Value
+	currentFile.Store("")
+
+	progressDone := make(chan struct{})
+	go func() {
+		ticker := time.NewTicker(500 * time.Millisecond)
+		defer ticker.Stop()
+		lastReported := int64(-1)
+		for {
+			select {
+			case <-progressDone:
+				count := atomic.LoadInt64(&processedCount)
+				file, _ := currentFile.Load().(string)
+				_, _ = s.db.ExecContext(ctx, `UPDATE scan_status SET current_file = ?, progress = ? WHERE id = ?`,
+					file, count, scanID)
+				return
+			case <-ticker.C:
+				count := atomic.LoadInt64(&processedCount)
+				if count != lastReported {
+					file, _ := currentFile.Load().(string)
+					_, _ = s.db.ExecContext(ctx, `UPDATE scan_status SET current_file = ?, progress = ? WHERE id = ?`,
+						file, count, scanID)
+					lastReported = count
+				}
+			}
 		}
-		_, _ = s.db.ExecContext(ctx, `UPDATE scan_status SET current_file = ?, progress = ? WHERE id = ?`, file, progress(i+1, len(files)), scanID)
+	}()
+
+	fileChan := make(chan string, len(files))
+	var wg sync.WaitGroup
+
+	for w := 0; w < s.workers; w++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for file := range fileChan {
+				localSongs := map[int64]struct{}{}
+				localAlbums := map[int64]struct{}{}
+				localArtists := map[int64]struct{}{}
+
+				currentFile.Store(file)
+				
+				if err := s.ingestFile(ctx, file, localSongs, localAlbums, localArtists); err != nil {
+					atomic.AddInt64(&processedCount, 1)
+				} else {
+					mu.Lock()
+					for id := range localSongs {
+						seenSongs[id] = struct{}{}
+					}
+					for id := range localAlbums {
+						seenAlbums[id] = struct{}{}
+					}
+					for id := range localArtists {
+						seenArtists[id] = struct{}{}
+					}
+					mu.Unlock()
+
+					atomic.AddInt64(&processedCount, 1)
+				}
+			}
+		}()
 	}
+
+	for _, file := range files {
+		fileChan <- file
+	}
+	close(fileChan)
+
+	wg.Wait()
+
+	close(progressDone)
+	time.Sleep(100 * time.Millisecond)
 
 	if err := s.cleanup(ctx, seenSongs, seenAlbums, seenArtists); err != nil {
 		return 0, err
 	}
 
 	now := time.Now()
-	_, _ = s.db.ExecContext(ctx, `UPDATE scan_status SET status='completed', progress=1, completed_at=? WHERE id=?`, now, scanID)
+	_, _ = s.db.ExecContext(ctx, `UPDATE scan_status SET status='completed', progress=?, completed_at=? WHERE id=?`, len(files), now, scanID)
 	return scanID, nil
 }
 
@@ -190,10 +268,10 @@ func (s *ScannerService) ingestFile(ctx context.Context, path string, seenSongs 
 	var songID int64
 	if err := s.db.QueryRowContext(ctx, `SELECT id FROM songs WHERE file_path = ?`, path).Scan(&songID); err == nil {
 		seenSongs[songID] = struct{}{}
+		// Delete old FTS entry and insert new one (FTS5 contentless tables don't support ON CONFLICT)
+		_, _ = s.db.ExecContext(ctx, `DELETE FROM songs_fts WHERE rowid = ?`, songID)
 		_, _ = s.db.ExecContext(ctx, `INSERT INTO songs_fts (rowid, song_id, title, artist_name, album_title)
-			VALUES (?, ?, ?, ?, ?)
-			ON CONFLICT(rowid) DO UPDATE SET title=excluded.title, artist_name=excluded.artist_name, album_title=excluded.album_title
-		`, songID, songID, title, artistName, albumTitle)
+			VALUES (?, ?, ?, ?, ?)`, songID, songID, title, artistName, albumTitle)
 	}
 
 	if s.scanEmbedded {
@@ -278,6 +356,10 @@ func (s *ScannerService) Watch(ctx context.Context) error {
 	defer w.Close()
 	filepath.WalkDir(s.mediaRoot, func(path string, d fs.DirEntry, err error) error {
 		if err == nil && d.IsDir() {
+			// Skip hidden directories
+			if strings.HasPrefix(d.Name(), ".") && path != s.mediaRoot {
+				return fs.SkipDir
+			}
 			_ = w.Add(path)
 		}
 		return nil
@@ -289,11 +371,18 @@ func (s *ScannerService) Watch(ctx context.Context) error {
 		case <-ctx.Done():
 			return nil
 		case ev := <-w.Events:
+			// Ignore events from hidden files/directories and database files
+			if strings.Contains(ev.Name, "/.") || strings.HasSuffix(ev.Name, ".db") {
+				continue
+			}
 			if ev.Op&(fsnotify.Create|fsnotify.Write|fsnotify.Remove|fsnotify.Rename) != 0 {
 				debounce.Reset(time.Second * 5)
 			}
 		case <-debounce.C:
-			go s.StartScan(context.Background())
+			// Only trigger if not already scanning
+			if !s.IsScanning() {
+				go s.StartScan(context.Background())
+			}
 		case err := <-w.Errors:
 			return err
 		}
@@ -336,12 +425,18 @@ func parseStringToInt(v string) int {
 }
 
 func (s *ScannerService) extractCover(ctx context.Context, src string, albumID int64) (string, error) {
-	outDir := filepath.Join(s.mediaRoot, ".covers")
-	if err := os.MkdirAll(outDir, 0o755); err != nil {
+	if err := os.MkdirAll(s.coverCachePath, 0o755); err != nil {
 		return "", err
 	}
-	outPath := filepath.Join(outDir, fmt.Sprintf("%d.jpg", albumID))
-	cmd := exec.CommandContext(ctx, s.ffmpegPath, "-y", "-i", src, "-an", "-vcodec", "copy", "-map", "0:v:0", "-frames:v", "1", outPath)
+	outPath := filepath.Join(s.coverCachePath, fmt.Sprintf("%d.jpg", albumID))
+	// Extract and resize to 500x500, compress as JPEG with quality 85
+	cmd := exec.CommandContext(ctx, s.ffmpegPath, 
+		"-y", "-i", src, 
+		"-an",                         // No audio
+		"-vf", "scale=500:500:force_original_aspect_ratio=decrease,pad=500:500:(ow-iw)/2:(oh-ih)/2", // Resize and pad to 500x500
+		"-frames:v", "1",               // Just one frame
+		"-q:v", "2",                    // JPEG quality (2 is high quality, smaller file)
+		outPath)
 	if err := cmd.Run(); err != nil {
 		return "", err
 	}
@@ -359,11 +454,4 @@ func isAudioFile(path string) bool {
 	default:
 		return false
 	}
-}
-
-func progress(done, total int) float64 {
-	if total == 0 {
-		return 1
-	}
-	return float64(done) / float64(total)
 }

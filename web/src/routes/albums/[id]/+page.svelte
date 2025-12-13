@@ -27,8 +27,17 @@
         loading = true;
         try {
             const data = await api.getAlbum(id);
-            album = data.album;
-            songs = data.songs;
+            album = {
+                id: data.id,
+                artist_id: data.artist?.id || 0,
+                title: data.title,
+                year: data.year,
+                cover_path: data.cover_path,
+                mbid: data.mbid,
+                artist: data.artist,
+                created_at: data.created_at || new Date().toISOString(),
+            };
+            songs = data.songs || [];
         } catch (e) {
             console.error("Failed to load album:", e);
         } finally {
@@ -42,7 +51,7 @@
     }
 
     const totalDuration = $derived(
-        songs.reduce((acc, s) => acc + s.duration, 0),
+        songs.reduce((acc, s) => acc + (s.duration || 0), 0),
     );
 </script>
 

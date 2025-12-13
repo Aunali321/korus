@@ -66,7 +66,7 @@ func main() {
 		log.Fatalf("ffprobe not found at %s: %v", cfg.FFprobePath, err)
 	}
 
-	scanner := services.NewScannerService(database, cfg.MediaRoot, cfg.FFprobePath, cfg.FFmpegPath, cfg.ScanExcludePattern, cfg.ScanEmbeddedCover, cfg.ScanWatch)
+	scanner := services.NewScannerService(database, cfg.MediaRoot, cfg.FFprobePath, cfg.FFmpegPath, cfg.ScanExcludePattern, cfg.ScanEmbeddedCover, cfg.ScanWatch, cfg.ScanWorkers, cfg.CoverCachePath)
 	if cfg.ScanWatch {
 		go func() {
 			if err := scanner.Watch(context.Background()); err != nil {

@@ -38,7 +38,7 @@ func (h *Handler) ListPlaylists(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusInternalServerError, map[string]string{"error": err.Error(), "code": "PLAYLIST_LIST_FAILED"})
 	}
 	defer rows.Close()
-	var res []map[string]interface{}
+	var res = []map[string]interface{}{}
 	for rows.Next() {
 		var id, uid int64
 		var name, desc string
@@ -320,7 +320,7 @@ func (h *Handler) fetchPlaylistSongs(ctx context.Context, playlistID int64) ([]m
 		return nil, err
 	}
 	defer rows.Close()
-	var res []map[string]interface{}
+	var res = []map[string]interface{}{}
 	for rows.Next() {
 		var id int64
 		var title, path string

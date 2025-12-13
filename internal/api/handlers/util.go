@@ -24,3 +24,13 @@ func parseLimitOffset(c echo.Context, def, max int) (limit int, offset int) {
 	}
 	return
 }
+
+// parseOptionalLimit returns -1 (unlimited) by default, or the specified limit if provided
+func parseOptionalLimit(c echo.Context) int {
+	if v := c.QueryParam("limit"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil && n > 0 {
+			return n
+		}
+	}
+	return -1 // SQLite treats -1 as LIMIT ALL
+}
