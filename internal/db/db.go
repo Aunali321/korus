@@ -12,7 +12,6 @@ import (
 	_ "modernc.org/sqlite"
 )
 
-//go:embed schema.sql
 var schemaSQL string
 
 func Open(path string) (*sql.DB, error) {
@@ -28,7 +27,6 @@ func Open(path string) (*sql.DB, error) {
 	return db, nil
 }
 
-// Migrate applies the embedded schema.
 func Migrate(ctx context.Context, db *sql.DB) error {
 	stmts := strings.Split(schemaSQL, ";\n")
 	for _, stmt := range stmts {
@@ -43,7 +41,6 @@ func Migrate(ctx context.Context, db *sql.DB) error {
 	return nil
 }
 
-// SeedAdmin inserts the first admin user if none exist.
 func SeedAdmin(ctx context.Context, db *sql.DB, username, email, passwordHash string) error {
 	var count int
 	if err := db.QueryRowContext(ctx, `SELECT COUNT(1) FROM users`).Scan(&count); err != nil {

@@ -153,10 +153,10 @@ func (h *Handler) Song(c echo.Context) error {
 func (h *Handler) fetchArtists(ctx context.Context, limit, offset int) ([]models.Artist, error) {
 	rows, err := h.db.QueryContext(ctx, `SELECT id, name, bio, image_path, mbid, created_at FROM artists ORDER BY created_at DESC LIMIT ? OFFSET ?`, limit, offset)
 	if err != nil {
-		return nil, err
+		return []models.Artist{}, err
 	}
 	defer rows.Close()
-	var res []models.Artist
+	res := []models.Artist{}
 	for rows.Next() {
 		var a models.Artist
 		var mbid sql.NullString
@@ -173,10 +173,10 @@ func (h *Handler) fetchArtists(ctx context.Context, limit, offset int) ([]models
 func (h *Handler) fetchAlbums(ctx context.Context, limit, offset int) ([]models.Album, error) {
 	rows, err := h.db.QueryContext(ctx, `SELECT id, artist_id, title, year, cover_path, mbid, created_at FROM albums ORDER BY created_at DESC LIMIT ? OFFSET ?`, limit, offset)
 	if err != nil {
-		return nil, err
+		return []models.Album{}, err
 	}
 	defer rows.Close()
-	var res []models.Album
+	res := []models.Album{}
 	for rows.Next() {
 		var al models.Album
 		var mbid sql.NullString
@@ -198,10 +198,10 @@ func (h *Handler) fetchAlbums(ctx context.Context, limit, offset int) ([]models.
 func (h *Handler) fetchSongs(ctx context.Context, limit, offset int) ([]models.Song, error) {
 	rows, err := h.db.QueryContext(ctx, `SELECT id, album_id, title, track_number, duration, file_path FROM songs ORDER BY id DESC LIMIT ? OFFSET ?`, limit, offset)
 	if err != nil {
-		return nil, err
+		return []models.Song{}, err
 	}
 	defer rows.Close()
-	var res []models.Song
+	res := []models.Song{}
 	for rows.Next() {
 		var s models.Song
 		var track sql.NullInt64
@@ -224,10 +224,10 @@ func (h *Handler) fetchSongs(ctx context.Context, limit, offset int) ([]models.S
 func (h *Handler) fetchAlbumsByArtist(ctx context.Context, artistID int64) ([]models.Album, error) {
 	rows, err := h.db.QueryContext(ctx, `SELECT id, artist_id, title, year, cover_path, mbid, created_at FROM albums WHERE artist_id = ?`, artistID)
 	if err != nil {
-		return nil, err
+		return []models.Album{}, err
 	}
 	defer rows.Close()
-	var res []models.Album
+	res := []models.Album{}
 	for rows.Next() {
 		var al models.Album
 		var mbid sql.NullString
@@ -254,10 +254,10 @@ func (h *Handler) fetchSongsByArtist(ctx context.Context, artistID int64) ([]mod
 		WHERE a.artist_id = ?
 	`, artistID)
 	if err != nil {
-		return nil, err
+		return []models.Song{}, err
 	}
 	defer rows.Close()
-	var res []models.Song
+	res := []models.Song{}
 	for rows.Next() {
 		var s models.Song
 		var track sql.NullInt64
@@ -284,10 +284,10 @@ func (h *Handler) fetchSongsByAlbum(ctx context.Context, albumID int64) ([]model
 		ORDER BY track_number
 	`, albumID)
 	if err != nil {
-		return nil, err
+		return []models.Song{}, err
 	}
 	defer rows.Close()
-	var res []models.Song
+	res := []models.Song{}
 	for rows.Next() {
 		var s models.Song
 		var track sql.NullInt64

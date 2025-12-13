@@ -13,15 +13,22 @@ import (
 func Auth(auth *services.AuthService) echo.MiddlewareFunc {
 	return func(next echo.HandlerFunc) echo.HandlerFunc {
 		return func(c echo.Context) error {
+			var token string
 			header := c.Request().Header.Get("Authorization")
-			if header == "" {
+			if header != "" {
+				parts := strings.SplitN(header, " ", 2)
+				if len(parts) == 2 && strings.EqualFold(parts[0], "Bearer") {
+					token = parts[1]
+				}
+			}
+			// Fallback to query parameter for media endpoints
+			if token == "" {
+				token = c.QueryParam("token")
+			}
+			if token == "" {
 				return echo.NewHTTPError(http.StatusUnauthorized, map[string]string{"error": "missing authorization", "code": "UNAUTHORIZED"})
 			}
-			parts := strings.SplitN(header, " ", 2)
-			if len(parts) != 2 || !strings.EqualFold(parts[0], "Bearer") {
-				return echo.NewHTTPError(http.StatusUnauthorized, map[string]string{"error": "invalid authorization", "code": "UNAUTHORIZED"})
-			}
-			user, err := auth.ValidateToken(c.Request().Context(), parts[1])
+			user, err := auth.ValidateToken(c.Request().Context(), token)
 			if err != nil {
 				return echo.NewHTTPError(http.StatusUnauthorized, map[string]string{"error": "invalid token", "code": "UNAUTHORIZED"})
 			}

@@ -6,12 +6,13 @@ import (
 	"log"
 	"net/http"
 	"os"
-	"os/signal"
 	"os/exec"
+	"os/signal"
 	"time"
 
 	"golang.org/x/crypto/bcrypt"
 
+	_ "github.com/joho/godotenv/autoload"
 	echoSwagger "github.com/swaggo/echo-swagger"
 
 	_ "github.com/Aunali321/korus/docs"
@@ -143,4 +144,3 @@ func seedAdmin(ctx context.Context, auth *services.AuthService, dbConn *sql.DB, 
 	log.Printf("seeded admin user %s with token %s", username, tokens.Access)
 	return nil
 }
-

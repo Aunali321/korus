@@ -41,7 +41,7 @@ func (h *Handler) Register(c echo.Context) error {
 	if err != nil {
 		return echo.NewHTTPError(http.StatusBadRequest, map[string]string{"error": err.Error(), "code": "REGISTER_FAILED"})
 	}
-	return c.JSON(http.StatusOK, map[string]interface{}{"user": sanitizeUser(user), "token": tokens.Access, "refresh_token": tokens.Refresh})
+	return c.JSON(http.StatusOK, map[string]interface{}{"user": sanitizeUser(user), "access_token": tokens.Access, "refresh_token": tokens.Refresh})
 }
 
 // Login godoc
@@ -65,7 +65,7 @@ func (h *Handler) Login(c echo.Context) error {
 	if err != nil {
 		return echo.NewHTTPError(http.StatusUnauthorized, map[string]string{"error": err.Error(), "code": "UNAUTHORIZED"})
 	}
-	return c.JSON(http.StatusOK, map[string]interface{}{"user": sanitizeUser(user), "token": tokens.Access, "refresh_token": tokens.Refresh})
+	return c.JSON(http.StatusOK, map[string]interface{}{"user": sanitizeUser(user), "access_token": tokens.Access, "refresh_token": tokens.Refresh})
 }
 
 // Logout godoc
@@ -109,7 +109,7 @@ func (h *Handler) Refresh(c echo.Context) error {
 	if err != nil {
 		return echo.NewHTTPError(http.StatusUnauthorized, map[string]string{"error": err.Error(), "code": "UNAUTHORIZED"})
 	}
-	return c.JSON(http.StatusOK, map[string]interface{}{"user": sanitizeUser(user), "token": tokens.Access, "refresh_token": tokens.Refresh})
+	return c.JSON(http.StatusOK, map[string]interface{}{"user": sanitizeUser(user), "access_token": tokens.Access, "refresh_token": tokens.Refresh})
 }
 
 // Me godoc
