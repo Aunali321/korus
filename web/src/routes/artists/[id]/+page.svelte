@@ -29,9 +29,16 @@
         loading = true;
         try {
             const data = await api.getArtist(id);
-            artist = data.artist;
+            // API returns flat object with artist fields at root level
+            artist = {
+                id: data.id,
+                name: data.name,
+                bio: data.bio,
+                image_path: data.image_path,
+                mbid: data.mbid,
+            } as Artist;
             albums = data.albums || [];
-            topSongs = data.top_songs || [];
+            topSongs = data.songs || [];
         } catch (e) {
             console.error("Failed to load artist:", e);
         } finally {
@@ -114,7 +121,7 @@
                             title={album.title}
                             subtitle={album.year?.toString() || ""}
                             image={album.cover_path
-                                ? api.getArtworkUrl(album.id)
+                                ? api.getArtworkUrl(album.id, "album")
                                 : undefined}
                             href="/albums/{album.id}"
                         />

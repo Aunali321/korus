@@ -36,10 +36,12 @@ func (h *Handler) RecordHistory(c echo.Context) error {
 	if req.Timestamp != nil {
 		ts = time.Unix(*req.Timestamp, 0)
 	}
+	// Format timestamp as RFC3339 for SQLite compatibility
+	tsFormatted := ts.Format(time.RFC3339)
 	_, err := h.db.ExecContext(c.Request().Context(), `
 		INSERT INTO play_history(user_id, song_id, played_at, duration_listened, completion_rate, source)
 		VALUES (?, ?, ?, ?, ?, ?)
-	`, user.ID, req.SongID, ts, req.DurationListened, req.CompletionRate, req.Source)
+	`, user.ID, req.SongID, tsFormatted, req.DurationListened, req.CompletionRate, req.Source)
 	if err != nil {
 		return echo.NewHTTPError(http.StatusInternalServerError, map[string]string{"error": err.Error(), "code": "HISTORY_SAVE_FAILED"})
 	}
@@ -70,7 +72,7 @@ func (h *Handler) ListHistory(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusInternalServerError, map[string]string{"error": err.Error(), "code": "HISTORY_QUERY_FAILED"})
 	}
 	defer rows.Close()
-	var res []map[string]interface{}
+	res := []map[string]interface{}{}
 	for rows.Next() {
 		var id, songID int64
 		var playedAt string

@@ -162,7 +162,7 @@ export const api = {
     request<{ id: number; title: string; year?: number; cover_path?: string; mbid?: string; artist?: Artist; songs: Song[]; created_at?: string }>(`/albums/${id}`),
 
   getArtist: (id: number) =>
-    request<{ artist: Artist; albums: Album[]; top_songs: Song[] }>(
+    request<{ id: number; name: string; bio?: string; image_path?: string; mbid?: string; albums: Album[]; songs: Song[] }>(
       `/artists/${id}`,
     ),
 
@@ -171,10 +171,13 @@ export const api = {
       `/search?q=${encodeURIComponent(q)}&limit=${limit}&offset=${offset}`,
     ),
 
-  getArtworkUrl: (id: number) => {
+  getArtworkUrl: (id: number, type?: 'song' | 'album') => {
     const token = getAccessToken();
-    const url = `${getApiUrl()}/artwork/${id}`;
-    return token ? `${url}?token=${token}` : url;
+    let url = `${getApiUrl()}/artwork/${id}`;
+    const params: string[] = [];
+    if (token) params.push(`token=${token}`);
+    if (type === 'album') params.push('type=album');
+    return params.length ? `${url}?${params.join('&')}` : url;
   },
 
   getStreamUrl: (id: number, format?: string, bitrate?: number) => {

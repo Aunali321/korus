@@ -1,38 +1,55 @@
 <script lang="ts">
-	import { page } from '$app/stores';
-	import { Home, Search, Library, ListMusic, Disc3, Mic2, Heart, Settings, BarChart3, Clock, Users, Sparkles, Lightbulb, Shield } from 'lucide-svelte';
-	import { auth } from '$lib/stores/auth.svelte';
+	import { page } from "$app/stores";
+	import {
+		Home,
+		Search,
+		Library,
+		ListMusic,
+		Disc3,
+		Mic2,
+		Heart,
+		Settings,
+		BarChart3,
+		Sparkles,
+		Shield,
+	} from "lucide-svelte";
+	import { auth } from "$lib/stores/auth.svelte";
 
 	const navItems = [
-		{ icon: Home, label: 'Home', href: '/' },
-		{ icon: Search, label: 'Search', href: '/search' },
-		{ icon: Library, label: 'Library', href: '/library' }
+		{ icon: Home, label: "Home", href: "/" },
+		{ icon: Search, label: "Search", href: "/search" },
+		{ icon: Library, label: "Library", href: "/library" },
 	];
 
 	const libraryItems = [
-		{ icon: ListMusic, label: 'Playlists', href: '/playlists' },
-		{ icon: Disc3, label: 'Albums', href: '/albums' },
-		{ icon: Mic2, label: 'Artists', href: '/artists' },
-		{ icon: Heart, label: 'Favorites', href: '/favorites' }
+		{ icon: ListMusic, label: "Playlists", href: "/playlists" },
+		{ icon: Disc3, label: "Albums", href: "/albums" },
+		{ icon: Mic2, label: "Artists", href: "/artists" },
+		{ icon: Heart, label: "Favorites", href: "/favorites" },
 	];
 
-	const statsItems = [
-		{ icon: Clock, label: 'History', href: '/history' },
-		{ icon: BarChart3, label: 'Stats', href: '/stats' },
-		{ icon: Sparkles, label: 'Wrapped', href: '/wrapped' },
-		{ icon: Lightbulb, label: 'Insights', href: '/insights' },
-		{ icon: Users, label: 'Social', href: '/social' }
-	];
+	// Wrapped is shown only during last week of month or in December
+	function isWrappedSeason(): boolean {
+		const now = new Date();
+		const month = now.getMonth(); // 0-11
+		const date = now.getDate();
+		const lastDay = new Date(now.getFullYear(), month + 1, 0).getDate();
+
+		// Show in December (month 11) or last 7 days of any month
+		return month === 11 || lastDay - date < 7;
+	}
 
 	function isActive(href: string): boolean {
-		if (href === '/') return $page.url.pathname === '/';
+		if (href === "/") return $page.url.pathname === "/";
 		return $page.url.pathname.startsWith(href);
 	}
 </script>
 
 <div class="w-64 bg-zinc-950 border-r border-zinc-800 flex flex-col h-full">
 	<div class="p-6 border-b border-zinc-800">
-		<h1 class="text-2xl font-bold bg-gradient-to-r from-emerald-400 to-cyan-400 bg-clip-text text-transparent">
+		<h1
+			class="text-2xl font-bold bg-gradient-to-r from-emerald-400 to-cyan-400 bg-clip-text text-transparent"
+		>
 			Korus
 		</h1>
 		<p class="text-xs text-zinc-500 mt-1">Self-hosted Music</p>
@@ -43,7 +60,9 @@
 			{#each navItems as item}
 				<a
 					href={item.href}
-					class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all {isActive(item.href)
+					class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all {isActive(
+						item.href,
+					)
 						? 'bg-zinc-800 text-emerald-400'
 						: 'text-zinc-400 hover:text-zinc-100 hover:bg-zinc-900'}"
 				>
@@ -54,14 +73,18 @@
 		</div>
 
 		<div class="mt-6 px-3">
-			<h2 class="text-xs font-semibold text-zinc-500 uppercase tracking-wider px-3 py-2">
+			<h2
+				class="text-xs font-semibold text-zinc-500 uppercase tracking-wider px-3 py-2"
+			>
 				Library
 			</h2>
 			<div class="space-y-1 mt-1">
 				{#each libraryItems as item}
 					<a
 						href={item.href}
-						class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all {isActive(item.href)
+						class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all {isActive(
+							item.href,
+						)
 							? 'bg-zinc-800 text-emerald-400'
 							: 'text-zinc-400 hover:text-zinc-100 hover:bg-zinc-900'}"
 					>
@@ -73,21 +96,36 @@
 		</div>
 
 		<div class="mt-6 px-3">
-			<h2 class="text-xs font-semibold text-zinc-500 uppercase tracking-wider px-3 py-2">
+			<h2
+				class="text-xs font-semibold text-zinc-500 uppercase tracking-wider px-3 py-2"
+			>
 				Stats
 			</h2>
 			<div class="space-y-1 mt-1">
-				{#each statsItems as item}
+				<a
+					href="/stats"
+					class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all {isActive(
+						'/stats',
+					)
+						? 'bg-zinc-800 text-emerald-400'
+						: 'text-zinc-400 hover:text-zinc-100 hover:bg-zinc-900'}"
+				>
+					<BarChart3 size={18} />
+					<span class="text-sm">Stats</span>
+				</a>
+				{#if isWrappedSeason()}
 					<a
-						href={item.href}
-						class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all {isActive(item.href)
+						href="/wrapped"
+						class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all {isActive(
+							'/wrapped',
+						)
 							? 'bg-zinc-800 text-emerald-400'
 							: 'text-zinc-400 hover:text-zinc-100 hover:bg-zinc-900'}"
 					>
-						<item.icon size={18} />
-						<span class="text-sm">{item.label}</span>
+						<Sparkles size={18} />
+						<span class="text-sm">Wrapped</span>
 					</a>
-				{/each}
+				{/if}
 			</div>
 		</div>
 	</nav>
@@ -96,7 +134,9 @@
 		{#if auth.isAdmin}
 			<a
 				href="/admin"
-				class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all {isActive('/admin')
+				class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all {isActive(
+					'/admin',
+				)
 					? 'bg-zinc-800 text-emerald-400'
 					: 'text-zinc-400 hover:text-zinc-100 hover:bg-zinc-900'}"
 			>
@@ -106,7 +146,9 @@
 		{/if}
 		<a
 			href="/settings"
-			class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all {isActive('/settings')
+			class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all {isActive(
+				'/settings',
+			)
 				? 'bg-zinc-800 text-emerald-400'
 				: 'text-zinc-400 hover:text-zinc-100 hover:bg-zinc-900'}"
 		>

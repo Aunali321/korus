@@ -40,6 +40,7 @@ export interface Playlist {
     user_id: number;
     songs?: Song[];
     song_count?: number;
+    first_song_id?: number;
     created_at?: string;
     updated_at?: string;
 }
@@ -55,7 +56,7 @@ export interface User {
 export interface PlayHistory {
     id: number;
     song: Song;
-    timestamp: string;
+    played_at: string;
     duration_listened: number;
     completion_rate: number;
     source?: string;

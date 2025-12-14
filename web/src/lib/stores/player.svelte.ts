@@ -12,6 +12,24 @@ function createPlayerStore() {
     let shuffle = $state(false);
     let repeat = $state<RepeatMode>('off');
     let audio: HTMLAudioElement | null = null;
+    let playStartTime = 0; // Track when playback started
+
+    // Record play history for the current song
+    function recordHistory() {
+        if (!currentSong || playStartTime === 0 || !audio) return;
+
+        const listenedSeconds = Math.floor(audio.currentTime);
+        const totalDuration = audio.duration || 1;
+        const completionRate = Math.min(listenedSeconds / totalDuration, 1);
+
+        // Only record if listened for at least 10 seconds
+        if (listenedSeconds >= 10) {
+            api.recordPlay(currentSong.id, listenedSeconds, completionRate, 'web')
+                .catch(err => console.error('Failed to record play:', err));
+        }
+
+        playStartTime = 0;
+    }
 
     function initAudio() {
         if (typeof window === 'undefined') return;
@@ -19,6 +37,13 @@ function createPlayerStore() {
 
         audio = new Audio();
         audio.volume = volume;
+
+        // Record history when tab becomes hidden (covers refresh, close, tab switch)
+        document.addEventListener('visibilitychange', () => {
+            if (document.visibilityState === 'hidden') {
+                recordHistory();
+            }
+        });
 
         audio.addEventListener('timeupdate', () => {
             progress = audio!.currentTime;
@@ -29,8 +54,10 @@ function createPlayerStore() {
         });
 
         audio.addEventListener('ended', () => {
+            recordHistory(); // Record play before moving to next
             if (repeat === 'one') {
                 audio!.currentTime = 0;
+                playStartTime = Date.now();
                 audio!.play();
             } else {
                 next();
@@ -39,6 +66,9 @@ function createPlayerStore() {
 
         audio.addEventListener('play', () => {
             isPlaying = true;
+            if (playStartTime === 0) {
+                playStartTime = Date.now();
+            }
         });
 
         audio.addEventListener('pause', () => {
@@ -67,7 +97,11 @@ function createPlayerStore() {
         if (!audio) return;
 
         if (song) {
+            // Record history for previous song before switching
+            recordHistory();
+
             currentSong = song;
+            playStartTime = 0; // Reset for new song
             if (songs) {
                 queue = songs;
                 queueIndex = index ?? songs.findIndex((s) => s.id === song.id);
@@ -89,6 +123,9 @@ function createPlayerStore() {
 
     function next() {
         if (queue.length === 0) return;
+
+        // Record history for current song before switching
+        recordHistory();
 
         let nextIndex: number;
         if (shuffle) {
@@ -113,8 +150,12 @@ function createPlayerStore() {
     function prev() {
         if (queue.length === 0) return;
 
+        // Record history for current song before switching or restarting
+        recordHistory();
+
         if (audio && audio.currentTime > 3) {
             audio.currentTime = 0;
+            playStartTime = Date.now();
             return;
         }
 
@@ -126,6 +167,7 @@ function createPlayerStore() {
 
         queueIndex = prevIndex;
         currentSong = queue[prevIndex];
+        playStartTime = 0; // Reset for new song
         loadSong(currentSong);
         audio?.play().catch(console.error);
     }
@@ -159,9 +201,11 @@ function createPlayerStore() {
     }
 
     function playQueue(songs: Song[], startIndex = 0) {
+        recordHistory();
         queue = songs;
         queueIndex = startIndex;
         currentSong = songs[startIndex];
+        playStartTime = 0;
         loadSong(currentSong);
         audio?.play().catch(console.error);
     }

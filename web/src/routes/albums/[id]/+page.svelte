@@ -63,7 +63,7 @@
     <div class="p-6">
         <div class="flex gap-6 mb-8">
             <img
-                src={api.getArtworkUrl(album.id)}
+                src={api.getArtworkUrl(album.id, "album")}
                 alt={album.title}
                 class="w-56 h-56 rounded-lg object-cover bg-zinc-800 shadow-xl"
             />

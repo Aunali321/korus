@@ -99,7 +99,6 @@ func New(deps Deps) *echo.Echo {
 	api.GET("/stats", h.Stats, middleware.Auth(deps.Auth))
 	api.GET("/stats/wrapped", h.Wrapped, middleware.Auth(deps.Auth))
 	api.GET("/stats/insights", h.Insights, middleware.Auth(deps.Auth))
-	api.GET("/stats/social", h.Social, middleware.Auth(deps.Auth))
 	api.GET("/home", h.Home, middleware.Auth(deps.Auth))
 
 	admin := api.Group("/admin", middleware.Auth(deps.Auth), middleware.AdminOnly)

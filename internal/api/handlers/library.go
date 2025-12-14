@@ -43,11 +43,17 @@ func (h *Handler) Artist(c echo.Context) error {
 	ctx := c.Request().Context()
 	id, _ := strconv.ParseInt(c.Param("id"), 10, 64)
 	var a models.Artist
-	var mbid sql.NullString
+	var mbid, bio, imagePath sql.NullString
 	err := h.db.QueryRowContext(ctx, `SELECT id, name, bio, image_path, mbid, created_at FROM artists WHERE id = ?`, id).
-		Scan(&a.ID, &a.Name, &a.Bio, &a.ImagePath, &mbid, &a.CreatedAt)
+		Scan(&a.ID, &a.Name, &bio, &imagePath, &mbid, &a.CreatedAt)
 	if err != nil {
 		return echo.NewHTTPError(http.StatusNotFound, map[string]string{"error": "artist not found", "code": "NOT_FOUND"})
+	}
+	if bio.Valid {
+		a.Bio = bio.String
+	}
+	if imagePath.Valid {
+		a.ImagePath = imagePath.String
 	}
 	if mbid.Valid {
 		a.MBID = &mbid.String

@@ -1,5 +1,5 @@
 <script lang="ts">
-    import { Sparkles, Music, User, Disc } from "lucide-svelte";
+    import { Sparkles, Music, User, Disc, Lock } from "lucide-svelte";
     import { api } from "$lib/api";
     import { auth } from "$lib/stores/auth.svelte";
     import type { WrappedData } from "$lib/types";
@@ -9,9 +9,21 @@
     let loaded = $state(false);
     let period = $state("year");
 
+    // Wrapped is available only during last week of month or in December
+    function isWrappedSeason(): boolean {
+        const now = new Date();
+        const month = now.getMonth(); // 0-11
+        const date = now.getDate();
+        const lastDay = new Date(now.getFullYear(), month + 1, 0).getDate();
+
+        return month === 11 || lastDay - date < 7;
+    }
+
     $effect(() => {
-        if (auth.isAuthenticated) {
+        if (auth.isAuthenticated && isWrappedSeason()) {
             loadWrapped();
+        } else {
+            loading = false;
         }
     });
 
@@ -28,6 +40,7 @@
     }
 
     function formatMinutes(mins: number): string {
+        if (!mins || isNaN(mins)) return "0 minutes";
         const hours = Math.floor(mins / 60);
         if (hours > 0) return `${hours.toLocaleString()} hours`;
         return `${mins} minutes`;
@@ -69,6 +82,19 @@
     {#if loading}
         <div class="flex justify-center py-12">
             <div class="text-zinc-500">Loading...</div>
+        </div>
+    {:else if !isWrappedSeason()}
+        <div
+            class="flex flex-col items-center justify-center py-20 text-center"
+        >
+            <Lock class="text-zinc-600 mb-4" size={64} />
+            <h3 class="text-2xl font-bold text-zinc-400 mb-2">
+                Wrapped Not Available
+            </h3>
+            <p class="text-zinc-500 max-w-md">
+                Your Wrapped summary is only available during the last week of
+                each month and throughout December. Check back soon!
+            </p>
         </div>
     {:else if wrapped}
         <div class="grid md:grid-cols-2 gap-6">

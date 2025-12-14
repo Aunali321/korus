@@ -2,11 +2,14 @@ package handlers
 
 import (
 	"context"
+	"database/sql"
 	"net/http"
 	"strconv"
 	"time"
 
 	"github.com/labstack/echo/v4"
+
+	"github.com/Aunali321/korus/internal/models"
 )
 
 type playlistRequest struct {
@@ -27,7 +30,9 @@ func (h *Handler) ListPlaylists(c echo.Context) error {
 	user, _ := currentUser(c)
 	limit, offset := parseLimitOffset(c, 50, 200)
 	rows, err := h.db.QueryContext(c.Request().Context(), `
-		SELECT p.id, p.user_id, p.name, p.description, p.public, p.created_at, u.username
+		SELECT p.id, p.user_id, p.name, p.description, p.public, p.created_at, u.username,
+		       (SELECT COUNT(*) FROM playlist_songs ps WHERE ps.playlist_id = p.id) as song_count,
+		       (SELECT ps2.song_id FROM playlist_songs ps2 WHERE ps2.playlist_id = p.id ORDER BY ps2.position LIMIT 1) as first_song_id
 		FROM playlists p
 		JOIN users u ON u.id = p.user_id
 		WHERE p.public = 1 OR p.user_id = ?
@@ -38,22 +43,29 @@ func (h *Handler) ListPlaylists(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusInternalServerError, map[string]string{"error": err.Error(), "code": "PLAYLIST_LIST_FAILED"})
 	}
 	defer rows.Close()
-	var res = []map[string]interface{}{}
+	var res = []map[string]any{}
 	for rows.Next() {
 		var id, uid int64
 		var name, desc string
 		var pub bool
 		var created string
 		var owner string
-		if err := rows.Scan(&id, &uid, &name, &desc, &pub, &created, &owner); err == nil {
-			res = append(res, map[string]interface{}{
+		var songCount int
+		var firstSongID *int64
+		if err := rows.Scan(&id, &uid, &name, &desc, &pub, &created, &owner, &songCount, &firstSongID); err == nil {
+			item := map[string]any{
 				"id":          id,
 				"name":        name,
 				"description": desc,
 				"public":      pub,
 				"created_at":  created,
-				"owner":       map[string]interface{}{"id": uid, "username": owner},
-			})
+				"owner":       map[string]any{"id": uid, "username": owner},
+				"song_count":  songCount,
+			}
+			if firstSongID != nil {
+				item["first_song_id"] = *firstSongID
+			}
+			res = append(res, item)
 		}
 	}
 	return c.JSON(http.StatusOK, res)
@@ -308,11 +320,15 @@ func (h *Handler) ReorderPlaylistSongs(c echo.Context) error {
 	return c.JSON(http.StatusOK, map[string]bool{"success": true})
 }
 
-func (h *Handler) fetchPlaylistSongs(ctx context.Context, playlistID int64) ([]map[string]interface{}, error) {
+func (h *Handler) fetchPlaylistSongs(ctx context.Context, playlistID int64) ([]models.Song, error) {
 	rows, err := h.db.QueryContext(ctx, `
-		SELECT s.id, s.title, s.file_path, ps.position
+		SELECT s.id, s.album_id, s.title, s.duration, s.file_path,
+		       ar.id, ar.name,
+		       al.id, al.title
 		FROM playlist_songs ps
 		JOIN songs s ON s.id = ps.song_id
+		LEFT JOIN albums al ON al.id = s.album_id
+		LEFT JOIN artists ar ON ar.id = al.artist_id
 		WHERE ps.playlist_id = ?
 		ORDER BY ps.position
 	`, playlistID)
@@ -320,18 +336,27 @@ func (h *Handler) fetchPlaylistSongs(ctx context.Context, playlistID int64) ([]m
 		return nil, err
 	}
 	defer rows.Close()
-	var res = []map[string]interface{}{}
+	var res []models.Song
 	for rows.Next() {
-		var id int64
-		var title, path string
-		var pos int
-		if err := rows.Scan(&id, &title, &path, &pos); err == nil {
-			res = append(res, map[string]interface{}{
-				"id":        id,
-				"title":     title,
-				"file_path": path,
-				"position":  pos,
-			})
+		var song models.Song
+		var duration sql.NullInt64
+		var artistID sql.NullInt64
+		var artistName sql.NullString
+		var albumID sql.NullInt64
+		var albumTitle sql.NullString
+		if err := rows.Scan(&song.ID, &song.AlbumID, &song.Title, &duration, &song.FilePath,
+			&artistID, &artistName, &albumID, &albumTitle); err == nil {
+			if duration.Valid {
+				d := int(duration.Int64)
+				song.Duration = &d
+			}
+			if artistID.Valid {
+				song.Artist = &models.Artist{ID: artistID.Int64, Name: artistName.String}
+			}
+			if albumID.Valid {
+				song.Album = &models.Album{ID: albumID.Int64, Title: albumTitle.String}
+			}
+			res = append(res, song)
 		}
 	}
 	return res, nil

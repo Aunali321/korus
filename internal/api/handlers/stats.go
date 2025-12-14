@@ -32,7 +32,11 @@ func (h *Handler) Stats(c echo.Context) error {
 
 	return c.JSON(http.StatusOK, map[string]interface{}{
 		"period":             map[string]string{"start": start.Format(time.RFC3339), "end": end.Format(time.RFC3339)},
-		"overview":           overview,
+		"total_plays":        overview["total_plays"],
+		"total_duration":     overview["total_time"],
+		"unique_songs":       overview["unique_songs"],
+		"unique_artists":     overview["unique_artists"],
+		"unique_albums":      overview["unique_albums"],
 		"top_songs":          topSongs,
 		"top_artists":        topArtists,
 		"top_albums":         topAlbums,
@@ -83,35 +87,10 @@ func (h *Handler) Insights(c echo.Context) error {
 	ctx := c.Request().Context()
 	currentStreak, longest := h.streaks(ctx, user.ID)
 	return c.JSON(http.StatusOK, map[string]interface{}{
-		"current_streak": map[string]interface{}{"days": currentStreak, "type": "play"},
-		"longest_streak": map[string]interface{}{"days": longest},
+		"current_streak": currentStreak,
+		"longest_streak": longest,
 		"trends":         []interface{}{},
 		"fun_facts":      []interface{}{},
-	})
-}
-
-// Social godoc
-// @Summary Social stats
-// @Tags Stats
-// @Produce json
-// @Success 200 {object} map[string]interface{}
-// @Router /api/stats/social [get]
-func (h *Handler) Social(c echo.Context) error {
-	user, _ := currentUser(c)
-	ctx := c.Request().Context()
-	leaderboard := h.leaderboard(ctx, 10)
-	rank := 0
-	for i, item := range leaderboard {
-		if uid, ok := item["user"].(map[string]interface{})["id"].(int64); ok && uid == user.ID {
-			rank = i + 1
-			break
-		}
-	}
-	return c.JSON(http.StatusOK, map[string]interface{}{
-		"your_rank":   rank,
-		"total_users": len(leaderboard),
-		"leaderboard": leaderboard,
-		"taste_match": []interface{}{},
 	})
 }
 
@@ -126,7 +105,7 @@ func (h *Handler) Home(c echo.Context) error {
 	ctx := c.Request().Context()
 	recent, _ := h.recentPlays(ctx, user.ID, 10)
 	recommended := h.rankSongs(ctx, user.ID, time.Now().AddDate(0, -1, 0), time.Now(), 5)
-	newAdditions, _ := h.fetchSongs(ctx, 10)
+	newAdditions, _ := h.fetchAlbums(ctx, 10)
 	return c.JSON(http.StatusOK, map[string]interface{}{
 		"recent_plays":  recent,
 		"recommended":   recommended,
@@ -189,9 +168,12 @@ func (h *Handler) rankSongs(ctx context.Context, userID int64, start, end time.T
 
 func (h *Handler) recentPlays(ctx context.Context, userID int64, limit int) ([]map[string]interface{}, error) {
 	rows, err := h.db.QueryContext(ctx, `
-		SELECT ph.song_id, ph.played_at, s.title
+		SELECT ph.song_id, ph.played_at, s.title, s.album_id,
+		       ar.id, ar.name
 		FROM play_history ph
 		JOIN songs s ON s.id = ph.song_id
+		JOIN albums al ON al.id = s.album_id
+		JOIN artists ar ON ar.id = al.artist_id
 		WHERE ph.user_id = ?
 		ORDER BY ph.played_at DESC
 		LIMIT ?
@@ -200,14 +182,16 @@ func (h *Handler) recentPlays(ctx context.Context, userID int64, limit int) ([]m
 		return nil, err
 	}
 	defer rows.Close()
-	var res []map[string]interface{}
+	res := []map[string]interface{}{}
 	for rows.Next() {
-		var songID int64
-		var playedAt, title string
-		if err := rows.Scan(&songID, &playedAt, &title); err == nil {
+		var songID, albumID, artistID int64
+		var playedAt, title, artistName string
+		if err := rows.Scan(&songID, &playedAt, &title, &albumID, &artistID, &artistName); err == nil {
 			res = append(res, map[string]interface{}{
-				"song":      map[string]interface{}{"id": songID, "title": title},
-				"played_at": playedAt,
+				"id":       songID,
+				"title":    title,
+				"album_id": albumID,
+				"artist":   map[string]interface{}{"id": artistID, "name": artistName},
 			})
 		}
 	}
@@ -394,49 +378,44 @@ func (h *Handler) streaks(ctx context.Context, userID int64) (int, int) {
 			}
 		}
 	}
+	if len(dates) == 0 {
+		return 0, 0
+	}
+
+	// Check if the first date (most recent) is today or yesterday to count current streak
+	today := time.Now().Truncate(24 * time.Hour)
+	yesterday := today.Add(-24 * time.Hour)
+	
 	current, longest := 0, 0
-	prev := time.Time{}
-	for _, d := range dates {
-		if prev.IsZero() || prev.Sub(d) == 24*time.Hour {
-			current++
-		} else if prev.Sub(d) > 24*time.Hour {
-			current = 1
+	for i, d := range dates {
+		if i == 0 {
+			// Current streak only starts if played today or yesterday
+			if d.Equal(today) || d.Equal(yesterday) {
+				current = 1
+			} else {
+				current = 0 // Streak is broken
+			}
+		} else {
+			prev := dates[i-1]
+			diff := prev.Sub(d).Hours() / 24
+			if diff == 1 {
+				// Consecutive day
+				if current > 0 {
+					current++
+				}
+			} else if diff > 1 {
+				// Streak broken, only track longest
+				if current > longest {
+					longest = current
+				}
+				current = 0
+			}
 		}
 		if current > longest {
 			longest = current
 		}
-		prev = d
 	}
 	return current, longest
-}
-
-func (h *Handler) leaderboard(ctx context.Context, limit int) []map[string]interface{} {
-	rows, err := h.db.QueryContext(ctx, `
-		SELECT u.id, u.username, COUNT(ph.id) as plays, COALESCE(SUM(ph.duration_listened),0) as total_time
-		FROM users u
-		LEFT JOIN play_history ph ON ph.user_id = u.id
-		GROUP BY u.id, u.username
-		ORDER BY plays DESC
-		LIMIT ?
-	`, limit)
-	if err != nil {
-		return nil
-	}
-	defer rows.Close()
-	var res []map[string]interface{}
-	for rows.Next() {
-		var id int64
-		var username string
-		var plays, totalTime int64
-		if err := rows.Scan(&id, &username, &plays, &totalTime); err == nil {
-			res = append(res, map[string]interface{}{
-				"user":       map[string]interface{}{"id": id, "username": username},
-				"play_count": plays,
-				"total_time": totalTime,
-			})
-		}
-	}
-	return res
 }
 
 func safeDivInt(v interface{}, divisor int) float64 {

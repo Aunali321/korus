@@ -87,11 +87,19 @@
 {:else if playlist}
     <div class="p-6">
         <div class="flex gap-6 mb-8">
-            <div
-                class="w-56 h-56 rounded-lg bg-gradient-to-br from-zinc-700 to-zinc-800 flex items-center justify-center shadow-xl"
-            >
-                <span class="text-6xl">🎵</span>
-            </div>
+            {#if songs.length > 0}
+                <img
+                    src={api.getArtworkUrl(songs[0].id)}
+                    alt={playlist.name}
+                    class="w-56 h-56 rounded-lg object-cover shadow-xl bg-zinc-800"
+                />
+            {:else}
+                <div
+                    class="w-56 h-56 rounded-lg bg-gradient-to-br from-zinc-700 to-zinc-800 flex items-center justify-center shadow-xl"
+                >
+                    <span class="text-6xl">🎵</span>
+                </div>
+            {/if}
             <div class="flex flex-col justify-end">
                 <p class="text-sm text-zinc-400 uppercase tracking-wider">
                     Playlist
@@ -170,7 +178,13 @@
             </div>
             <div class="space-y-1">
                 {#each songs as song, i (song.id)}
-                    <TrackRow {song} index={i} {songs} />
+                    <TrackRow 
+                        {song} 
+                        index={i} 
+                        {songs} 
+                        playlistId={playlist.id}
+                        onRemoveFromPlaylist={() => removeSong(song.id)}
+                    />
                 {/each}
             </div>
         {:else}

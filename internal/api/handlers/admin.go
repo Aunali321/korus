@@ -49,21 +49,25 @@ func (h *Handler) SystemInfo(c echo.Context) error {
 	_ = h.db.QueryRow(`SELECT COUNT(*) FROM songs`).Scan(&songs)
 	_ = h.db.QueryRow(`SELECT COUNT(*) FROM artists`).Scan(&artists)
 	_ = h.db.QueryRow(`SELECT COUNT(*) FROM albums`).Scan(&albums)
+
+	// Get database size
+	var dbSize int64
+	dbFile := "korus.db"
+	if info, err := os.Stat(dbFile); err == nil {
+		dbSize = info.Size()
+	}
+
 	return c.JSON(http.StatusOK, map[string]interface{}{
-		"library": map[string]int{
-			"users":   users,
-			"songs":   songs,
-			"artists": artists,
-			"albums":  albums,
-		},
-		"storage": map[string]interface{}{
-			"media_root": h.mediaRoot,
-		},
-		"server": map[string]interface{}{
-			"go_version": runtime.Version(),
-			"uptime":     time.Since(startTime).String(),
-			"hostname":   hostname(),
-		},
+		"version":       "1.0.0",
+		"uptime":        int(time.Since(startTime).Seconds()),
+		"database_size": dbSize,
+		"total_songs":   songs,
+		"total_albums":  albums,
+		"total_artists": artists,
+		"total_users":   users,
+		"media_root":    h.mediaRoot,
+		"go_version":    runtime.Version(),
+		"hostname":      hostname(),
 	})
 }
 

@@ -73,10 +73,21 @@ func (h *Handler) Stream(c echo.Context) error {
 func (h *Handler) Artwork(c echo.Context) error {
 	ctx := c.Request().Context()
 	id, _ := strconv.ParseInt(c.Param("id"), 10, 64)
+	artworkType := c.QueryParam("type") // "album" or default to song
+	
 	var cover string
-	err := h.db.QueryRowContext(ctx, `
-		SELECT cover_path FROM albums WHERE id = (SELECT album_id FROM songs WHERE id = ?)
-	`, id).Scan(&cover)
+	var err error
+	
+	if artworkType == "album" {
+		// Direct album lookup
+		err = h.db.QueryRowContext(ctx, `SELECT cover_path FROM albums WHERE id = ?`, id).Scan(&cover)
+	} else {
+		// Song -> album lookup (default)
+		err = h.db.QueryRowContext(ctx, `
+			SELECT cover_path FROM albums WHERE id = (SELECT album_id FROM songs WHERE id = ?)
+		`, id).Scan(&cover)
+	}
+	
 	if err != nil || cover == "" {
 		return echo.NewHTTPError(http.StatusNotFound, map[string]string{"error": "artwork not found", "code": "NOT_FOUND"})
 	}

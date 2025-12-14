@@ -120,7 +120,7 @@
                             subtitle="{album.artist?.name ||
                                 'Unknown'} • {album.year || ''}"
                             image={album.cover_path
-                                ? api.getArtworkUrl(album.id)
+                                ? api.getArtworkUrl(album.id, "album")
                                 : undefined}
                             href="/albums/{album.id}"
                         />

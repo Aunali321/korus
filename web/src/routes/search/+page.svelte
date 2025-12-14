@@ -106,7 +106,7 @@
                                 title={album.title}
                                 subtitle={album.artist?.name || "Unknown"}
                                 image={album.cover_path
-                                    ? api.getArtworkUrl(album.id)
+                                    ? api.getArtworkUrl(album.id, "album")
                                     : undefined}
                                 href="/albums/{album.id}"
                             />
