@@ -9,10 +9,9 @@ import type {
   Stats,
   WrappedData,
   Insights,
-  SocialStats,
   ScanJob,
   SystemInfo,
-  LibraryStats,
+  StreamingOptions,
 } from "./types";
 
 const API_URL_KEY = "korus_api_url";
@@ -192,7 +191,17 @@ export const api = {
   },
 
   getLyrics: (id: number) =>
-    request<{ lyrics?: string; lyrics_synced?: string }>(`/lyrics/${id}`),
+    request<{ lyrics?: string; synced?: string }>(`/lyrics/${id}`),
+
+  getStreamingOptions: () => request<StreamingOptions>("/streaming/options"),
+
+  getSettings: () => request<{ streaming_preset: string; streaming_format?: string; streaming_bitrate?: number }>("/settings"),
+
+  updateSettings: (settings: { streaming_preset: string; streaming_format?: string; streaming_bitrate?: number }) =>
+    request<{ streaming_preset: string; streaming_format?: string; streaming_bitrate?: number }>("/settings", {
+      method: "PUT",
+      body: JSON.stringify(settings),
+    }),
 
   getPlaylists: (limit = 50, offset = 0) =>
     request<Playlist[]>(`/playlists?limit=${limit}&offset=${offset}`),
@@ -300,8 +309,6 @@ export const api = {
     request<WrappedData>(`/stats/wrapped?period=${period}`),
 
   getInsights: () => request<Insights>("/stats/insights"),
-
-  getSocial: () => request<SocialStats>("/stats/social"),
 
   startScan: () => request<ScanJob>("/admin/scan", { method: "POST" }),
 

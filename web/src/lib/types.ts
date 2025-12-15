@@ -69,13 +69,6 @@ export interface SearchResults {
     playlists: Playlist[];
 }
 
-export interface LibraryStats {
-    total_songs: number;
-    total_albums: number;
-    total_artists: number;
-    total_playlists: number;
-}
-
 export interface Stats {
     total_plays: number;
     total_duration: number;
@@ -84,7 +77,7 @@ export interface Stats {
     top_songs: Array<{ song: Song; play_count: number }>;
     top_artists: Array<{ artist: Artist; play_count: number }>;
     top_albums: Array<{ album: Album; play_count: number }>;
-    top_genres: Array<{ genre: string; play_count: number }>;
+    top_genres?: Array<{ genre: string; play_count: number }>;
     listening_by_hour?: Record<string, number>;
     listening_by_day?: Record<string, number>;
 }
@@ -104,15 +97,8 @@ export interface WrappedData {
 export interface Insights {
     current_streak: number;
     longest_streak: number;
-    trends: Array<{ label: string; value: number; change: number }>;
-    predictions: string[];
+    trends: Array<{ label: string; value: number; change?: number }>;
     fun_facts: string[];
-}
-
-export interface SocialStats {
-    leaderboard: Array<{ user: User; play_count: number; rank: number }>;
-    taste_matches: Array<{ user: User; similarity: number }>;
-    your_rank: number;
 }
 
 export interface ScanJob {
@@ -136,3 +122,23 @@ export interface SystemInfo {
 }
 
 export type RepeatMode = 'off' | 'one' | 'all';
+
+export interface StreamingFormat {
+    format: string;
+    bitrates: number[];
+    mime_type: string;
+}
+
+export interface StreamingOptions {
+    formats: StreamingFormat[];
+    ffmpeg_available: boolean;
+    original_enabled: boolean;
+}
+
+export type StreamingPreset = 'original' | 'lossless' | 'high' | 'medium' | 'low' | 'custom';
+
+export interface StreamingQuality {
+    preset: StreamingPreset;
+    format?: string;
+    bitrate?: number;
+}

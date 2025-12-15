@@ -7,6 +7,7 @@ import (
 
 	"github.com/labstack/echo/v4"
 
+	"github.com/Aunali321/korus/internal/db"
 	"github.com/Aunali321/korus/internal/models"
 )
 
@@ -118,35 +119,14 @@ func (h *Handler) UnfollowArtist(c echo.Context) error {
 func (h *Handler) ListFavorites(c echo.Context) error {
 	user, _ := currentUser(c)
 	ctx := c.Request().Context()
-	songs, _ := h.fetchSongsByFav(ctx, user.ID)
+	songs, _ := db.GetSongsByFavorites(ctx, h.db, user.ID)
 	albums, _ := h.fetchAlbumsByFav(ctx, user.ID)
 	artists, _ := h.fetchArtistsByFollow(ctx, user.ID)
-	return c.JSON(http.StatusOK, map[string]interface{}{
+	return c.JSON(http.StatusOK, map[string]any{
 		"songs":   songs,
 		"albums":  albums,
 		"artists": artists,
 	})
-}
-
-func (h *Handler) fetchSongsByFav(ctx context.Context, userID int64) ([]models.Song, error) {
-	rows, err := h.db.QueryContext(ctx, `
-		SELECT s.id, s.title, s.file_path
-		FROM favorites_songs f
-		JOIN songs s ON s.id = f.song_id
-		WHERE f.user_id = ?
-	`, userID)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var res []models.Song
-	for rows.Next() {
-		var s models.Song
-		if err := rows.Scan(&s.ID, &s.Title, &s.FilePath); err == nil {
-			res = append(res, s)
-		}
-	}
-	return res, nil
 }
 
 func (h *Handler) fetchAlbumsByFav(ctx context.Context, userID int64) ([]models.Album, error) {

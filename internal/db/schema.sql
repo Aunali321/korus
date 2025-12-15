@@ -53,7 +53,10 @@ CREATE TABLE IF NOT EXISTS songs (
     album_id INTEGER NOT NULL,
     title TEXT NOT NULL,
     track_number INTEGER,
-    duration INTEGER,
+    duration_ms INTEGER,
+    sample_rate INTEGER,
+    bit_depth INTEGER,
+    channels INTEGER,
     file_path TEXT NOT NULL UNIQUE,
     lyrics TEXT,
     lyrics_synced TEXT,
@@ -138,4 +141,13 @@ CREATE VIRTUAL TABLE IF NOT EXISTS songs_fts USING fts5(
 );
 
 CREATE INDEX IF NOT EXISTS idx_play_history_user_time ON play_history(user_id, played_at);
+
+CREATE TABLE IF NOT EXISTS user_settings (
+    user_id INTEGER PRIMARY KEY,
+    streaming_preset TEXT NOT NULL DEFAULT 'original',
+    streaming_format TEXT,
+    streaming_bitrate INTEGER,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
 

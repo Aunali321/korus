@@ -8,6 +8,7 @@ import (
 
 	"github.com/labstack/echo/v4"
 
+	"github.com/Aunali321/korus/internal/db"
 	"github.com/Aunali321/korus/internal/models"
 )
 
@@ -23,8 +24,8 @@ func (h *Handler) Library(c echo.Context) error {
 	limit := parseOptionalLimit(c)
 	artists, _ := h.fetchArtists(ctx, limit)
 	albums, _ := h.fetchAlbums(ctx, limit)
-	songs, _ := h.fetchSongs(ctx, limit)
-	return c.JSON(http.StatusOK, map[string]interface{}{
+	songs, _ := db.GetSongsRecent(ctx, h.db, limit)
+	return c.JSON(http.StatusOK, map[string]any{
 		"artists": artists,
 		"albums":  albums,
 		"songs":   songs,
@@ -59,8 +60,8 @@ func (h *Handler) Artist(c echo.Context) error {
 		a.MBID = &mbid.String
 	}
 	albums, _ := h.fetchAlbumsByArtist(ctx, id)
-	songs, _ := h.fetchSongsByArtist(ctx, id)
-	return c.JSON(http.StatusOK, map[string]interface{}{
+	songs, _ := db.GetSongsByArtist(ctx, h.db, id)
+	return c.JSON(http.StatusOK, map[string]any{
 		"id":         a.ID,
 		"name":       a.Name,
 		"bio":        a.Bio,
@@ -98,10 +99,10 @@ func (h *Handler) Album(c echo.Context) error {
 	if mbid.Valid {
 		al.MBID = &mbid.String
 	}
-	songs, _ := h.fetchSongsByAlbum(ctx, id)
+	songs, _ := db.GetSongsByAlbum(ctx, h.db, id)
 	artist, _ := h.fetchArtist(ctx, al.ArtistID)
 	al.Artist = artist
-	return c.JSON(http.StatusOK, map[string]interface{}{
+	return c.JSON(http.StatusOK, map[string]any{
 		"id":         al.ID,
 		"title":      al.Title,
 		"year":       al.Year,
@@ -128,7 +129,7 @@ func (h *Handler) Song(c echo.Context) error {
 	var duration sql.NullInt64
 	var mbid sql.NullString
 	err := h.db.QueryRowContext(ctx, `
-		SELECT id, album_id, title, track_number, duration, file_path, lyrics, lyrics_synced, mbid
+		SELECT id, album_id, title, track_number, duration_ms / 1000, file_path, lyrics, lyrics_synced, mbid
 		FROM songs WHERE id = ?
 	`, id).Scan(&s.ID, &s.AlbumID, &s.Title, &track, &duration, &s.FilePath, &s.Lyrics, &s.LyricsSynced, &mbid)
 	if err != nil {
@@ -227,51 +228,6 @@ func (h *Handler) fetchAlbums(ctx context.Context, limit int) ([]models.Album, e
 	return res, nil
 }
 
-func (h *Handler) fetchSongs(ctx context.Context, limit int) ([]models.Song, error) {
-	rows, err := h.db.QueryContext(ctx, `
-		SELECT s.id, s.album_id, s.title, s.track_number, s.duration, s.file_path,
-		       ar.id, ar.name, ar.bio, ar.image_path
-		FROM songs s
-		LEFT JOIN albums al ON al.id = s.album_id
-		LEFT JOIN artists ar ON ar.id = al.artist_id
-		ORDER BY s.id DESC LIMIT ?`, limit)
-	if err != nil {
-		return []models.Song{}, err
-	}
-	defer rows.Close()
-	res := []models.Song{}
-	for rows.Next() {
-		var s models.Song
-		var track sql.NullInt64
-		var duration sql.NullInt64
-		var artistID sql.NullInt64
-		var artistName, artistBio, artistImagePath sql.NullString
-		if err := rows.Scan(&s.ID, &s.AlbumID, &s.Title, &track, &duration, &s.FilePath,
-			&artistID, &artistName, &artistBio, &artistImagePath); err == nil {
-			if track.Valid {
-				t := int(track.Int64)
-				s.TrackNumber = &t
-			}
-			if duration.Valid {
-				d := int(duration.Int64)
-				s.Duration = &d
-			}
-			if artistID.Valid {
-				artist := &models.Artist{ID: artistID.Int64, Name: artistName.String}
-				if artistBio.Valid {
-					artist.Bio = artistBio.String
-				}
-				if artistImagePath.Valid {
-					artist.ImagePath = artistImagePath.String
-				}
-				s.Artist = artist
-			}
-			res = append(res, s)
-		}
-	}
-	return res, nil
-}
-
 func (h *Handler) fetchAlbumsByArtist(ctx context.Context, artistID int64) ([]models.Album, error) {
 	rows, err := h.db.QueryContext(ctx, `SELECT id, artist_id, title, year, cover_path, mbid, created_at FROM albums WHERE artist_id = ?`, artistID)
 	if err != nil {
@@ -292,67 +248,6 @@ func (h *Handler) fetchAlbumsByArtist(ctx context.Context, artistID int64) ([]mo
 				al.MBID = &mbid.String
 			}
 			res = append(res, al)
-		}
-	}
-	return res, nil
-}
-
-func (h *Handler) fetchSongsByArtist(ctx context.Context, artistID int64) ([]models.Song, error) {
-	rows, err := h.db.QueryContext(ctx, `
-		SELECT s.id, s.album_id, s.title, s.track_number, s.duration, s.file_path
-		FROM songs s
-		INNER JOIN albums a ON a.id = s.album_id
-		WHERE a.artist_id = ?
-	`, artistID)
-	if err != nil {
-		return []models.Song{}, err
-	}
-	defer rows.Close()
-	res := []models.Song{}
-	for rows.Next() {
-		var s models.Song
-		var track sql.NullInt64
-		var duration sql.NullInt64
-		if err := rows.Scan(&s.ID, &s.AlbumID, &s.Title, &track, &duration, &s.FilePath); err == nil {
-			if track.Valid {
-				t := int(track.Int64)
-				s.TrackNumber = &t
-			}
-			if duration.Valid {
-				d := int(duration.Int64)
-				s.Duration = &d
-			}
-			res = append(res, s)
-		}
-	}
-	return res, nil
-}
-
-func (h *Handler) fetchSongsByAlbum(ctx context.Context, albumID int64) ([]models.Song, error) {
-	rows, err := h.db.QueryContext(ctx, `
-		SELECT id, album_id, title, track_number, duration, file_path
-		FROM songs WHERE album_id = ?
-		ORDER BY track_number
-	`, albumID)
-	if err != nil {
-		return []models.Song{}, err
-	}
-	defer rows.Close()
-	res := []models.Song{}
-	for rows.Next() {
-		var s models.Song
-		var track sql.NullInt64
-		var duration sql.NullInt64
-		if err := rows.Scan(&s.ID, &s.AlbumID, &s.Title, &track, &duration, &s.FilePath); err == nil {
-			if track.Valid {
-				t := int(track.Int64)
-				s.TrackNumber = &t
-			}
-			if duration.Valid {
-				d := int(duration.Int64)
-				s.Duration = &d
-			}
-			res = append(res, s)
 		}
 	}
 	return res, nil

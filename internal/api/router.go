@@ -73,6 +73,7 @@ func New(deps Deps) *echo.Echo {
 	api.GET("/search", h.Search, middleware.Auth(deps.Auth))
 
 	api.GET("/stream/:id", h.Stream, middleware.Auth(deps.Auth))
+	api.GET("/streaming/options", h.StreamingOptions, middleware.Auth(deps.Auth))
 	api.GET("/artwork/:id", h.Artwork, middleware.Auth(deps.Auth))
 	api.GET("/lyrics/:id", h.Lyrics, middleware.Auth(deps.Auth))
 
@@ -100,6 +101,9 @@ func New(deps Deps) *echo.Echo {
 	api.GET("/stats/wrapped", h.Wrapped, middleware.Auth(deps.Auth))
 	api.GET("/stats/insights", h.Insights, middleware.Auth(deps.Auth))
 	api.GET("/home", h.Home, middleware.Auth(deps.Auth))
+
+	api.GET("/settings", h.GetSettings, middleware.Auth(deps.Auth))
+	api.PUT("/settings", h.UpdateSettings, middleware.Auth(deps.Auth))
 
 	admin := api.Group("/admin", middleware.Auth(deps.Auth), middleware.AdminOnly)
 	admin.POST("/scan", h.StartScan)

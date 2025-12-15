@@ -22,6 +22,13 @@ import (
 	"github.com/fsnotify/fsnotify"
 )
 
+// lrcPattern matches LRC timestamp format [mm:ss] or [mm:ss.xx]
+var lrcPattern = regexp.MustCompile(`\[\d{2}:\d{2}`)
+
+func isLRCFormat(text string) bool {
+	return lrcPattern.MatchString(text)
+}
+
 type ScanStatus struct {
 	Status      string     `json:"status"`
 	Progress    int        `json:"progress"`
@@ -153,7 +160,7 @@ func (s *ScannerService) StartScan(ctx context.Context) (int64, error) {
 				localArtists := map[int64]struct{}{}
 
 				currentFile.Store(file)
-				
+
 				if err := s.ingestFile(ctx, file, localSongs, localAlbums, localArtists); err != nil {
 					atomic.AddInt64(&processedCount, 1)
 				} else {
@@ -242,25 +249,32 @@ func (s *ScannerService) ingestFile(ctx context.Context, path string, seenSongs 
 	seenAlbums[albumID] = struct{}{}
 
 	trackNo, _ := meta.Track()
-	dur, bitrate := s.probe(path)
+	audioMeta := s.probe(path)
 
 	var existingLyrics, existingSynced, existingMBID string
 	_ = s.db.QueryRowContext(ctx, `SELECT lyrics, lyrics_synced, COALESCE(mbid, '') FROM songs WHERE file_path = ?`, path).Scan(&existingLyrics, &existingSynced, &existingMBID)
 
-	lyrics := meta.Lyrics()
-	if lyrics == "" {
-		lyrics = existingLyrics
-	}
+	rawLyrics := meta.Lyrics()
+	lyrics := existingLyrics
 	lyricsSynced := existingSynced
+
+	// Detect LRC format and store in correct column
+	if rawLyrics != "" {
+		if isLRCFormat(rawLyrics) {
+			lyricsSynced = rawLyrics
+		} else {
+			lyrics = rawLyrics
+		}
+	}
 	mbid := existingMBID
 
 	_, err = s.db.ExecContext(ctx, `
-		INSERT OR REPLACE INTO songs(id, album_id, title, track_number, duration, file_path, lyrics, lyrics_synced, mbid)
+		INSERT OR REPLACE INTO songs(id, album_id, title, track_number, duration_ms, sample_rate, bit_depth, channels, file_path, lyrics, lyrics_synced, mbid)
 		VALUES (
 			COALESCE((SELECT id FROM songs WHERE file_path = ?), NULL),
-			?, ?, ?, ?, ?, ?, ?, NULLIF(?, '')
+			?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULLIF(?, '')
 		)
-	`, path, albumID, title, trackNo, dur, path, lyrics, lyricsSynced, mbid)
+	`, path, albumID, title, trackNo, audioMeta.DurationMs, audioMeta.SampleRate, audioMeta.BitDepth, audioMeta.Channels, path, lyrics, lyricsSynced, mbid)
 	if err != nil {
 		return fmt.Errorf("insert song: %w", err)
 	}
@@ -281,7 +295,6 @@ func (s *ScannerService) ingestFile(ctx context.Context, path string, seenSongs 
 		}
 	}
 
-	_ = bitrate // currently unused; placeholder for future schema
 	return nil
 }
 
@@ -389,7 +402,14 @@ func (s *ScannerService) Watch(ctx context.Context) error {
 	}
 }
 
-func (s *ScannerService) probe(path string) (int, int) {
+type audioMetadata struct {
+	DurationMs int
+	SampleRate int
+	BitDepth   int
+	Channels   int
+}
+
+func (s *ScannerService) probe(path string) audioMetadata {
 	cmd := exec.Command(s.ffprobePath, "-v", "quiet", "-print_format", "json", "-show_format", "-show_streams", path)
 	var out bytes.Buffer
 	cmd.Stdout = &out
@@ -397,26 +417,39 @@ func (s *ScannerService) probe(path string) (int, int) {
 	var data struct {
 		Format struct {
 			Duration string `json:"duration"`
-			BitRate  string `json:"bit_rate"`
 		} `json:"format"`
+		Streams []struct {
+			CodecType        string `json:"codec_type"`
+			SampleRate       string `json:"sample_rate"`
+			Channels         int    `json:"channels"`
+			BitsPerSample    int    `json:"bits_per_sample"`
+			BitsPerRawSample string `json:"bits_per_raw_sample"`
+		} `json:"streams"`
 	}
+	meta := audioMetadata{}
 	if err := json.Unmarshal(out.Bytes(), &data); err == nil {
-		if dur, err := parseFloatToInt(data.Format.Duration); err == nil {
-			return dur, parseStringToInt(data.Format.BitRate)
+		if dur, err := strconv.ParseFloat(data.Format.Duration, 64); err == nil {
+			meta.DurationMs = int(dur * 1000)
+		}
+		for _, stream := range data.Streams {
+			if stream.CodecType == "audio" {
+				meta.SampleRate = parseStringToInt(stream.SampleRate)
+				meta.Channels = stream.Channels
+				// bit_depth can come from bits_per_sample or bits_per_raw_sample
+				// For lossy formats (MP3, AAC, etc.) these are often 0 - default to 16-bit
+				if stream.BitsPerSample > 0 {
+					meta.BitDepth = stream.BitsPerSample
+				} else if stream.BitsPerRawSample != "" {
+					meta.BitDepth = parseStringToInt(stream.BitsPerRawSample)
+				}
+				if meta.BitDepth == 0 {
+					meta.BitDepth = 16 // Default to 16-bit for lossy formats
+				}
+				break
+			}
 		}
 	}
-	return 0, 0
-}
-
-func parseFloatToInt(v string) (int, error) {
-	if v == "" {
-		return 0, errors.New("empty")
-	}
-	f, err := strconv.ParseFloat(v, 64)
-	if err != nil {
-		return 0, err
-	}
-	return int(f), nil
+	return meta
 }
 
 func parseStringToInt(v string) int {
@@ -430,12 +463,12 @@ func (s *ScannerService) extractCover(ctx context.Context, src string, albumID i
 	}
 	outPath := filepath.Join(s.coverCachePath, fmt.Sprintf("%d.jpg", albumID))
 	// Extract and resize to 500x500, compress as JPEG with quality 85
-	cmd := exec.CommandContext(ctx, s.ffmpegPath, 
-		"-y", "-i", src, 
-		"-an",                         // No audio
+	cmd := exec.CommandContext(ctx, s.ffmpegPath,
+		"-y", "-i", src,
+		"-an",                                                                                       // No audio
 		"-vf", "scale=500:500:force_original_aspect_ratio=decrease,pad=500:500:(ow-iw)/2:(oh-ih)/2", // Resize and pad to 500x500
-		"-frames:v", "1",               // Just one frame
-		"-q:v", "2",                    // JPEG quality (2 is high quality, smaller file)
+		"-frames:v", "1", // Just one frame
+		"-q:v", "2", // JPEG quality (2 is high quality, smaller file)
 		outPath)
 	if err := cmd.Run(); err != nil {
 		return "", err

@@ -35,7 +35,7 @@ func (s *SearchService) Search(ctx context.Context, q string, limit, offset int)
 	}
 	// Songs via FTS - join with actual tables since FTS is contentless
 	rows, err := s.db.QueryContext(ctx, `
-		SELECT s.id, s.album_id, s.title, s.duration, ar.id, ar.name, al.id, al.title
+		SELECT s.id, s.album_id, s.title, s.duration_ms / 1000, ar.id, ar.name, al.id, al.title
 		FROM songs_fts fts
 		JOIN songs s ON s.id = fts.rowid
 		JOIN albums al ON al.id = s.album_id

@@ -1,5 +1,8 @@
 import type { User } from '$lib/types';
 import { api, setTokens, clearTokens } from '$lib/api';
+import { favorites } from './favorites.svelte';
+import { library } from './library.svelte';
+import { settings } from './settings.svelte';
 
 let initPromise: Promise<void> | null = null;
 
@@ -26,6 +29,7 @@ function createAuthStore() {
             try {
                 user = await api.me();
                 isAuthenticated = true;
+                settings.load();
             } catch {
                 clearTokens();
             } finally {
@@ -45,6 +49,7 @@ function createAuthStore() {
         setTokens(res.access_token, res.refresh_token);
         user = res.user;
         isAuthenticated = true;
+        settings.load();
     }
 
     async function register(username: string, email: string, password: string) {
@@ -52,6 +57,7 @@ function createAuthStore() {
         setTokens(res.access_token, res.refresh_token);
         user = res.user;
         isAuthenticated = true;
+        settings.load();
     }
 
     function logout() {
@@ -60,6 +66,9 @@ function createAuthStore() {
         user = null;
         isAuthenticated = false;
         initPromise = null;
+        favorites.reset();
+        library.reset();
+        settings.reset();
     }
 
     return {

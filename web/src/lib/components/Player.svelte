@@ -11,11 +11,32 @@
         VolumeX,
         Heart,
         ListMusic,
+        Mic,
     } from "lucide-svelte";
     import { player } from "$lib/stores/player.svelte";
+    import { favorites } from "$lib/stores/favorites.svelte";
     import { api } from "$lib/api";
 
-    let { onToggleQueue }: { onToggleQueue: () => void } = $props();
+    let { onToggleQueue, onToggleLyrics }: { onToggleQueue: () => void; onToggleLyrics: () => void } = $props();
+
+    let isFavorited = $state(false);
+    let isSeeking = $state(false);
+    let seekValue = $state(0);
+
+    $effect(() => {
+        favorites.load();
+    });
+
+    $effect(() => {
+        if (player.currentSong) {
+            isFavorited = favorites.isFavorite(player.currentSong.id);
+        }
+    });
+
+    async function handleFavorite() {
+        if (!player.currentSong) return;
+        isFavorited = await favorites.toggle(player.currentSong.id);
+    }
 
     function formatTime(seconds: number): string {
         if (!seconds || !isFinite(seconds)) return "0:00";
@@ -24,19 +45,34 @@
         return `${mins}:${secs.toString().padStart(2, "0")}`;
     }
 
-    function handleSeek(e: Event) {
+    function handleSeekStart() {
+        isSeeking = true;
+        seekValue = player.progress;
+    }
+
+    function handleSeekInput(e: Event) {
+        const target = e.target as HTMLInputElement;
+        seekValue = parseFloat(target.value);
+    }
+
+    function handleSeekEnd(e: Event) {
         const target = e.target as HTMLInputElement;
         player.seek(parseFloat(target.value));
+        isSeeking = false;
     }
 
     function handleVolume(e: Event) {
         const target = e.target as HTMLInputElement;
         player.setVolume(parseFloat(target.value));
     }
+
+    const displayProgress = $derived(isSeeking ? seekValue : player.progress);
+    const progressPercent = $derived(player.duration ? (displayProgress / player.duration) * 100 : 0);
+    const volumePercent = $derived(player.volume * 100);
 </script>
 
 <div
-    class="h-24 bg-zinc-950 border-t border-zinc-800 flex items-center px-4 gap-4"
+    class="h-24 bg-zinc-950 border-t border-zinc-800 flex items-center px-4 gap-4 relative z-40"
 >
     {#if player.currentSong}
         <div class="flex items-center gap-3 w-80">
@@ -54,9 +90,10 @@
                 </p>
             </div>
             <button
+                onclick={handleFavorite}
                 class="p-2 hover:bg-zinc-800 rounded-full transition-colors"
             >
-                <Heart size={18} class="text-zinc-400 hover:text-red-400" />
+                <Heart size={18} class={isFavorited ? 'fill-red-500 text-red-500' : 'text-zinc-400 hover:text-red-400'} />
             </button>
         </div>
 
@@ -108,15 +145,19 @@
 
             <div class="flex items-center gap-2 w-full max-w-2xl">
                 <span class="text-xs text-zinc-400 w-10 text-right"
-                    >{formatTime(player.progress)}</span
+                    >{formatTime(displayProgress)}</span
                 >
                 <input
                     type="range"
                     min="0"
                     max={player.duration || 100}
-                    value={player.progress}
-                    oninput={handleSeek}
-                    class="flex-1"
+                    value={displayProgress}
+                    onmousedown={handleSeekStart}
+                    ontouchstart={handleSeekStart}
+                    oninput={handleSeekInput}
+                    onchange={handleSeekEnd}
+                    class="flex-1 range-progress"
+                    style="--progress: {progressPercent}%"
                 />
                 <span class="text-xs text-zinc-400 w-10"
                     >{formatTime(player.duration)}</span
@@ -125,6 +166,12 @@
         </div>
 
         <div class="flex items-center gap-3 w-80 justify-end">
+            <button
+                onclick={onToggleLyrics}
+                class="p-2 text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800 rounded-lg transition-all"
+            >
+                <Mic size={20} />
+            </button>
             <button
                 onclick={onToggleQueue}
                 class="p-2 text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800 rounded-lg transition-all"
@@ -149,7 +196,8 @@
                     step="0.01"
                     value={player.volume}
                     oninput={handleVolume}
-                    class="w-24"
+                    class="w-24 range-progress"
+                    style="--progress: {volumePercent}%"
                 />
             </div>
         </div>

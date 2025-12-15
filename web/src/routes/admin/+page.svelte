@@ -2,6 +2,7 @@
     import { Shield, RefreshCw, Server, Trash2 } from "lucide-svelte";
     import { api } from "$lib/api";
     import { auth } from "$lib/stores/auth.svelte";
+    import { library } from "$lib/stores/library.svelte";
     import { toast } from "$lib/stores/toast.svelte";
     import type { ScanJob, SystemInfo } from "$lib/types";
 
@@ -58,6 +59,7 @@
                     setTimeout(poll, 2000);
                 } else if (status.status === "completed") {
                     toast.success("Scan completed");
+                    library.invalidate();
                     systemInfo = await api.getSystemInfo();
                 }
             } catch {

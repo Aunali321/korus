@@ -1,44 +1,32 @@
 <script lang="ts">
     import { api } from "$lib/api";
     import { auth } from "$lib/stores/auth.svelte";
-    import type { Album } from "$lib/types";
+    import { library } from "$lib/stores/library.svelte";
     import Card from "$lib/components/Card.svelte";
 
-    let albums = $state<Album[]>([]);
     let loading = $state(true);
     let loaded = $state(false);
 
     $effect(() => {
         if (auth.isAuthenticated && !loaded) {
-            loadAlbums();
+            loaded = true;
+            library.load().finally(() => loading = false);
         }
     });
-
-    async function loadAlbums() {
-        loaded = true;
-        try {
-            const data = await api.getLibrary();
-            albums = data.albums || [];
-        } catch (e) {
-            console.error("Failed to load albums:", e);
-        } finally {
-            loading = false;
-        }
-    }
 </script>
 
 <div class="p-6 space-y-6">
     <h2 class="text-3xl font-bold">Albums</h2>
 
-    {#if loading}
+    {#if loading && library.albums.length === 0}
         <div class="flex justify-center py-12">
             <div class="text-zinc-500">Loading...</div>
         </div>
-    {:else if albums.length > 0}
+    {:else if library.albums.length > 0}
         <div
             class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 xl:grid-cols-6 gap-4"
         >
-            {#each albums as album (album.id)}
+            {#each library.albums as album (album.id)}
                 <Card
                     title={album.title}
                     subtitle="{album.artist?.name || 'Unknown'} • {album.year ||

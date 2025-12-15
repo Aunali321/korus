@@ -1,15 +1,13 @@
 package handlers
 
 import (
-	"context"
-	"database/sql"
 	"net/http"
 	"strconv"
 	"time"
 
 	"github.com/labstack/echo/v4"
 
-	"github.com/Aunali321/korus/internal/models"
+	"github.com/Aunali321/korus/internal/db"
 )
 
 type playlistRequest struct {
@@ -126,8 +124,8 @@ func (h *Handler) GetPlaylist(c echo.Context) error {
 	if !pub && ownerID != user.ID {
 		return echo.NewHTTPError(http.StatusForbidden, map[string]string{"error": "forbidden", "code": "FORBIDDEN"})
 	}
-	songs, _ := h.fetchPlaylistSongs(c.Request().Context(), id)
-	return c.JSON(http.StatusOK, map[string]interface{}{
+	songs, _ := db.GetSongsByPlaylist(c.Request().Context(), h.db, id)
+	return c.JSON(http.StatusOK, map[string]any{
 		"id":          id,
 		"name":        name,
 		"description": desc,
@@ -318,46 +316,4 @@ func (h *Handler) ReorderPlaylistSongs(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusInternalServerError, map[string]string{"error": err.Error(), "code": "REORDER_FAILED"})
 	}
 	return c.JSON(http.StatusOK, map[string]bool{"success": true})
-}
-
-func (h *Handler) fetchPlaylistSongs(ctx context.Context, playlistID int64) ([]models.Song, error) {
-	rows, err := h.db.QueryContext(ctx, `
-		SELECT s.id, s.album_id, s.title, s.duration, s.file_path,
-		       ar.id, ar.name,
-		       al.id, al.title
-		FROM playlist_songs ps
-		JOIN songs s ON s.id = ps.song_id
-		LEFT JOIN albums al ON al.id = s.album_id
-		LEFT JOIN artists ar ON ar.id = al.artist_id
-		WHERE ps.playlist_id = ?
-		ORDER BY ps.position
-	`, playlistID)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var res []models.Song
-	for rows.Next() {
-		var song models.Song
-		var duration sql.NullInt64
-		var artistID sql.NullInt64
-		var artistName sql.NullString
-		var albumID sql.NullInt64
-		var albumTitle sql.NullString
-		if err := rows.Scan(&song.ID, &song.AlbumID, &song.Title, &duration, &song.FilePath,
-			&artistID, &artistName, &albumID, &albumTitle); err == nil {
-			if duration.Valid {
-				d := int(duration.Int64)
-				song.Duration = &d
-			}
-			if artistID.Valid {
-				song.Artist = &models.Artist{ID: artistID.Int64, Name: artistName.String}
-			}
-			if albumID.Valid {
-				song.Album = &models.Album{ID: albumID.Int64, Title: albumTitle.String}
-			}
-			res = append(res, song)
-		}
-	}
-	return res, nil
 }

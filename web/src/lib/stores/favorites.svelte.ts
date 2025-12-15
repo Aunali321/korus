@@ -3,16 +3,22 @@ import { api } from '$lib/api';
 function createFavoritesStore() {
     let songIds = $state<Set<number>>(new Set());
     let loaded = $state(false);
+    let promise: Promise<void> | null = null;
 
     async function load() {
         if (loaded) return;
-        try {
-            const data = await api.getFavorites();
+        if (promise) return promise;
+
+        promise = api.getFavorites().then((data) => {
             songIds = new Set((data.songs || []).map(s => s.id));
             loaded = true;
-        } catch (err) {
+            promise = null;
+        }).catch((err) => {
             console.error('Failed to load favorites:', err);
-        }
+            promise = null;
+        });
+
+        return promise;
     }
 
     function isFavorite(songId: number): boolean {
@@ -41,6 +47,7 @@ function createFavoritesStore() {
     function reset() {
         songIds = new Set();
         loaded = false;
+        promise = null;
     }
 
     return {

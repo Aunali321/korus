@@ -1,5 +1,6 @@
 import type { Song, RepeatMode } from '$lib/types';
 import { api } from '$lib/api';
+import { settings } from './settings.svelte';
 
 function createPlayerStore() {
     let currentSong = $state<Song | null>(null);
@@ -19,7 +20,7 @@ function createPlayerStore() {
         if (!currentSong || playStartTime === 0 || !audio) return;
 
         const listenedSeconds = Math.floor(audio.currentTime);
-        const totalDuration = audio.duration || 1;
+        const totalDuration = duration || currentSong.duration || 1;
         const completionRate = Math.min(listenedSeconds / totalDuration, 1);
 
         // Only record if listened for at least 10 seconds
@@ -50,7 +51,14 @@ function createPlayerStore() {
         });
 
         audio.addEventListener('loadedmetadata', () => {
-            duration = audio!.duration;
+            // Only use audio.duration if valid (not Infinity, which happens with transcoded streams)
+            if (audio!.duration && isFinite(audio!.duration)) {
+                duration = audio!.duration;
+            }
+        });
+
+        audio.addEventListener('error', (e) => {
+            console.error('Audio error:', audio?.error);
         });
 
         audio.addEventListener('ended', () => {
@@ -80,16 +88,15 @@ function createPlayerStore() {
         initAudio();
         if (!audio) return;
 
-        const token = localStorage.getItem('korus_access_token');
-        const streamUrl = api.getStreamUrl(song.id);
+        // Use song duration from API (works for transcoded streams where metadata may not be available)
+        duration = song.duration || 0;
+        progress = 0;
+
+        const { format, bitrate } = settings.getStreamParams();
+        const streamUrl = api.getStreamUrl(song.id, format, bitrate);
 
         audio.src = streamUrl;
         audio.load();
-
-        // Set auth header for streaming
-        if (token) {
-            audio.src = `${streamUrl}${streamUrl.includes('?') ? '&' : '?'}token=${token}`;
-        }
     }
 
     function play(song?: Song, songs?: Song[], index?: number) {

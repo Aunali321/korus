@@ -1,16 +1,46 @@
 <script lang="ts">
-    import { Settings, LogOut, Server } from "lucide-svelte";
+    import { Settings, LogOut, Server, Volume2 } from "lucide-svelte";
     import { auth } from "$lib/stores/auth.svelte";
+    import { settings } from "$lib/stores/settings.svelte";
     import { toast } from "$lib/stores/toast.svelte";
-    import { setApiUrl } from "$lib/api";
+    import { api, setApiUrl } from "$lib/api";
     import { goto } from "$app/navigation";
+    import type { StreamingOptions, StreamingPreset } from "$lib/types";
 
     let apiUrl = $state("");
+    let showAdvanced = $state(false);
+    let streamingOptions = $state<StreamingOptions | null>(null);
+    let customFormat = $state("opus");
+    let customBitrate = $state(128);
+
+    const presets: { value: StreamingPreset; label: string; description: string }[] = [
+        { value: "original", label: "Original", description: "No transcoding, best for compatible formats" },
+        { value: "lossless", label: "Lossless", description: "WAV transcoding, for incompatible lossless sources" },
+        { value: "high", label: "High", description: "Opus 192 kbps" },
+        { value: "medium", label: "Medium", description: "Opus 128 kbps" },
+        { value: "low", label: "Low", description: "Opus 64 kbps" },
+    ];
 
     $effect(() => {
         if (typeof localStorage !== "undefined") {
             apiUrl = localStorage.getItem("korus_api_url") || "/api";
         }
+    });
+
+    $effect(() => {
+        if (settings.preset === "custom") {
+            showAdvanced = true;
+            customFormat = settings.format || "opus";
+            customBitrate = settings.bitrate || 128;
+        }
+    });
+
+    $effect(() => {
+        api.getStreamingOptions().then((opts) => {
+            streamingOptions = opts;
+        }).catch(() => {
+            // ignore
+        });
     });
 
     function saveApiUrl() {
@@ -23,6 +53,20 @@
         auth.logout();
         goto("/login");
     }
+
+    function handlePresetChange(preset: StreamingPreset) {
+        settings.setPreset(preset);
+        toast.success("Streaming quality updated");
+    }
+
+    function handleCustomChange() {
+        settings.setCustom(customFormat, customBitrate);
+        toast.success("Streaming quality updated");
+    }
+
+    const availableBitrates = $derived(
+        streamingOptions?.formats.find(f => f.format === customFormat)?.bitrates || []
+    );
 </script>
 
 <div class="p-6 space-y-8">
@@ -69,6 +113,90 @@
                 <LogOut size={18} />
                 Sign Out
             </button>
+        </div>
+    </section>
+
+    <section>
+        <h3 class="text-xl font-bold mb-4 flex items-center gap-2">
+            <Volume2 size={20} class="text-zinc-400" />
+            Streaming Quality
+        </h3>
+        <div
+            class="bg-zinc-900 border border-zinc-800 rounded-xl p-6 space-y-4"
+        >
+            {#if streamingOptions && !streamingOptions.ffmpeg_available}
+                <div class="text-sm text-amber-400 bg-amber-400/10 px-3 py-2 rounded-lg">
+                    FFmpeg not available on server. Only original quality is supported.
+                </div>
+            {/if}
+
+            <div class="space-y-2">
+                {#each presets as preset}
+                    <label
+                        class="flex items-center gap-3 p-3 rounded-lg cursor-pointer transition-colors {settings.preset === preset.value ? 'bg-zinc-800' : 'hover:bg-zinc-800/50'}"
+                    >
+                        <input
+                            type="radio"
+                            name="quality"
+                            value={preset.value}
+                            checked={settings.preset === preset.value}
+                            onchange={() => handlePresetChange(preset.value)}
+                            disabled={preset.value !== 'original' && streamingOptions && !streamingOptions.ffmpeg_available}
+                            class="w-4 h-4 accent-emerald-500"
+                        />
+                        <div>
+                            <div class="font-medium">{preset.label}</div>
+                            <div class="text-sm text-zinc-400">{preset.description}</div>
+                        </div>
+                    </label>
+                {/each}
+            </div>
+
+            <div class="border-t border-zinc-800 pt-4">
+                <label class="flex items-center gap-2 cursor-pointer">
+                    <input
+                        type="checkbox"
+                        bind:checked={showAdvanced}
+                        disabled={streamingOptions && !streamingOptions.ffmpeg_available}
+                        class="w-4 h-4 accent-emerald-500"
+                    />
+                    <span class="text-sm text-zinc-400">Advanced options</span>
+                </label>
+
+                {#if showAdvanced && streamingOptions?.ffmpeg_available}
+                    <div class="mt-4 flex gap-4">
+                        <div class="flex-1">
+                            <label for="format" class="block text-sm text-zinc-400 mb-1">Format</label>
+                            <select
+                                id="format"
+                                bind:value={customFormat}
+                                onchange={handleCustomChange}
+                                class="w-full px-3 py-2 bg-zinc-800 border border-zinc-700 rounded-lg"
+                            >
+                                {#each streamingOptions.formats as fmt}
+                                    <option value={fmt.format}>{fmt.format.toUpperCase()}</option>
+                                {/each}
+                            </select>
+                        </div>
+                        <div class="flex-1">
+                            <label for="bitrate" class="block text-sm text-zinc-400 mb-1">Bitrate</label>
+                            <select
+                                id="bitrate"
+                                bind:value={customBitrate}
+                                onchange={handleCustomChange}
+                                class="w-full px-3 py-2 bg-zinc-800 border border-zinc-700 rounded-lg"
+                            >
+                                {#each availableBitrates as br}
+                                    <option value={br}>{br} kbps</option>
+                                {/each}
+                            </select>
+                        </div>
+                    </div>
+                    <p class="text-xs text-zinc-500 mt-2">
+                        Custom settings override presets. Opus is recommended for best quality-to-size ratio.
+                    </p>
+                {/if}
+            </div>
         </div>
     </section>
 

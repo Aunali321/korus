@@ -6,6 +6,8 @@ import (
 	"time"
 
 	"github.com/labstack/echo/v4"
+
+	"github.com/Aunali321/korus/internal/db"
 )
 
 // Stats godoc
@@ -103,19 +105,21 @@ func (h *Handler) Insights(c echo.Context) error {
 func (h *Handler) Home(c echo.Context) error {
 	user, _ := currentUser(c)
 	ctx := c.Request().Context()
-	recent, _ := h.recentPlays(ctx, user.ID, 10)
-	recommended := h.rankSongs(ctx, user.ID, time.Now().AddDate(0, -1, 0), time.Now(), 5)
+	recent, _ := db.GetSongsByRecentPlays(ctx, h.db, user.ID, 10)
+	recommended, _ := db.GetSongsByTopPlayed(ctx, h.db, user.ID, 5)
 	newAdditions, _ := h.fetchAlbums(ctx, 10)
 	return c.JSON(http.StatusOK, map[string]interface{}{
-		"recent_plays":  recent,
-		"recommended":   recommended,
-		"new_additions": newAdditions,
+		"recent_plays":    recent,
+		"recommendations": recommended,
+		"new_additions":   newAdditions,
 	})
 }
 
 func resolvePeriod(period string) (time.Time, time.Time) {
 	now := time.Now()
 	switch period {
+	case "hour":
+		return now.Add(-time.Hour), now
 	case "today":
 		start := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
 		return start, start.Add(24 * time.Hour)
@@ -127,6 +131,10 @@ func resolvePeriod(period string) (time.Time, time.Time) {
 		return start, now
 	case "year":
 		start := now.AddDate(-1, 0, 0)
+		return start, now
+	case "all_time":
+		// Return a very old date to capture all history
+		start := time.Date(2000, 1, 1, 0, 0, 0, 0, now.Location())
 		return start, now
 	default:
 		start := now.AddDate(0, 0, -30)
@@ -143,7 +151,7 @@ func (h *Handler) rankSongs(ctx context.Context, userID int64, start, end time.T
 		GROUP BY s.id, s.title
 		ORDER BY plays DESC
 		LIMIT ?
-	`, userID, start, end, limit)
+	`, userID, start.Format(time.RFC3339), end.Format(time.RFC3339), limit)
 	if err != nil {
 		return nil
 	}
@@ -209,7 +217,7 @@ func (h *Handler) rankArtists(ctx context.Context, userID int64, start, end time
 		GROUP BY a.id, a.name
 		ORDER BY plays DESC
 		LIMIT ?
-	`, userID, start, end, limit)
+	`, userID, start.Format(time.RFC3339), end.Format(time.RFC3339), limit)
 	if err != nil {
 		return nil
 	}
@@ -241,7 +249,7 @@ func (h *Handler) rankAlbums(ctx context.Context, userID int64, start, end time.
 		GROUP BY al.id, al.title
 		ORDER BY plays DESC
 		LIMIT ?
-	`, userID, start, end, limit)
+	`, userID, start.Format(time.RFC3339), end.Format(time.RFC3339), limit)
 	if err != nil {
 		return nil
 	}
@@ -285,7 +293,7 @@ func (h *Handler) aggregate(ctx context.Context, userID int64, start, end time.T
 		SELECT strftime(?, played_at) as bucket, COUNT(*) FROM play_history
 		WHERE user_id = ? AND played_at BETWEEN ? AND ?
 		GROUP BY bucket ORDER BY bucket
-	`, format, userID, start, end)
+	`, format, userID, start.Format(time.RFC3339), end.Format(time.RFC3339))
 	if err != nil {
 		return nil
 	}
@@ -302,12 +310,15 @@ func (h *Handler) aggregate(ctx context.Context, userID int64, start, end time.T
 }
 
 func (h *Handler) discoveryStats(ctx context.Context, userID int64, start, end time.Time, overview map[string]interface{}) map[string]interface{} {
+	startStr := start.Format(time.RFC3339)
+	endStr := end.Format(time.RFC3339)
+
 	var newSongs int
 	_ = h.db.QueryRowContext(ctx, `
 		SELECT COUNT(DISTINCT song_id) FROM play_history
 		WHERE user_id = ? AND played_at BETWEEN ? AND ?
 		AND song_id NOT IN (SELECT DISTINCT song_id FROM play_history WHERE user_id = ? AND played_at < ?)
-	`, userID, start, end, userID, start).Scan(&newSongs)
+	`, userID, startStr, endStr, userID, startStr).Scan(&newSongs)
 
 	var newArtists int
 	_ = h.db.QueryRowContext(ctx, `
@@ -323,7 +334,7 @@ func (h *Handler) discoveryStats(ctx context.Context, userID int64, start, end t
 			JOIN artists a2 ON a2.id = al2.artist_id
 			WHERE ph2.user_id = ? AND ph2.played_at < ?
 		)
-	`, userID, start, end, userID, start).Scan(&newArtists)
+	`, userID, startStr, endStr, userID, startStr).Scan(&newArtists)
 
 	totalPlays, _ := overview["total_plays"].(int64)
 	exploration := 0.0
@@ -350,7 +361,7 @@ func (h *Handler) overview(ctx context.Context, userID int64, start, end time.Ti
 		JOIN songs s ON s.id = ph.song_id
 		JOIN albums a ON a.id = s.album_id
 		WHERE ph.user_id = ? AND ph.played_at BETWEEN ? AND ?
-	`, userID, start, end).Scan(&totalPlays, &totalTime, &uniqueSongs, &uniqueArtists, &uniqueAlbums, &avgCompletion)
+	`, userID, start.Format(time.RFC3339), end.Format(time.RFC3339)).Scan(&totalPlays, &totalTime, &uniqueSongs, &uniqueArtists, &uniqueAlbums, &avgCompletion)
 	return map[string]interface{}{
 		"total_plays":         totalPlays,
 		"total_time":          totalTime,
@@ -385,7 +396,7 @@ func (h *Handler) streaks(ctx context.Context, userID int64) (int, int) {
 	// Check if the first date (most recent) is today or yesterday to count current streak
 	today := time.Now().Truncate(24 * time.Hour)
 	yesterday := today.Add(-24 * time.Hour)
-	
+
 	current, longest := 0, 0
 	for i, d := range dates {
 		if i == 0 {
