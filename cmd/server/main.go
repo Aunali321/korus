@@ -96,9 +96,9 @@ func main() {
 		MediaRoot:    cfg.MediaRoot,
 		AuthRate:     cfg.RateLimitAuthCount,
 		AuthWindow:   cfg.RateLimitAuthWindow,
+		WebDistPath:  "web/dist",
 	})
 	e.GET("/swagger/*", echoSwagger.WrapHandler)
-	e.Static("/", "web/dist")
 
 	go func() {
 		if err := e.Start(cfg.Addr); err != nil && err != http.ErrServerClosed {

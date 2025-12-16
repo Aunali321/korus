@@ -3,6 +3,8 @@ package api
 import (
 	"database/sql"
 	"net/http"
+	"os"
+	"strings"
 	"time"
 
 	"github.com/labstack/echo/v4"
@@ -26,6 +28,7 @@ type Deps struct {
 	MediaRoot    string
 	AuthRate     int
 	AuthWindow   time.Duration
+	WebDistPath  string
 }
 
 func New(deps Deps) *echo.Echo {
@@ -115,7 +118,34 @@ func New(deps Deps) *echo.Echo {
 	api.POST("/musicbrainz/submit-listen", h.SubmitListen, middleware.Auth(deps.Auth))
 	api.GET("/musicbrainz/recommendations", h.Recommendations, middleware.Auth(deps.Auth))
 
+	// SPA fallback: serve static files, fall back to index.html for client-side routing
+	if deps.WebDistPath != "" {
+		e.Use(spaMiddleware(deps.WebDistPath))
+	}
+
 	return e
+}
+
+func spaMiddleware(distPath string) echo.MiddlewareFunc {
+	return func(next echo.HandlerFunc) echo.HandlerFunc {
+		return func(c echo.Context) error {
+			path := c.Request().URL.Path
+
+			// Skip API and swagger routes
+			if strings.HasPrefix(path, "/api") || strings.HasPrefix(path, "/swagger") {
+				return next(c)
+			}
+
+			// Check if file exists in dist folder
+			filePath := distPath + path
+			if _, err := os.Stat(filePath); err == nil {
+				return c.File(filePath)
+			}
+
+			// Serve index.html for SPA routes
+			return c.File(distPath + "/index.html")
+		}
+	}
 }
 
 func max(a, b int) int {
