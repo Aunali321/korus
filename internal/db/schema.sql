@@ -70,6 +70,7 @@ CREATE TABLE IF NOT EXISTS playlists (
     name TEXT NOT NULL,
     description TEXT,
     public INTEGER NOT NULL DEFAULT 0,
+    source_path TEXT,
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );

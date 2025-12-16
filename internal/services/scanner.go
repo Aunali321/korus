@@ -1,6 +1,7 @@
 package services
 
 import (
+	"bufio"
 	"bytes"
 	"context"
 	"database/sql"
@@ -8,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
+	"log"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -49,9 +51,10 @@ type ScannerService struct {
 	watchEnabled   bool
 	workers        int
 	coverCachePath string
+	autoPlaylists  bool
 }
 
-func NewScannerService(db *sql.DB, mediaRoot, ffprobePath, ffmpegPath, exclude string, scanEmbeddedCover bool, watch bool, workers int, coverCachePath string) *ScannerService {
+func NewScannerService(db *sql.DB, mediaRoot, ffprobePath, ffmpegPath, exclude string, scanEmbeddedCover bool, watch bool, workers int, coverCachePath string, autoPlaylists bool) *ScannerService {
 	var re *regexp.Regexp
 	if exclude != "" {
 		re = regexp.MustCompile(exclude)
@@ -73,6 +76,7 @@ func NewScannerService(db *sql.DB, mediaRoot, ffprobePath, ffmpegPath, exclude s
 		watchEnabled:   watch,
 		workers:        workers,
 		coverCachePath: coverCachePath,
+		autoPlaylists:  autoPlaylists,
 	}
 }
 
@@ -102,6 +106,7 @@ func (s *ScannerService) runScan(scanID int64) {
 	ctx := context.Background()
 
 	var files []string
+	var playlists []string
 	err := filepath.WalkDir(s.mediaRoot, func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
 			return err
@@ -117,6 +122,8 @@ func (s *ScannerService) runScan(scanID int64) {
 		}
 		if isAudioFile(path) {
 			files = append(files, path)
+		} else if s.autoPlaylists && isPlaylistFile(path) {
+			playlists = append(playlists, path)
 		}
 		return nil
 	})
@@ -210,6 +217,10 @@ func (s *ScannerService) runScan(scanID int64) {
 	if err := s.cleanup(ctx, seenSongs, seenAlbums, seenArtists); err != nil {
 		_, _ = s.db.ExecContext(ctx, `UPDATE scan_status SET status='failed' WHERE id=?`, scanID)
 		return
+	}
+
+	if s.autoPlaylists {
+		s.importPlaylists(ctx, playlists)
 	}
 
 	now := time.Now()
@@ -503,5 +514,106 @@ func isAudioFile(path string) bool {
 		return true
 	default:
 		return false
+	}
+}
+
+func isPlaylistFile(path string) bool {
+	ext := strings.ToLower(filepath.Ext(path))
+	return ext == ".m3u" || ext == ".m3u8"
+}
+
+func (s *ScannerService) importPlaylists(ctx context.Context, m3uFiles []string) {
+	seenPaths := make(map[string]struct{})
+	for _, path := range m3uFiles {
+		seenPaths[path] = struct{}{}
+		if err := s.importM3U(ctx, path); err != nil {
+			log.Printf("import playlist %s: %v", path, err)
+		}
+	}
+	s.cleanupPlaylists(ctx, seenPaths)
+}
+
+func (s *ScannerService) importM3U(ctx context.Context, path string) error {
+	f, err := os.Open(path)
+	if err != nil {
+		return fmt.Errorf("open m3u: %w", err)
+	}
+	defer f.Close()
+
+	var trackPaths []string
+	scanner := bufio.NewScanner(f)
+	for scanner.Scan() {
+		line := strings.TrimSpace(scanner.Text())
+		if line == "" || strings.HasPrefix(line, "#") {
+			continue
+		}
+		trackPath := line
+		if !filepath.IsAbs(trackPath) {
+			trackPath = filepath.Join(filepath.Dir(path), trackPath)
+		}
+		trackPath = filepath.Clean(trackPath)
+		trackPaths = append(trackPaths, trackPath)
+	}
+	if err := scanner.Err(); err != nil {
+		return fmt.Errorf("scan m3u: %w", err)
+	}
+
+	if len(trackPaths) == 0 {
+		return nil
+	}
+
+	name := strings.TrimSuffix(filepath.Base(path), filepath.Ext(path))
+
+	var adminID int64
+	err = s.db.QueryRowContext(ctx, `SELECT id FROM users WHERE role = 'admin' ORDER BY id LIMIT 1`).Scan(&adminID)
+	if err != nil {
+		return fmt.Errorf("find admin user: %w", err)
+	}
+
+	var playlistID int64
+	err = s.db.QueryRowContext(ctx, `SELECT id FROM playlists WHERE source_path = ?`, path).Scan(&playlistID)
+	if errors.Is(err, sql.ErrNoRows) {
+		res, err := s.db.ExecContext(ctx, `INSERT INTO playlists(user_id, name, description, public, source_path) VALUES(?, ?, '', 1, ?)`,
+			adminID, name, path)
+		if err != nil {
+			return fmt.Errorf("create playlist: %w", err)
+		}
+		playlistID, _ = res.LastInsertId()
+	} else if err != nil {
+		return fmt.Errorf("query playlist: %w", err)
+	} else {
+		_, _ = s.db.ExecContext(ctx, `UPDATE playlists SET name = ? WHERE id = ?`, name, playlistID)
+		_, _ = s.db.ExecContext(ctx, `DELETE FROM playlist_songs WHERE playlist_id = ?`, playlistID)
+	}
+
+	for i, trackPath := range trackPaths {
+		var songID int64
+		err := s.db.QueryRowContext(ctx, `SELECT id FROM songs WHERE file_path = ?`, trackPath).Scan(&songID)
+		if err != nil {
+			continue
+		}
+		_, _ = s.db.ExecContext(ctx, `INSERT OR IGNORE INTO playlist_songs(playlist_id, song_id, position) VALUES(?, ?, ?)`,
+			playlistID, songID, i+1)
+	}
+
+	return nil
+}
+
+func (s *ScannerService) cleanupPlaylists(ctx context.Context, seenPaths map[string]struct{}) {
+	rows, err := s.db.QueryContext(ctx, `SELECT id, source_path FROM playlists WHERE source_path IS NOT NULL`)
+	if err != nil {
+		return
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var id int64
+		var sourcePath string
+		if err := rows.Scan(&id, &sourcePath); err != nil {
+			continue
+		}
+		if _, ok := seenPaths[sourcePath]; !ok {
+			_, _ = s.db.ExecContext(ctx, `DELETE FROM playlists WHERE id = ?`, id)
+		}
 	}
 }

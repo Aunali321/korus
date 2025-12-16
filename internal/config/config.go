@@ -28,6 +28,7 @@ type Config struct {
 	ScanExcludePattern  string
 	ScanEmbeddedCover   bool
 	ScanWorkers         int
+	ScanAutoPlaylists   bool
 	CoverCachePath      string
 }
 
@@ -52,7 +53,8 @@ func FromEnv() (Config, error) {
 		ScanWatch:           boolEnv("SCAN_WATCH", false),
 		ScanExcludePattern:  getenv("SCAN_EXCLUDE_PATTERN", ""),
 		ScanEmbeddedCover:   boolEnv("SCAN_EMBEDDED_COVER", true),
-		ScanWorkers:         intEnv("SCAN_WORKERS", 4),
+		ScanWorkers:         intEnv("SCAN_WORKERS", 8),
+		ScanAutoPlaylists:   boolEnv("SCAN_AUTO_PLAYLISTS", true),
 		CoverCachePath:      getenv("COVER_CACHE_PATH", "./cache/covers"),
 	}
 	if cfg.JWTSecret == "" {
