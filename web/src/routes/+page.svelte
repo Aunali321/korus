@@ -1,8 +1,9 @@
 <script lang="ts">
-    import { Play } from "lucide-svelte";
+    import { Play, Shuffle } from "lucide-svelte";
     import { api } from "$lib/api";
     import { auth } from "$lib/stores/auth.svelte";
     import { player } from "$lib/stores/player.svelte";
+    import { library } from "$lib/stores/library.svelte";
     import type { Song, Album } from "$lib/types";
     import Card from "$lib/components/Card.svelte";
 
@@ -38,6 +39,12 @@
             songs.findIndex((s) => s.id === song.id),
         );
     }
+
+    async function shuffleLibrary() {
+        await library.load();
+        if (library.songs.length === 0) return;
+        player.playShuffled(library.songs);
+    }
 </script>
 
 <div class="p-6 space-y-8">
@@ -53,7 +60,7 @@
                     Welcome Back
                 </p>
                 <h2 class="text-5xl font-bold mb-3">Your Music</h2>
-                <p class="text-zinc-400 mb-4">Pick up where you left off</p>
+                <p class="text-zinc-400 mb-4">{recentPlays.length > 0 ? "Pick up where you left off" : "Discover something new"}</p>
                 {#if recentPlays.length > 0}
                     <button
                         onclick={() => player.playQueue(recentPlays, 0)}
@@ -61,6 +68,14 @@
                     >
                         <Play size={20} fill="currentColor" />
                         Play Recent
+                    </button>
+                {:else if !loading}
+                    <button
+                        onclick={shuffleLibrary}
+                        class="px-6 py-3 bg-emerald-500 hover:bg-emerald-600 text-black font-semibold rounded-full flex items-center gap-2 transition-all hover:scale-105"
+                    >
+                        <Shuffle size={20} />
+                        Shuffle Library
                     </button>
                 {/if}
             </div>

@@ -255,6 +255,20 @@ function createPlayerStore() {
         audio?.play().catch(console.error);
     }
 
+    function playShuffled(songs: Song[]) {
+        recordHistory();
+        originalQueue = [...songs];
+        const startIndex = Math.floor(Math.random() * songs.length);
+        const result = shuffleQueue(songs, startIndex);
+        queue = result.shuffled;
+        queueIndex = result.newIndex;
+        currentSong = queue[queueIndex];
+        shuffle = true;
+        playStartTime = 0;
+        loadSong(currentSong);
+        audio?.play().catch(console.error);
+    }
+
     return {
         get currentSong() { return currentSong; },
         get queue() { return queue; },
@@ -276,7 +290,8 @@ function createPlayerStore() {
         toggleRepeat,
         addToQueue,
         clearQueue,
-        playQueue
+        playQueue,
+        playShuffled
     };
 }
 
