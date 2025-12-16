@@ -88,6 +88,9 @@ export interface WrappedData {
     top_artist?: Artist;
     top_album?: Album;
     total_minutes: number;
+    total_plays: number;
+    days_listened: number;
+    avg_plays_per_day: number;
     unique_songs: number;
     unique_artists: number;
     personality?: string;

@@ -163,6 +163,33 @@
                 class="bg-zinc-900 border border-zinc-800 rounded-xl p-6 text-center"
             >
                 <div class="text-3xl font-bold text-emerald-400">
+                    {wrapped.total_plays}
+                </div>
+                <p class="text-zinc-400 mt-1">Total Plays</p>
+            </div>
+            <div
+                class="bg-zinc-900 border border-zinc-800 rounded-xl p-6 text-center"
+            >
+                <div class="text-3xl font-bold text-cyan-400">
+                    {wrapped.days_listened}
+                </div>
+                <p class="text-zinc-400 mt-1">Days Listened</p>
+            </div>
+            <div
+                class="bg-zinc-900 border border-zinc-800 rounded-xl p-6 text-center"
+            >
+                <div class="text-3xl font-bold text-purple-400">
+                    {wrapped.avg_plays_per_day.toFixed(1)}
+                </div>
+                <p class="text-zinc-400 mt-1">Avg Plays/Day</p>
+            </div>
+        </div>
+
+        <div class="grid md:grid-cols-3 gap-4">
+            <div
+                class="bg-zinc-900 border border-zinc-800 rounded-xl p-6 text-center"
+            >
+                <div class="text-3xl font-bold text-emerald-400">
                     {wrapped.unique_songs}
                 </div>
                 <p class="text-zinc-400 mt-1">Unique Songs</p>

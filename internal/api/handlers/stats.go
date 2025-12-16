@@ -59,22 +59,114 @@ func (h *Handler) Wrapped(c echo.Context) error {
 	user, _ := currentUser(c)
 	start, end := resolvePeriod(c.QueryParam("period"))
 	ctx := c.Request().Context()
-	topSongs := h.rankSongs(ctx, user.ID, start, end, 10)
-	topArtists := h.rankArtists(ctx, user.ID, start, end, 10)
-	topAlbums := h.rankAlbums(ctx, user.ID, start, end, 10)
 	overview := h.overview(ctx, user.ID, start, end)
+
+	startStr := start.Format(time.RFC3339)
+	endStr := end.Format(time.RFC3339)
+
+	// Get top song with artist info
+	var topSong interface{}
+	var songID int64
+	var songTitle, artistName string
+	var artistID int64
+	err := h.db.QueryRowContext(ctx, `
+		SELECT s.id, s.title, ar.id, ar.name
+		FROM play_history ph
+		JOIN songs s ON s.id = ph.song_id
+		JOIN albums al ON al.id = s.album_id
+		JOIN artists ar ON ar.id = al.artist_id
+		WHERE ph.user_id = ? AND ph.played_at BETWEEN ? AND ?
+		GROUP BY s.id
+		ORDER BY COUNT(*) DESC
+		LIMIT 1
+	`, user.ID, startStr, endStr).Scan(&songID, &songTitle, &artistID, &artistName)
+	if err == nil {
+		topSong = map[string]interface{}{
+			"id":    songID,
+			"title": songTitle,
+			"artist": map[string]interface{}{
+				"id":   artistID,
+				"name": artistName,
+			},
+		}
+	}
+
+	// Get top artist
+	var topArtist interface{}
+	err = h.db.QueryRowContext(ctx, `
+		SELECT ar.id, ar.name
+		FROM play_history ph
+		JOIN songs s ON s.id = ph.song_id
+		JOIN albums al ON al.id = s.album_id
+		JOIN artists ar ON ar.id = al.artist_id
+		WHERE ph.user_id = ? AND ph.played_at BETWEEN ? AND ?
+		GROUP BY ar.id
+		ORDER BY COUNT(*) DESC
+		LIMIT 1
+	`, user.ID, startStr, endStr).Scan(&artistID, &artistName)
+	if err == nil {
+		topArtist = map[string]interface{}{
+			"id":   artistID,
+			"name": artistName,
+		}
+	}
+
+	// Get top album with artist info
+	var topAlbum interface{}
+	var albumID int64
+	var albumTitle string
+	err = h.db.QueryRowContext(ctx, `
+		SELECT al.id, al.title, ar.id, ar.name
+		FROM play_history ph
+		JOIN songs s ON s.id = ph.song_id
+		JOIN albums al ON al.id = s.album_id
+		JOIN artists ar ON ar.id = al.artist_id
+		WHERE ph.user_id = ? AND ph.played_at BETWEEN ? AND ?
+		GROUP BY al.id
+		ORDER BY COUNT(*) DESC
+		LIMIT 1
+	`, user.ID, startStr, endStr).Scan(&albumID, &albumTitle, &artistID, &artistName)
+	if err == nil {
+		topAlbum = map[string]interface{}{
+			"id":    albumID,
+			"title": albumTitle,
+			"artist": map[string]interface{}{
+				"id":   artistID,
+				"name": artistName,
+			},
+		}
+	}
+
+	totalTime, _ := overview["total_time"].(int64)
+	totalMinutes := totalTime / 60
+	totalPlays, _ := overview["total_plays"].(int64)
+	uniqueSongs, _ := overview["unique_songs"].(int64)
+	uniqueArtists, _ := overview["unique_artists"].(int64)
+
+	var daysListened int
+	_ = h.db.QueryRowContext(ctx, `
+		SELECT COUNT(DISTINCT DATE(played_at))
+		FROM play_history
+		WHERE user_id = ? AND played_at BETWEEN ? AND ?
+	`, user.ID, startStr, endStr).Scan(&daysListened)
+
+	var avgPlaysPerDay float64
+	if daysListened > 0 {
+		avgPlaysPerDay = float64(totalPlays) / float64(daysListened)
+	}
+
 	return c.JSON(http.StatusOK, map[string]interface{}{
-		"period": map[string]string{"start": start.Format("2006-01-02"), "end": end.Format("2006-01-02")},
-		"summary": map[string]interface{}{
-			"total_plays":       overview["total_plays"],
-			"total_time":        overview["total_time"],
-			"days_listened":     int(end.Sub(start).Hours()) / 24,
-			"avg_plays_per_day": safeDivInt(overview["total_plays"], int(end.Sub(start).Hours()/24+1)),
-		},
-		"top_songs":   topSongs,
-		"top_artists": topArtists,
-		"top_albums":  topAlbums,
-		"milestones":  []interface{}{},
+		"period":            c.QueryParam("period"),
+		"top_song":          topSong,
+		"top_artist":        topArtist,
+		"top_album":         topAlbum,
+		"total_minutes":     totalMinutes,
+		"total_plays":       totalPlays,
+		"days_listened":     daysListened,
+		"avg_plays_per_day": avgPlaysPerDay,
+		"unique_songs":      uniqueSongs,
+		"unique_artists":    uniqueArtists,
+		"milestones":        []string{},
 	})
 }
 
