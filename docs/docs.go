@@ -54,46 +54,6 @@ const docTemplate = `{
                 }
             }
         },
-        "/api/admin/scan": {
-            "post": {
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Admin"
-                ],
-                "summary": "Start library scan",
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "type": "object",
-                            "additionalProperties": true
-                        }
-                    }
-                }
-            }
-        },
-        "/api/admin/scan/status": {
-            "get": {
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Admin"
-                ],
-                "summary": "Get scan status",
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "type": "object",
-                            "additionalProperties": true
-                        }
-                    }
-                }
-            }
-        },
         "/api/admin/sessions/cleanup": {
             "delete": {
                 "consumes": [
@@ -283,7 +243,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/internal_api_handlers.loginRequest"
+                            "$ref": "#/definitions/handlers.loginRequest"
                         }
                     }
                 ],
@@ -432,7 +392,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/internal_api_handlers.registerRequest"
+                            "$ref": "#/definitions/handlers.registerRequest"
                         }
                     }
                 ],
@@ -712,7 +672,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/internal_api_handlers.historyRequest"
+                            "$ref": "#/definitions/handlers.historyRequest"
                         }
                     }
                 ],
@@ -761,14 +721,8 @@ const docTemplate = `{
                 "parameters": [
                     {
                         "type": "integer",
-                        "description": "max songs (default 50, max 200)",
+                        "description": "max items (default: all)",
                         "name": "limit",
-                        "in": "query"
-                    },
-                    {
-                        "type": "integer",
-                        "description": "song offset",
-                        "name": "offset",
                         "in": "query"
                     }
                 ],
@@ -935,7 +889,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/internal_api_handlers.playlistRequest"
+                            "$ref": "#/definitions/handlers.playlistRequest"
                         }
                     }
                 ],
@@ -1012,7 +966,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/internal_api_handlers.playlistRequest"
+                            "$ref": "#/definitions/handlers.playlistRequest"
                         }
                     }
                 ],
@@ -1220,6 +1174,46 @@ const docTemplate = `{
                 }
             }
         },
+        "/api/scan": {
+            "post": {
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Library"
+                ],
+                "summary": "Start library scan",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            }
+        },
+        "/api/scan/status": {
+            "get": {
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Library"
+                ],
+                "summary": "Get scan status",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            }
+        },
         "/api/search": {
             "get": {
                 "produces": [
@@ -1261,6 +1255,56 @@ const docTemplate = `{
                 }
             }
         },
+        "/api/settings": {
+            "get": {
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Settings"
+                ],
+                "summary": "Get user settings",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.UserSettings"
+                        }
+                    }
+                }
+            },
+            "put": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Settings"
+                ],
+                "summary": "Update user settings",
+                "parameters": [
+                    {
+                        "description": "Settings",
+                        "name": "settings",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handlers.UserSettings"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.UserSettings"
+                        }
+                    }
+                }
+            }
+        },
         "/api/songs/{id}": {
             "get": {
                 "produces": [
@@ -1283,7 +1327,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/github_com_Aunali321_korus_internal_models.Song"
+                            "$ref": "#/definitions/models.Song"
                         }
                     },
                     "404": {
@@ -1346,26 +1390,6 @@ const docTemplate = `{
                 }
             }
         },
-        "/api/stats/social": {
-            "get": {
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Stats"
-                ],
-                "summary": "Social stats",
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "type": "object",
-                            "additionalProperties": true
-                        }
-                    }
-                }
-            }
-        },
         "/api/stats/wrapped": {
             "get": {
                 "produces": [
@@ -1410,7 +1434,7 @@ const docTemplate = `{
                     },
                     {
                         "type": "string",
-                        "description": "mp3|aac|opus",
+                        "description": "mp3|aac|opus|wav",
                         "name": "format",
                         "in": "query"
                     },
@@ -1439,14 +1463,124 @@ const docTemplate = `{
                     }
                 }
             }
+        },
+        "/api/streaming/options": {
+            "get": {
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Player"
+                ],
+                "summary": "Get available streaming formats and bitrates",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            }
         }
     },
     "definitions": {
-        "github_com_Aunali321_korus_internal_models.Album": {
+        "handlers.UserSettings": {
+            "type": "object",
+            "properties": {
+                "streaming_bitrate": {
+                    "type": "integer"
+                },
+                "streaming_format": {
+                    "type": "string"
+                },
+                "streaming_preset": {
+                    "type": "string"
+                }
+            }
+        },
+        "handlers.historyRequest": {
+            "type": "object",
+            "required": [
+                "song_id"
+            ],
+            "properties": {
+                "completion_rate": {
+                    "type": "number"
+                },
+                "duration_listened": {
+                    "type": "integer"
+                },
+                "song_id": {
+                    "type": "integer"
+                },
+                "source": {
+                    "type": "string"
+                },
+                "timestamp": {
+                    "type": "integer"
+                }
+            }
+        },
+        "handlers.loginRequest": {
+            "type": "object",
+            "required": [
+                "password",
+                "username"
+            ],
+            "properties": {
+                "password": {
+                    "type": "string"
+                },
+                "username": {
+                    "type": "string"
+                }
+            }
+        },
+        "handlers.playlistRequest": {
+            "type": "object",
+            "required": [
+                "name"
+            ],
+            "properties": {
+                "description": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "public": {
+                    "type": "boolean"
+                }
+            }
+        },
+        "handlers.registerRequest": {
+            "type": "object",
+            "required": [
+                "email",
+                "password",
+                "username"
+            ],
+            "properties": {
+                "email": {
+                    "type": "string"
+                },
+                "password": {
+                    "type": "string",
+                    "minLength": 8
+                },
+                "username": {
+                    "type": "string",
+                    "minLength": 3
+                }
+            }
+        },
+        "models.Album": {
             "type": "object",
             "properties": {
                 "artist": {
-                    "$ref": "#/definitions/github_com_Aunali321_korus_internal_models.Artist"
+                    "$ref": "#/definitions/models.Artist"
                 },
                 "artist_id": {
                     "type": "integer"
@@ -1471,7 +1605,7 @@ const docTemplate = `{
                 }
             }
         },
-        "github_com_Aunali321_korus_internal_models.Artist": {
+        "models.Artist": {
             "type": "object",
             "properties": {
                 "bio": {
@@ -1494,17 +1628,17 @@ const docTemplate = `{
                 }
             }
         },
-        "github_com_Aunali321_korus_internal_models.Song": {
+        "models.Song": {
             "type": "object",
             "properties": {
                 "album": {
-                    "$ref": "#/definitions/github_com_Aunali321_korus_internal_models.Album"
+                    "$ref": "#/definitions/models.Album"
                 },
                 "album_id": {
                     "type": "integer"
                 },
                 "artist": {
-                    "$ref": "#/definitions/github_com_Aunali321_korus_internal_models.Artist"
+                    "$ref": "#/definitions/models.Artist"
                 },
                 "duration": {
                     "type": "integer"
@@ -1529,82 +1663,6 @@ const docTemplate = `{
                 },
                 "track_number": {
                     "type": "integer"
-                }
-            }
-        },
-        "internal_api_handlers.historyRequest": {
-            "type": "object",
-            "required": [
-                "song_id"
-            ],
-            "properties": {
-                "completion_rate": {
-                    "type": "number"
-                },
-                "duration_listened": {
-                    "type": "integer"
-                },
-                "song_id": {
-                    "type": "integer"
-                },
-                "source": {
-                    "type": "string"
-                },
-                "timestamp": {
-                    "type": "integer"
-                }
-            }
-        },
-        "internal_api_handlers.loginRequest": {
-            "type": "object",
-            "required": [
-                "password",
-                "username"
-            ],
-            "properties": {
-                "password": {
-                    "type": "string"
-                },
-                "username": {
-                    "type": "string"
-                }
-            }
-        },
-        "internal_api_handlers.playlistRequest": {
-            "type": "object",
-            "required": [
-                "name"
-            ],
-            "properties": {
-                "description": {
-                    "type": "string"
-                },
-                "name": {
-                    "type": "string"
-                },
-                "public": {
-                    "type": "boolean"
-                }
-            }
-        },
-        "internal_api_handlers.registerRequest": {
-            "type": "object",
-            "required": [
-                "email",
-                "password",
-                "username"
-            ],
-            "properties": {
-                "email": {
-                    "type": "string"
-                },
-                "password": {
-                    "type": "string",
-                    "minLength": 8
-                },
-                "username": {
-                    "type": "string",
-                    "minLength": 3
                 }
             }
         }

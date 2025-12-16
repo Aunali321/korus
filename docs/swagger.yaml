@@ -1,9 +1,69 @@
 basePath: /api
 definitions:
-  github_com_Aunali321_korus_internal_models.Album:
+  handlers.UserSettings:
+    properties:
+      streaming_bitrate:
+        type: integer
+      streaming_format:
+        type: string
+      streaming_preset:
+        type: string
+    type: object
+  handlers.historyRequest:
+    properties:
+      completion_rate:
+        type: number
+      duration_listened:
+        type: integer
+      song_id:
+        type: integer
+      source:
+        type: string
+      timestamp:
+        type: integer
+    required:
+    - song_id
+    type: object
+  handlers.loginRequest:
+    properties:
+      password:
+        type: string
+      username:
+        type: string
+    required:
+    - password
+    - username
+    type: object
+  handlers.playlistRequest:
+    properties:
+      description:
+        type: string
+      name:
+        type: string
+      public:
+        type: boolean
+    required:
+    - name
+    type: object
+  handlers.registerRequest:
+    properties:
+      email:
+        type: string
+      password:
+        minLength: 8
+        type: string
+      username:
+        minLength: 3
+        type: string
+    required:
+    - email
+    - password
+    - username
+    type: object
+  models.Album:
     properties:
       artist:
-        $ref: '#/definitions/github_com_Aunali321_korus_internal_models.Artist'
+        $ref: '#/definitions/models.Artist'
       artist_id:
         type: integer
       cover_path:
@@ -19,7 +79,7 @@ definitions:
       year:
         type: integer
     type: object
-  github_com_Aunali321_korus_internal_models.Artist:
+  models.Artist:
     properties:
       bio:
         type: string
@@ -34,14 +94,14 @@ definitions:
       name:
         type: string
     type: object
-  github_com_Aunali321_korus_internal_models.Song:
+  models.Song:
     properties:
       album:
-        $ref: '#/definitions/github_com_Aunali321_korus_internal_models.Album'
+        $ref: '#/definitions/models.Album'
       album_id:
         type: integer
       artist:
-        $ref: '#/definitions/github_com_Aunali321_korus_internal_models.Artist'
+        $ref: '#/definitions/models.Artist'
       duration:
         type: integer
       file_path:
@@ -58,57 +118,6 @@ definitions:
         type: string
       track_number:
         type: integer
-    type: object
-  internal_api_handlers.historyRequest:
-    properties:
-      completion_rate:
-        type: number
-      duration_listened:
-        type: integer
-      song_id:
-        type: integer
-      source:
-        type: string
-      timestamp:
-        type: integer
-    required:
-    - song_id
-    type: object
-  internal_api_handlers.loginRequest:
-    properties:
-      password:
-        type: string
-      username:
-        type: string
-    required:
-    - password
-    - username
-    type: object
-  internal_api_handlers.playlistRequest:
-    properties:
-      description:
-        type: string
-      name:
-        type: string
-      public:
-        type: boolean
-    required:
-    - name
-    type: object
-  internal_api_handlers.registerRequest:
-    properties:
-      email:
-        type: string
-      password:
-        minLength: 8
-        type: string
-      username:
-        minLength: 3
-        type: string
-    required:
-    - email
-    - password
-    - username
     type: object
 info:
   contact: {}
@@ -139,32 +148,6 @@ paths:
               type: string
             type: object
       summary: MusicBrainz enrich
-      tags:
-      - Admin
-  /api/admin/scan:
-    post:
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            additionalProperties: true
-            type: object
-      summary: Start library scan
-      tags:
-      - Admin
-  /api/admin/scan/status:
-    get:
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            additionalProperties: true
-            type: object
-      summary: Get scan status
       tags:
       - Admin
   /api/admin/sessions/cleanup:
@@ -288,7 +271,7 @@ paths:
         name: body
         required: true
         schema:
-          $ref: '#/definitions/internal_api_handlers.loginRequest'
+          $ref: '#/definitions/handlers.loginRequest'
       produces:
       - application/json
       responses:
@@ -385,7 +368,7 @@ paths:
         name: body
         required: true
         schema:
-          $ref: '#/definitions/internal_api_handlers.registerRequest'
+          $ref: '#/definitions/handlers.registerRequest'
       produces:
       - application/json
       responses:
@@ -567,7 +550,7 @@ paths:
         name: body
         required: true
         schema:
-          $ref: '#/definitions/internal_api_handlers.historyRequest'
+          $ref: '#/definitions/handlers.historyRequest'
       produces:
       - application/json
       responses:
@@ -596,13 +579,9 @@ paths:
   /api/library:
     get:
       parameters:
-      - description: max songs (default 50, max 200)
+      - description: 'max items (default: all)'
         in: query
         name: limit
-        type: integer
-      - description: song offset
-        in: query
-        name: offset
         type: integer
       produces:
       - application/json
@@ -712,7 +691,7 @@ paths:
         name: body
         required: true
         schema:
-          $ref: '#/definitions/internal_api_handlers.playlistRequest'
+          $ref: '#/definitions/handlers.playlistRequest'
       produces:
       - application/json
       responses:
@@ -786,7 +765,7 @@ paths:
         name: body
         required: true
         schema:
-          $ref: '#/definitions/internal_api_handlers.playlistRequest'
+          $ref: '#/definitions/handlers.playlistRequest'
       produces:
       - application/json
       responses:
@@ -902,6 +881,32 @@ paths:
       summary: Remove song from playlist
       tags:
       - Playlists
+  /api/scan:
+    post:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+      summary: Start library scan
+      tags:
+      - Library
+  /api/scan/status:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+      summary: Get scan status
+      tags:
+      - Library
   /api/search:
     get:
       parameters:
@@ -929,6 +934,38 @@ paths:
       summary: Search library
       tags:
       - Search
+  /api/settings:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.UserSettings'
+      summary: Get user settings
+      tags:
+      - Settings
+    put:
+      consumes:
+      - application/json
+      parameters:
+      - description: Settings
+        in: body
+        name: settings
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.UserSettings'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.UserSettings'
+      summary: Update user settings
+      tags:
+      - Settings
   /api/songs/{id}:
     get:
       parameters:
@@ -943,7 +980,7 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/github_com_Aunali321_korus_internal_models.Song'
+            $ref: '#/definitions/models.Song'
         "404":
           description: Not Found
           schema:
@@ -984,19 +1021,6 @@ paths:
       summary: Insights
       tags:
       - Stats
-  /api/stats/social:
-    get:
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            additionalProperties: true
-            type: object
-      summary: Social stats
-      tags:
-      - Stats
   /api/stats/wrapped:
     get:
       parameters:
@@ -1023,7 +1047,7 @@ paths:
         name: id
         required: true
         type: integer
-      - description: mp3|aac|opus
+      - description: mp3|aac|opus|wav
         in: query
         name: format
         type: string
@@ -1043,6 +1067,19 @@ paths:
               type: string
             type: object
       summary: Stream or transcode song
+      tags:
+      - Player
+  /api/streaming/options:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+      summary: Get available streaming formats and bitrates
       tags:
       - Player
 swagger: "2.0"

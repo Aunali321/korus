@@ -198,10 +198,14 @@ GET /api/stats/social?period=month → {
 GET /api/home → {recent_plays, recommended, new_additions, stats_summary}
 ```
 
+### Library Scanning
+```
+POST /api/scan → {scan_id, status}
+GET /api/scan/status → {scan_id, status, progress, total, current_file}
+```
+
 ### Admin
 ```
-POST /api/admin/scan {path} → {scan_id, status}
-GET /api/admin/scan/status → {scan_id, status, progress, total, current_file}
 GET /api/admin/system → {library: {...}, storage: {...}, users: {...}, uptime}
 DELETE /api/admin/sessions/cleanup {older_than_days} → {deleted}
 ```

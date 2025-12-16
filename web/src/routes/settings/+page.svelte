@@ -1,17 +1,20 @@
 <script lang="ts">
-    import { Settings, LogOut, Server, Volume2 } from "lucide-svelte";
+    import { Settings, LogOut, Server, Volume2, RefreshCw } from "lucide-svelte";
     import { auth } from "$lib/stores/auth.svelte";
     import { settings } from "$lib/stores/settings.svelte";
     import { toast } from "$lib/stores/toast.svelte";
+    import { library } from "$lib/stores/library.svelte";
     import { api, setApiUrl } from "$lib/api";
     import { goto } from "$app/navigation";
-    import type { StreamingOptions, StreamingPreset } from "$lib/types";
+    import type { StreamingOptions, StreamingPreset, ScanJob } from "$lib/types";
 
     let apiUrl = $state("");
     let showAdvanced = $state(false);
     let streamingOptions = $state<StreamingOptions | null>(null);
     let customFormat = $state("opus");
     let customBitrate = $state(128);
+    let scanJob = $state<ScanJob | null>(null);
+    let scanning = $state(false);
 
     const presets: { value: StreamingPreset; label: string; description: string }[] = [
         { value: "original", label: "Original", description: "No transcoding, best for compatible formats" },
@@ -41,6 +44,14 @@
         }).catch(() => {
             // ignore
         });
+        api.getScanStatus().then((status) => {
+            if (status.status === "running") {
+                scanJob = status;
+                pollScanStatus();
+            }
+        }).catch(() => {
+            // ignore
+        });
     });
 
     function saveApiUrl() {
@@ -67,6 +78,38 @@
     const availableBitrates = $derived(
         streamingOptions?.formats.find(f => f.format === customFormat)?.bitrates || []
     );
+
+    async function startScan() {
+        scanning = true;
+        try {
+            await api.startScan();
+            toast.success("Scan started");
+            pollScanStatus();
+        } catch {
+            toast.error("Failed to start scan");
+        } finally {
+            scanning = false;
+        }
+    }
+
+    async function pollScanStatus() {
+        const poll = async () => {
+            try {
+                const status = await api.getScanStatus();
+                scanJob = status;
+                if (status.status === "running") {
+                    setTimeout(poll, 1000);
+                } else if (status.status === "completed") {
+                    toast.success("Scan completed");
+                    library.invalidate();
+                    scanJob = null;
+                }
+            } catch {
+                // Ignore polling errors
+            }
+        };
+        poll();
+    }
 </script>
 
 <div class="p-6 space-y-8">
@@ -197,6 +240,73 @@
                     </p>
                 {/if}
             </div>
+        </div>
+    </section>
+
+    <section>
+        <h3 class="text-xl font-bold mb-4 flex items-center gap-2">
+            <RefreshCw size={20} class="text-zinc-400" />
+            Library
+        </h3>
+        <div
+            class="bg-zinc-900 border border-zinc-800 rounded-xl p-6 space-y-4"
+        >
+            <button
+                onclick={startScan}
+                disabled={scanning || scanJob?.status === "running"}
+                class="px-6 py-3 bg-emerald-500 hover:bg-emerald-600 disabled:opacity-50 text-black font-semibold rounded-lg flex items-center gap-2"
+            >
+                <RefreshCw
+                    size={18}
+                    class={scanJob?.status === "running"
+                        ? "animate-spin"
+                        : ""}
+                />
+                {scanJob?.status === "running"
+                    ? "Scanning..."
+                    : "Rescan Library"}
+            </button>
+
+            {#if scanJob}
+                <div class="text-sm text-zinc-400">
+                    <div>
+                        Status: <span class="text-zinc-200"
+                            >{scanJob.status}</span
+                        >
+                    </div>
+                    {#if scanJob.status === "running"}
+                        <div class="mt-2">
+                            <div class="flex justify-between text-xs mb-1">
+                                <span
+                                    >{scanJob.current_file ||
+                                        "Scanning..."}</span
+                                >
+                                <span
+                                    >{scanJob.progress} / {scanJob.total}</span
+                                >
+                            </div>
+                            <div
+                                class="h-2 bg-zinc-800 rounded-full overflow-hidden"
+                            >
+                                <div
+                                    class="h-full bg-emerald-500 transition-all"
+                                    style="width: {scanJob.total
+                                        ? (scanJob.progress /
+                                              scanJob.total) *
+                                          100
+                                        : 0}%"
+                                ></div>
+                            </div>
+                        </div>
+                    {/if}
+                    {#if scanJob.error}
+                        <div class="text-red-400 mt-2">{scanJob.error}</div>
+                    {/if}
+                </div>
+            {/if}
+            <p class="text-xs text-zinc-500">
+                Rescan your music library to detect new or modified files.
+            </p>
         </div>
     </section>
 

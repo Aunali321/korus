@@ -310,9 +310,9 @@ export const api = {
 
   getInsights: () => request<Insights>("/stats/insights"),
 
-  startScan: () => request<ScanJob>("/admin/scan", { method: "POST" }),
+  startScan: () => request<ScanJob>("/scan", { method: "POST" }),
 
-  getScanStatus: () => request<ScanJob>("/admin/scan/status"),
+  getScanStatus: () => request<ScanJob>("/scan/status"),
 
   getSystemInfo: () => request<SystemInfo>("/admin/system"),
 

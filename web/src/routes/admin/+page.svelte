@@ -1,16 +1,13 @@
 <script lang="ts">
-    import { Shield, RefreshCw, Server, Trash2 } from "lucide-svelte";
+    import { Shield, Server, Trash2 } from "lucide-svelte";
     import { api } from "$lib/api";
     import { auth } from "$lib/stores/auth.svelte";
-    import { library } from "$lib/stores/library.svelte";
     import { toast } from "$lib/stores/toast.svelte";
-    import type { ScanJob, SystemInfo } from "$lib/types";
+    import type { SystemInfo } from "$lib/types";
 
-    let scanJob = $state<ScanJob | null>(null);
     let systemInfo = $state<SystemInfo | null>(null);
     let loading = $state(true);
     let loaded = $state(false);
-    let scanning = $state(false);
     let cleanupDays = $state(30);
     let cleaning = $state(false);
 
@@ -23,50 +20,12 @@
     async function loadAdmin() {
         loaded = true;
         try {
-            const [status, sys] = await Promise.all([
-                api.getScanStatus().catch(() => null),
-                api.getSystemInfo().catch(() => null),
-            ]);
-            scanJob = status;
-            systemInfo = sys;
+            systemInfo = await api.getSystemInfo().catch(() => null);
         } catch (e) {
             console.error("Failed to load admin:", e);
         } finally {
             loading = false;
         }
-    }
-
-    async function startScan() {
-        scanning = true;
-        try {
-            const job = await api.startScan();
-            scanJob = job;
-            toast.success("Scan started");
-            pollScanStatus();
-        } catch (e) {
-            toast.error("Failed to start scan");
-        } finally {
-            scanning = false;
-        }
-    }
-
-    async function pollScanStatus() {
-        const poll = async () => {
-            try {
-                const status = await api.getScanStatus();
-                scanJob = status;
-                if (status.status === "running") {
-                    setTimeout(poll, 2000);
-                } else if (status.status === "completed") {
-                    toast.success("Scan completed");
-                    library.invalidate();
-                    systemInfo = await api.getSystemInfo();
-                }
-            } catch {
-                // Ignore polling errors
-            }
-        };
-        poll();
     }
 
     async function cleanupSessions() {
@@ -109,70 +68,6 @@
             <div class="text-zinc-500">Loading...</div>
         </div>
     {:else}
-        <section>
-            <h3 class="text-xl font-bold mb-4 flex items-center gap-2">
-                <RefreshCw size={20} class="text-emerald-400" />
-                Library Scan
-            </h3>
-            <div
-                class="bg-zinc-900 border border-zinc-800 rounded-xl p-6 space-y-4"
-            >
-                <button
-                    onclick={startScan}
-                    disabled={scanning || scanJob?.status === "running"}
-                    class="px-6 py-3 bg-emerald-500 hover:bg-emerald-600 disabled:opacity-50 text-black font-semibold rounded-lg flex items-center gap-2"
-                >
-                    <RefreshCw
-                        size={18}
-                        class={scanJob?.status === "running"
-                            ? "animate-spin"
-                            : ""}
-                    />
-                    {scanJob?.status === "running"
-                        ? "Scanning..."
-                        : "Start Scan"}
-                </button>
-
-                {#if scanJob}
-                    <div class="text-sm text-zinc-400">
-                        <div>
-                            Status: <span class="text-zinc-200"
-                                >{scanJob.status}</span
-                            >
-                        </div>
-                        {#if scanJob.status === "running"}
-                            <div class="mt-2">
-                                <div class="flex justify-between text-xs mb-1">
-                                    <span
-                                        >{scanJob.current_file ||
-                                            "Scanning..."}</span
-                                    >
-                                    <span
-                                        >{scanJob.progress} / {scanJob.total}</span
-                                    >
-                                </div>
-                                <div
-                                    class="h-2 bg-zinc-800 rounded-full overflow-hidden"
-                                >
-                                    <div
-                                        class="h-full bg-emerald-500 transition-all"
-                                        style="width: {scanJob.total
-                                            ? (scanJob.progress /
-                                                  scanJob.total) *
-                                              100
-                                            : 0}%"
-                                    ></div>
-                                </div>
-                            </div>
-                        {/if}
-                        {#if scanJob.error}
-                            <div class="text-red-400 mt-2">{scanJob.error}</div>
-                        {/if}
-                    </div>
-                {/if}
-            </div>
-        </section>
-
         {#if systemInfo}
             <section>
                 <h3 class="text-xl font-bold mb-4 flex items-center gap-2">

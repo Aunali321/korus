@@ -108,9 +108,10 @@ func New(deps Deps) *echo.Echo {
 	api.GET("/settings", h.GetSettings, middleware.Auth(deps.Auth))
 	api.PUT("/settings", h.UpdateSettings, middleware.Auth(deps.Auth))
 
+	api.POST("/scan", h.StartScan, middleware.Auth(deps.Auth))
+	api.GET("/scan/status", h.ScanStatus, middleware.Auth(deps.Auth))
+
 	admin := api.Group("/admin", middleware.Auth(deps.Auth), middleware.AdminOnly)
-	admin.POST("/scan", h.StartScan)
-	admin.GET("/scan/status", h.ScanStatus)
 	admin.GET("/system", h.SystemInfo)
 	admin.DELETE("/sessions/cleanup", h.CleanupSessions)
 	admin.POST("/musicbrainz/enrich", h.Enrich)

@@ -158,9 +158,11 @@ Environment variables:
 - `GET /api/stats` - Listening statistics
 - `GET /api/home` - Home page data
 
+### Library Scanning
+- `POST /api/scan` - Trigger library scan
+- `GET /api/scan/status` - Scan status
+
 ### Admin
-- `POST /api/admin/scan` - Trigger library scan
-- `GET /api/admin/scan/status` - Scan status
 - `GET /api/admin/system` - System info
 - `POST /api/admin/sessions/cleanup` - Clean expired sessions
 - `POST /api/admin/musicbrainz/enrich` - Enrich metadata

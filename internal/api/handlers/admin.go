@@ -11,24 +11,24 @@ import (
 
 // StartScan godoc
 // @Summary Start library scan
-// @Tags Admin
+// @Tags Library
 // @Produce json
 // @Success 200 {object} map[string]interface{}
-// @Router /api/admin/scan [post]
+// @Router /api/scan [post]
 func (h *Handler) StartScan(c echo.Context) error {
-	id, err := h.scanner.StartScan(c.Request().Context())
+	scanID, err := h.scanner.StartScan(c.Request().Context())
 	if err != nil {
-		return echo.NewHTTPError(http.StatusInternalServerError, map[string]string{"error": err.Error(), "code": "SCAN_FAILED"})
+		return echo.NewHTTPError(http.StatusConflict, map[string]string{"error": err.Error(), "code": "SCAN_FAILED"})
 	}
-	return c.JSON(http.StatusOK, map[string]interface{}{"scan_id": id, "status": "running"})
+	return c.JSON(http.StatusOK, map[string]interface{}{"scan_id": scanID, "status": "running"})
 }
 
 // ScanStatus godoc
 // @Summary Get scan status
-// @Tags Admin
+// @Tags Library
 // @Produce json
 // @Success 200 {object} map[string]interface{}
-// @Router /api/admin/scan/status [get]
+// @Router /api/scan/status [get]
 func (h *Handler) ScanStatus(c echo.Context) error {
 	status, err := h.scanner.Status(c.Request().Context())
 	if err != nil {

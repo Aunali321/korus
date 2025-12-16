@@ -82,7 +82,24 @@ func (s *ScannerService) StartScan(ctx context.Context) (int64, error) {
 	if !atomic.CompareAndSwapInt32(&s.scanning, 0, 1) {
 		return 0, errors.New("scan already running")
 	}
+
+	// Insert scan status row immediately so it's visible to status queries
+	res, err := s.db.ExecContext(ctx, `INSERT INTO scan_status(status, progress, total) VALUES ('running', 0, 0)`)
+	if err != nil {
+		atomic.StoreInt32(&s.scanning, 0)
+		return 0, fmt.Errorf("insert scan status: %w", err)
+	}
+	scanID, _ := res.LastInsertId()
+
+	// Run the actual scan in a goroutine
+	go s.runScan(scanID)
+
+	return scanID, nil
+}
+
+func (s *ScannerService) runScan(scanID int64) {
 	defer atomic.StoreInt32(&s.scanning, 0)
+	ctx := context.Background()
 
 	var files []string
 	err := filepath.WalkDir(s.mediaRoot, func(path string, d fs.DirEntry, err error) error {
@@ -104,14 +121,12 @@ func (s *ScannerService) StartScan(ctx context.Context) (int64, error) {
 		return nil
 	})
 	if err != nil {
-		return 0, fmt.Errorf("walk media root: %w", err)
+		_, _ = s.db.ExecContext(ctx, `UPDATE scan_status SET status='failed' WHERE id=?`, scanID)
+		return
 	}
 
-	res, err := s.db.ExecContext(ctx, `INSERT INTO scan_status(status, progress, total) VALUES ('running', 0, ?)`, len(files))
-	if err != nil {
-		return 0, fmt.Errorf("insert scan status: %w", err)
-	}
-	scanID, _ := res.LastInsertId()
+	// Update total count now that we know it
+	_, _ = s.db.ExecContext(ctx, `UPDATE scan_status SET total=? WHERE id=?`, len(files), scanID)
 
 	var mu sync.Mutex
 	seenSongs := map[int64]struct{}{}
@@ -193,12 +208,12 @@ func (s *ScannerService) StartScan(ctx context.Context) (int64, error) {
 	time.Sleep(100 * time.Millisecond)
 
 	if err := s.cleanup(ctx, seenSongs, seenAlbums, seenArtists); err != nil {
-		return 0, err
+		_, _ = s.db.ExecContext(ctx, `UPDATE scan_status SET status='failed' WHERE id=?`, scanID)
+		return
 	}
 
 	now := time.Now()
 	_, _ = s.db.ExecContext(ctx, `UPDATE scan_status SET status='completed', progress=?, completed_at=? WHERE id=?`, len(files), now, scanID)
-	return scanID, nil
 }
 
 func (s *ScannerService) ingestFile(ctx context.Context, path string, seenSongs map[int64]struct{}, seenAlbums map[int64]struct{}, seenArtists map[int64]struct{}) error {
@@ -349,12 +364,14 @@ func (s *ScannerService) cleanup(ctx context.Context, songs map[int64]struct{}, 
 
 func (s *ScannerService) Status(ctx context.Context) (ScanStatus, error) {
 	var st ScanStatus
+	var currentFile sql.NullString
 	err := s.db.QueryRowContext(ctx, `
 		SELECT status, progress, started_at, completed_at, total, current_file FROM scan_status ORDER BY id DESC LIMIT 1
-	`).Scan(&st.Status, &st.Progress, &st.StartedAt, &st.CompletedAt, &st.Total, &st.CurrentFile)
+	`).Scan(&st.Status, &st.Progress, &st.StartedAt, &st.CompletedAt, &st.Total, &currentFile)
 	if err != nil {
 		return st, err
 	}
+	st.CurrentFile = currentFile.String
 	return st, nil
 }
 
