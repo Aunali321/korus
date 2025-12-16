@@ -1,0 +1,31 @@
+.git
+.gitignore
+*.md
+!README.md
+.env
+.env.*
+*.db
+*.db-*
+
+# Frontend
+web/node_modules
+web/.svelte-kit
+web/dist
+
+# Go
+*.exe
+*.test
+
+# IDE
+.idea
+.vscode
+*.swp
+
+# Docker
+Dockerfile
+docker-compose.yml
+.dockerignore
+
+# Misc
+.oc
+docs/screenshots

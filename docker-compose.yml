@@ -1,0 +1,27 @@
+services:
+  korus:
+    build: .
+    container_name: korus
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    volumes:
+      - korus_data:/data
+      - /path/to/your/music:/media:ro
+    environment:
+      - ADDR=:8080
+      - DB_PATH=/data/korus.db
+      - MEDIA_ROOT=/media
+      - JWT_SECRET=changeme-use-a-secure-random-string
+      - TOKEN_TTL=24h
+      - REFRESH_TTL=720h
+      - ADMIN_USER=admin
+      - ADMIN_PASSWORD=changeme
+      - ADMIN_EMAIL=admin@example.com
+      - SCAN_WATCH=true
+      - SCAN_EMBEDDED_COVER=true
+      - ENABLE_MUSICBRAINZ=false
+      - ENABLE_LISTENBRAINZ=false
+
+volumes:
+  korus_data:
