@@ -1,4 +1,5 @@
 <script lang="ts">
+    import { VList } from "virtua/svelte";
     import { Shuffle } from "lucide-svelte";
     import { auth } from "$lib/stores/auth.svelte";
     import { library } from "$lib/stores/library.svelte";
@@ -43,11 +44,11 @@
     </div>
 
     {#if library.songs.length > 0}
-        <div class="space-y-1">
-            {#each library.songs as song, i (song.id)}
-                <TrackRow {song} index={i} songs={library.songs} />
-            {/each}
-        </div>
+        <VList data={library.songs} style="height: calc(100vh - 220px);" getKey={(song) => song.id}>
+            {#snippet children(song, index)}
+                <TrackRow {song} {index} songs={library.songs} />
+            {/snippet}
+        </VList>
     {:else if loading}
         <div class="flex justify-center py-12">
             <div class="text-zinc-500">Loading...</div>
