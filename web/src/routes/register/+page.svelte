@@ -2,6 +2,8 @@
     import { goto } from "$app/navigation";
     import { auth } from "$lib/stores/auth.svelte";
     import { toast } from "$lib/stores/toast.svelte";
+    import { setApiUrl } from "$lib/api";
+    import { ChevronDown, Server } from "lucide-svelte";
 
     let username = $state("");
     let email = $state("");
@@ -9,6 +11,20 @@
     let confirmPassword = $state("");
     let loading = $state(false);
     let error = $state("");
+    let showServerConfig = $state(false);
+    let apiUrl = $state("");
+
+    $effect(() => {
+        if (typeof localStorage !== "undefined") {
+            apiUrl = localStorage.getItem("korus_api_url") || "/api";
+        }
+    });
+
+    function saveApiUrl() {
+        if (!apiUrl.trim()) return;
+        setApiUrl(apiUrl);
+        toast.success("Server URL updated");
+    }
 
     async function handleSubmit(e: Event) {
         e.preventDefault();
@@ -144,6 +160,50 @@
                     >Sign in</a
                 >
             </p>
+
+            <div class="border-t border-zinc-800 pt-4">
+                <button
+                    type="button"
+                    onclick={() => (showServerConfig = !showServerConfig)}
+                    class="flex items-center gap-2 text-sm text-zinc-400 hover:text-zinc-300 w-full"
+                >
+                    <Server size={16} />
+                    <span>Server Configuration</span>
+                    <ChevronDown
+                        size={16}
+                        class="ml-auto transition-transform {showServerConfig ? 'rotate-180' : ''}"
+                    />
+                </button>
+
+                {#if showServerConfig}
+                    <div class="mt-3 space-y-2">
+                        <label
+                            for="apiUrl"
+                            class="block text-sm font-medium text-zinc-400"
+                            >API Base URL</label
+                        >
+                        <div class="flex gap-2">
+                            <input
+                                id="apiUrl"
+                                type="text"
+                                bind:value={apiUrl}
+                                class="flex-1 px-3 py-2 bg-zinc-800 border border-zinc-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm"
+                                placeholder="/api or https://your-server.com/api"
+                            />
+                            <button
+                                type="button"
+                                onclick={saveApiUrl}
+                                class="px-3 py-2 bg-zinc-700 hover:bg-zinc-600 text-sm rounded-lg"
+                            >
+                                Save
+                            </button>
+                        </div>
+                        <p class="text-xs text-zinc-500">
+                            Default: /api. Change if connecting to a different server.
+                        </p>
+                    </div>
+                {/if}
+            </div>
         </form>
     </div>
 </div>
