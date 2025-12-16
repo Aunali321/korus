@@ -47,7 +47,7 @@ func (h *Handler) getSongMetadata(c echo.Context, id int64) (*songMetadata, erro
 	var durationMs, sampleRate, bitDepth, channels sql.NullInt64
 
 	err := h.db.QueryRowContext(ctx, `
-		SELECT file_path, duration_ms, sample_rate, bit_depth, channels 
+		SELECT file_path, duration_ms, sample_rate, bit_depth, channels
 		FROM songs WHERE id = ?
 	`, id).Scan(&meta.Path, &durationMs, &sampleRate, &bitDepth, &channels)
 
@@ -263,9 +263,14 @@ func (h *Handler) Artwork(c echo.Context) error {
 	if err != nil || cover == "" {
 		return echo.NewHTTPError(http.StatusNotFound, map[string]string{"error": "artwork not found", "code": "NOT_FOUND"})
 	}
-	if _, err := os.Stat(cover); err != nil {
+	info, err := os.Stat(cover)
+	if err != nil {
 		return echo.NewHTTPError(http.StatusNotFound, map[string]string{"error": "artwork not found", "code": "NOT_FOUND"})
 	}
+
+	c.Response().Header().Set("Cache-Control", "public, max-age=31536000, immutable")
+	c.Response().Header().Set("Last-Modified", info.ModTime().UTC().Format(http.TimeFormat))
+
 	return c.File(cover)
 }
 
