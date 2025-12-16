@@ -46,57 +46,53 @@
     }
 </script>
 
-<div class="min-h-screen flex items-center justify-center p-4">
-    <div class="w-full max-w-md">
-        <div class="text-center mb-8">
-            <h1
-                class="text-4xl font-bold bg-gradient-to-r from-emerald-400 to-cyan-400 bg-clip-text text-transparent"
-            >
+<div class="min-h-screen flex items-center justify-center p-6 bg-grid">
+    <div class="w-full max-w-sm">
+        <div class="text-center mb-10">
+            <h1 class="text-5xl font-bold text-emerald-400 tracking-tight">
                 Korus
             </h1>
-            <p class="text-zinc-500 mt-2">Self-hosted Music</p>
+            <p class="text-zinc-500 mt-3 text-sm tracking-wide">Self-hosted Music</p>
         </div>
 
         <form
             onsubmit={handleSubmit}
-            class="bg-zinc-900 border border-zinc-800 rounded-xl p-6 space-y-4"
+            class="bg-zinc-900 border border-zinc-800 rounded-lg p-8 space-y-6"
         >
-            <h2 class="text-xl font-semibold text-center mb-4">Sign In</h2>
-
             {#if error}
                 <div
-                    class="bg-red-500/10 border border-red-500/50 text-red-400 px-4 py-2 rounded-lg text-sm"
+                    class="bg-red-500/10 border border-red-500/50 text-red-400 px-4 py-3 rounded text-sm"
                 >
                     {error}
                 </div>
             {/if}
 
-            <div>
+            <div class="space-y-2">
                 <label
                     for="username"
-                    class="block text-sm font-medium text-zinc-400 mb-1"
+                    class="block text-sm font-medium text-zinc-300"
                     >Username</label
                 >
                 <input
                     id="username"
                     type="text"
                     bind:value={username}
-                    class="w-full px-4 py-2 bg-zinc-800 border border-zinc-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
+                    class="w-full px-4 py-3 bg-zinc-800 border border-zinc-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
                     placeholder="Enter your username"
                 />
             </div>
 
-            <div>
+            <div class="space-y-2">
                 <label
                     for="password"
-                    class="block text-sm font-medium text-zinc-400 mb-1"
+                    class="block text-sm font-medium text-zinc-300"
                     >Password</label
                 >
                 <input
                     id="password"
                     type="password"
                     bind:value={password}
-                    class="w-full px-4 py-2 bg-zinc-800 border border-zinc-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
+                    class="w-full px-4 py-3 bg-zinc-800 border border-zinc-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
                     placeholder="Enter your password"
                 />
             </div>
@@ -104,19 +100,19 @@
             <button
                 type="submit"
                 disabled={loading}
-                class="w-full py-3 bg-emerald-500 hover:bg-emerald-600 disabled:opacity-50 disabled:cursor-not-allowed text-black font-semibold rounded-lg transition-colors"
+                class="w-full py-3 bg-emerald-500 hover:bg-emerald-600 disabled:opacity-50 disabled:cursor-not-allowed text-black font-semibold rounded-lg transition-colors mt-2"
             >
                 {loading ? "Signing in..." : "Sign In"}
             </button>
 
-            <p class="text-center text-sm text-zinc-500">
+            <p class="text-center text-sm text-zinc-500 pt-2">
                 Don't have an account?
                 <a href="/register" class="text-emerald-400 hover:underline"
                     >Sign up</a
                 >
             </p>
 
-            <div class="border-t border-zinc-800 pt-4">
+            <div class="border-t border-zinc-800 pt-6 mt-6">
                 <button
                     type="button"
                     onclick={() => (showServerConfig = !showServerConfig)}

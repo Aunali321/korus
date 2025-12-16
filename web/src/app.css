@@ -1,4 +1,5 @@
 @import 'tailwindcss';
+@plugin '@tailwindcss/forms';
 
 @theme {
 	--color-brand-primary: #10b981;
@@ -9,8 +10,69 @@
 
 body {
 	font-family: var(--font-family-sans);
-	background-color: #000;
+	background-color: #09090b;
 	color: #fafafa;
+}
+
+.bg-grid {
+	background-image: 
+		linear-gradient(to right, #18181b 1px, transparent 1px),
+		linear-gradient(to bottom, #18181b 1px, transparent 1px);
+	background-size: 48px 48px;
+}
+
+input[type='text'],
+input[type='password'],
+input[type='email'],
+input[type='url'],
+input[type='number'],
+input[type='search'],
+textarea,
+select {
+	background-color: #27272a;
+	border-color: #3f3f46;
+	color: #fafafa;
+}
+
+input[type='text']:focus,
+input[type='password']:focus,
+input[type='email']:focus,
+input[type='url']:focus,
+input[type='number']:focus,
+input[type='search']:focus,
+textarea:focus,
+select:focus {
+	border-color: #10b981;
+	--tw-ring-color: #10b981;
+}
+
+input[type='text']::placeholder,
+input[type='password']::placeholder,
+input[type='email']::placeholder,
+input[type='url']::placeholder,
+input[type='number']::placeholder,
+input[type='search']::placeholder,
+textarea::placeholder {
+	color: #71717a;
+}
+
+input[type='checkbox'],
+input[type='radio'] {
+	background-color: #27272a;
+	border-color: #3f3f46;
+	color: #10b981;
+}
+
+input[type='checkbox']:checked,
+input[type='radio']:checked {
+	background-color: #10b981;
+	border-color: #10b981;
+}
+
+input[type='checkbox']:focus,
+input[type='radio']:focus {
+	--tw-ring-color: #10b981;
+	--tw-ring-offset-color: #000;
 }
 
 input[type='range'] {
