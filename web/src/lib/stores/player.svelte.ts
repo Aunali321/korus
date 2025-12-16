@@ -5,6 +5,7 @@ import { settings } from './settings.svelte';
 function createPlayerStore() {
     let currentSong = $state<Song | null>(null);
     let queue = $state<Song[]>([]);
+    let originalQueue: Song[] = []; // Store original order for unshuffle
     let queueIndex = $state(0);
     let isPlaying = $state(false);
     let volume = $state(0.7);
@@ -99,6 +100,16 @@ function createPlayerStore() {
         audio.load();
     }
 
+    function shuffleQueue(songs: Song[], currentIndex: number): { shuffled: Song[], newIndex: number } {
+        const current = songs[currentIndex];
+        const remaining = songs.filter((_, i) => i !== currentIndex);
+        for (let i = remaining.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [remaining[i], remaining[j]] = [remaining[j], remaining[i]];
+        }
+        return { shuffled: [current, ...remaining], newIndex: 0 };
+    }
+
     function play(song?: Song, songs?: Song[], index?: number) {
         initAudio();
         if (!audio) return;
@@ -110,8 +121,17 @@ function createPlayerStore() {
             currentSong = song;
             playStartTime = 0; // Reset for new song
             if (songs) {
-                queue = songs;
-                queueIndex = index ?? songs.findIndex((s) => s.id === song.id);
+                originalQueue = [...songs];
+                const startIndex = index ?? songs.findIndex((s) => s.id === song.id);
+                
+                if (shuffle) {
+                    const result = shuffleQueue(songs, startIndex);
+                    queue = result.shuffled;
+                    queueIndex = result.newIndex;
+                } else {
+                    queue = songs;
+                    queueIndex = startIndex;
+                }
             }
             loadSong(song);
         }
@@ -134,17 +154,12 @@ function createPlayerStore() {
         // Record history for current song before switching
         recordHistory();
 
-        let nextIndex: number;
-        if (shuffle) {
-            nextIndex = Math.floor(Math.random() * queue.length);
-        } else {
-            nextIndex = queueIndex + 1;
-            if (nextIndex >= queue.length) {
-                if (repeat === 'all') nextIndex = 0;
-                else {
-                    pause();
-                    return;
-                }
+        let nextIndex = queueIndex + 1;
+        if (nextIndex >= queue.length) {
+            if (repeat === 'all') nextIndex = 0;
+            else {
+                pause();
+                return;
             }
         }
 
@@ -190,6 +205,19 @@ function createPlayerStore() {
 
     function toggleShuffle() {
         shuffle = !shuffle;
+        if (queue.length === 0 || !currentSong) return;
+
+        if (shuffle) {
+            originalQueue = [...queue];
+            const result = shuffleQueue(queue, queueIndex);
+            queue = result.shuffled;
+            queueIndex = result.newIndex;
+        } else {
+            const current = currentSong;
+            queue = [...originalQueue];
+            queueIndex = queue.findIndex(s => s.id === current.id);
+            if (queueIndex < 0) queueIndex = 0;
+        }
     }
 
     function toggleRepeat() {
@@ -209,9 +237,19 @@ function createPlayerStore() {
 
     function playQueue(songs: Song[], startIndex = 0) {
         recordHistory();
-        queue = songs;
-        queueIndex = startIndex;
-        currentSong = songs[startIndex];
+        originalQueue = [...songs];
+        
+        if (shuffle) {
+            const result = shuffleQueue(songs, startIndex);
+            queue = result.shuffled;
+            queueIndex = result.newIndex;
+            currentSong = queue[queueIndex];
+        } else {
+            queue = songs;
+            queueIndex = startIndex;
+            currentSong = songs[startIndex];
+        }
+        
         playStartTime = 0;
         loadSong(currentSong);
         audio?.play().catch(console.error);
