@@ -1,6 +1,7 @@
 services:
   korus:
-    build: .
+    image: ghcr.io/aunali321/korus:latest
+    # build: .  # Uncomment to build locally instead
     container_name: korus
     restart: unless-stopped
     ports:
