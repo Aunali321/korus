@@ -158,7 +158,7 @@ export interface StreamingOptions {
     original_enabled: boolean;
 }
 
-export type StreamingPreset = 'original' | 'lossless' | 'high' | 'medium' | 'low' | 'custom';
+export type StreamingPreset = 'original' | 'lossless' | 'very_high' | 'high' | 'medium' | 'low' | 'custom';
 
 export interface StreamingQuality {
     preset: StreamingPreset;

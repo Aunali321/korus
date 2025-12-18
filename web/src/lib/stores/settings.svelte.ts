@@ -6,6 +6,7 @@ const STORAGE_KEY = 'korus_streaming_quality';
 const PRESETS: Record<Exclude<StreamingPreset, 'custom'>, { format: string; bitrate: number } | null> = {
     original: null,
     lossless: { format: 'wav', bitrate: 0 },
+    very_high: { format: 'opus', bitrate: 256 },
     high: { format: 'opus', bitrate: 192 },
     medium: { format: 'opus', bitrate: 128 },
     low: { format: 'opus', bitrate: 64 },

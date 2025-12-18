@@ -73,7 +73,7 @@ func (h *Handler) UpdateSettings(c echo.Context) error {
 		req.StreamingPreset = "original"
 	}
 
-	validPresets := map[string]bool{"original": true, "lossless": true, "high": true, "medium": true, "low": true, "custom": true}
+	validPresets := map[string]bool{"original": true, "lossless": true, "very_high": true, "high": true, "medium": true, "low": true, "custom": true}
 	if !validPresets[req.StreamingPreset] {
 		return echo.NewHTTPError(http.StatusBadRequest, map[string]string{"error": "invalid preset"})
 	}
@@ -81,6 +81,9 @@ func (h *Handler) UpdateSettings(c echo.Context) error {
 	var format any = nil
 	var bitrate any = nil
 	if req.StreamingPreset == "custom" || req.StreamingFormat != "" {
+		if _, err := h.transcoder.Validate(req.StreamingFormat, req.StreamingBitrate); err != nil {
+			return echo.NewHTTPError(http.StatusBadRequest, map[string]string{"error": err.Error()})
+		}
 		format = req.StreamingFormat
 		bitrate = req.StreamingBitrate
 	}

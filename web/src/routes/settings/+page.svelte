@@ -17,11 +17,12 @@
     let scanning = $state(false);
 
     const presets: { value: StreamingPreset; label: string; description: string }[] = [
-        { value: "original", label: "Original", description: "No transcoding, best for compatible formats" },
-        { value: "lossless", label: "Lossless", description: "WAV transcoding, for incompatible lossless sources" },
-        { value: "high", label: "High", description: "Opus 192 kbps" },
-        { value: "medium", label: "Medium", description: "Opus 128 kbps" },
-        { value: "low", label: "Low", description: "Opus 64 kbps" },
+        { value: "original", label: "Original", description: "No transcoding (~600 MB/hr for lossless)" },
+        { value: "lossless", label: "Lossless", description: "WAV transcoding (~635-950 MB/hr)" },
+        { value: "very_high", label: "Very High", description: "Opus 256 kbps (~115 MB/hr)" },
+        { value: "high", label: "High", description: "Opus 192 kbps (~86 MB/hr)" },
+        { value: "medium", label: "Medium", description: "Opus 128 kbps (~58 MB/hr)" },
+        { value: "low", label: "Low", description: "Opus 64 kbps (~29 MB/hr)" },
     ];
 
     $effect(() => {

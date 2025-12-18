@@ -28,11 +28,35 @@ type Transcoder struct {
 
 const wavHeaderSize = 44
 
+// pcmCodec returns the FFmpeg PCM codec for the given bit depth
+func pcmCodec(bitDepth int) string {
+	switch bitDepth {
+	case 24:
+		return "pcm_s24le"
+	case 32:
+		return "pcm_s32le"
+	default:
+		return "pcm_s16le"
+	}
+}
+
+// rawPCMFormat returns the FFmpeg raw format for the given bit depth (no header)
+func rawPCMFormat(bitDepth int) string {
+	switch bitDepth {
+	case 24:
+		return "s24le"
+	case 32:
+		return "s32le"
+	default:
+		return "s16le"
+	}
+}
+
 var (
 	allowedFormats = map[string][]int{
 		"mp3":  {128, 192, 256, 320},
 		"aac":  {128, 192, 256},
-		"opus": {64, 96, 128, 192},
+		"opus": {64, 96, 128, 192, 256},
 		"wav":  {0}, // 0 means lossless, no bitrate selection
 	}
 	contentTypes = map[string]string{
@@ -113,13 +137,13 @@ func (t *Transcoder) WAVSeekArgs(req TranscodeRequest, byteOffset int64) ([]stri
 	timeOffsetSec := float64(audioByteOffset) / float64(bytesPerSec)
 
 	return []string{
-		"-i", req.Path,
 		"-ss", fmt.Sprintf("%.3f", timeOffsetSec),
+		"-i", req.Path,
 		"-vn",
-		"-c:a", "pcm_s16le",
+		"-c:a", pcmCodec(req.BitDepth),
 		"-ar", fmt.Sprintf("%d", req.SampleRate),
 		"-ac", fmt.Sprintf("%d", req.Channels),
-		"-f", "wav",
+		"-f", rawPCMFormat(req.BitDepth),
 		"-",
 	}, nil
 }
@@ -130,15 +154,14 @@ func (t *Transcoder) Args(req TranscodeRequest) ([]string, error) {
 	}
 	switch req.Format {
 	case "wav":
-		// Preserve source sample rate and channels, output as PCM
-		args := []string{"-i", req.Path, "-vn", "-c:a", "pcm_s16le", "-f", "wav", "-"}
+		codec := pcmCodec(req.BitDepth)
 		if req.SampleRate > 0 {
-			args = []string{"-i", req.Path, "-vn", "-c:a", "pcm_s16le",
+			return []string{"-i", req.Path, "-vn", "-c:a", codec,
 				"-ar", fmt.Sprintf("%d", req.SampleRate),
 				"-ac", fmt.Sprintf("%d", req.Channels),
-				"-f", "wav", "-"}
+				"-f", "wav", "-"}, nil
 		}
-		return args, nil
+		return []string{"-i", req.Path, "-vn", "-c:a", codec, "-f", "wav", "-"}, nil
 	case "mp3":
 		br := req.Bitrate
 		if br == 0 {
