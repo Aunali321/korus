@@ -64,76 +64,95 @@ func (h *Handler) Wrapped(c echo.Context) error {
 	startStr := start.Format(time.RFC3339)
 	endStr := end.Format(time.RFC3339)
 
-	// Get top song with artist info
-	var topSong interface{}
-	var songID int64
-	var songTitle, artistName string
-	var artistID int64
-	err := h.db.QueryRowContext(ctx, `
-		SELECT s.id, s.title, ar.id, ar.name
+	// Get top 5 songs with artist info
+	topSongs := []map[string]any{}
+	songRows, err := h.db.QueryContext(ctx, `
+		SELECT s.id, s.title, ar.id, ar.name, COUNT(*) as plays
 		FROM play_history ph
 		JOIN songs s ON s.id = ph.song_id
 		JOIN albums al ON al.id = s.album_id
 		JOIN artists ar ON ar.id = al.artist_id
 		WHERE ph.user_id = ? AND ph.played_at BETWEEN ? AND ?
 		GROUP BY s.id
-		ORDER BY COUNT(*) DESC
-		LIMIT 1
-	`, user.ID, startStr, endStr).Scan(&songID, &songTitle, &artistID, &artistName)
+		ORDER BY plays DESC
+		LIMIT 5
+	`, user.ID, startStr, endStr)
 	if err == nil {
-		topSong = map[string]interface{}{
-			"id":    songID,
-			"title": songTitle,
-			"artist": map[string]interface{}{
-				"id":   artistID,
-				"name": artistName,
-			},
+		defer songRows.Close()
+		for songRows.Next() {
+			var songID, artistID, plays int64
+			var songTitle, artistName string
+			if songRows.Scan(&songID, &songTitle, &artistID, &artistName, &plays) == nil {
+				topSongs = append(topSongs, map[string]any{
+					"id":    songID,
+					"title": songTitle,
+					"artist": map[string]any{
+						"id":   artistID,
+						"name": artistName,
+					},
+					"plays": plays,
+				})
+			}
 		}
 	}
 
-	// Get top artist
-	var topArtist interface{}
-	err = h.db.QueryRowContext(ctx, `
-		SELECT ar.id, ar.name
+	// Get top 5 artists
+	topArtists := []map[string]any{}
+	artistRows, err := h.db.QueryContext(ctx, `
+		SELECT ar.id, ar.name, COUNT(*) as plays
 		FROM play_history ph
 		JOIN songs s ON s.id = ph.song_id
 		JOIN albums al ON al.id = s.album_id
 		JOIN artists ar ON ar.id = al.artist_id
 		WHERE ph.user_id = ? AND ph.played_at BETWEEN ? AND ?
 		GROUP BY ar.id
-		ORDER BY COUNT(*) DESC
-		LIMIT 1
-	`, user.ID, startStr, endStr).Scan(&artistID, &artistName)
+		ORDER BY plays DESC
+		LIMIT 5
+	`, user.ID, startStr, endStr)
 	if err == nil {
-		topArtist = map[string]interface{}{
-			"id":   artistID,
-			"name": artistName,
+		defer artistRows.Close()
+		for artistRows.Next() {
+			var artistID, plays int64
+			var artistName string
+			if artistRows.Scan(&artistID, &artistName, &plays) == nil {
+				topArtists = append(topArtists, map[string]any{
+					"id":    artistID,
+					"name":  artistName,
+					"plays": plays,
+				})
+			}
 		}
 	}
 
-	// Get top album with artist info
-	var topAlbum interface{}
-	var albumID int64
-	var albumTitle string
-	err = h.db.QueryRowContext(ctx, `
-		SELECT al.id, al.title, ar.id, ar.name
+	// Get top 5 albums with artist info
+	topAlbums := []map[string]any{}
+	albumRows, err := h.db.QueryContext(ctx, `
+		SELECT al.id, al.title, ar.id, ar.name, COUNT(*) as plays
 		FROM play_history ph
 		JOIN songs s ON s.id = ph.song_id
 		JOIN albums al ON al.id = s.album_id
 		JOIN artists ar ON ar.id = al.artist_id
 		WHERE ph.user_id = ? AND ph.played_at BETWEEN ? AND ?
 		GROUP BY al.id
-		ORDER BY COUNT(*) DESC
-		LIMIT 1
-	`, user.ID, startStr, endStr).Scan(&albumID, &albumTitle, &artistID, &artistName)
+		ORDER BY plays DESC
+		LIMIT 5
+	`, user.ID, startStr, endStr)
 	if err == nil {
-		topAlbum = map[string]interface{}{
-			"id":    albumID,
-			"title": albumTitle,
-			"artist": map[string]interface{}{
-				"id":   artistID,
-				"name": artistName,
-			},
+		defer albumRows.Close()
+		for albumRows.Next() {
+			var albumID, artistID, plays int64
+			var albumTitle, artistName string
+			if albumRows.Scan(&albumID, &albumTitle, &artistID, &artistName, &plays) == nil {
+				topAlbums = append(topAlbums, map[string]any{
+					"id":    albumID,
+					"title": albumTitle,
+					"artist": map[string]any{
+						"id":   artistID,
+						"name": artistName,
+					},
+					"plays": plays,
+				})
+			}
 		}
 	}
 
@@ -155,11 +174,11 @@ func (h *Handler) Wrapped(c echo.Context) error {
 		avgPlaysPerDay = float64(totalPlays) / float64(daysListened)
 	}
 
-	return c.JSON(http.StatusOK, map[string]interface{}{
+	return c.JSON(http.StatusOK, map[string]any{
 		"period":            c.QueryParam("period"),
-		"top_song":          topSong,
-		"top_artist":        topArtist,
-		"top_album":         topAlbum,
+		"top_songs":         topSongs,
+		"top_artists":       topArtists,
+		"top_albums":        topAlbums,
 		"total_minutes":     totalMinutes,
 		"total_plays":       totalPlays,
 		"days_listened":     daysListened,

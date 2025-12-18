@@ -82,11 +82,31 @@ export interface Stats {
     listening_by_day?: Record<string, number>;
 }
 
+export interface WrappedSong {
+    id: number;
+    title: string;
+    artist?: { id: number; name: string };
+    plays: number;
+}
+
+export interface WrappedArtist {
+    id: number;
+    name: string;
+    plays: number;
+}
+
+export interface WrappedAlbum {
+    id: number;
+    title: string;
+    artist?: { id: number; name: string };
+    plays: number;
+}
+
 export interface WrappedData {
     period: string;
-    top_song?: Song;
-    top_artist?: Artist;
-    top_album?: Album;
+    top_songs: WrappedSong[];
+    top_artists: WrappedArtist[];
+    top_albums: WrappedAlbum[];
     total_minutes: number;
     total_plays: number;
     days_listened: number;
