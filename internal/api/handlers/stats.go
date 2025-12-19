@@ -16,7 +16,7 @@ import (
 // @Produce json
 // @Param period query string false "hour|today|week|month|year|all_time"
 // @Success 200 {object} map[string]interface{}
-// @Router /api/stats [get]
+// @Router /stats [get]
 func (h *Handler) Stats(c echo.Context) error {
 	user, _ := currentUser(c)
 	period := c.QueryParam("period")
@@ -54,7 +54,7 @@ func (h *Handler) Stats(c echo.Context) error {
 // @Produce json
 // @Param period query string false "year|all_time"
 // @Success 200 {object} map[string]interface{}
-// @Router /api/stats/wrapped [get]
+// @Router /stats/wrapped [get]
 func (h *Handler) Wrapped(c echo.Context) error {
 	user, _ := currentUser(c)
 	start, end := resolvePeriod(c.QueryParam("period"))
@@ -194,7 +194,7 @@ func (h *Handler) Wrapped(c echo.Context) error {
 // @Tags Stats
 // @Produce json
 // @Success 200 {object} map[string]interface{}
-// @Router /api/stats/insights [get]
+// @Router /stats/insights [get]
 func (h *Handler) Insights(c echo.Context) error {
 	user, _ := currentUser(c)
 	ctx := c.Request().Context()
@@ -212,7 +212,7 @@ func (h *Handler) Insights(c echo.Context) error {
 // @Tags Stats
 // @Produce json
 // @Success 200 {object} map[string]interface{}
-// @Router /api/home [get]
+// @Router /home [get]
 func (h *Handler) Home(c echo.Context) error {
 	user, _ := currentUser(c)
 	ctx := c.Request().Context()

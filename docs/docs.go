@@ -15,7 +15,7 @@ const docTemplate = `{
     "host": "{{.Host}}",
     "basePath": "{{.BasePath}}",
     "paths": {
-        "/api/admin/musicbrainz/enrich": {
+        "/admin/musicbrainz/enrich": {
             "post": {
                 "consumes": [
                     "application/json"
@@ -50,11 +50,20 @@ const docTemplate = `{
                                 "type": "string"
                             }
                         }
+                    },
+                    "503": {
+                        "description": "Service Unavailable",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
                     }
                 }
             }
         },
-        "/api/admin/sessions/cleanup": {
+        "/admin/sessions/cleanup": {
             "delete": {
                 "consumes": [
                     "application/json"
@@ -94,7 +103,7 @@ const docTemplate = `{
                 }
             }
         },
-        "/api/admin/system": {
+        "/admin/system": {
             "get": {
                 "produces": [
                     "application/json"
@@ -114,7 +123,7 @@ const docTemplate = `{
                 }
             }
         },
-        "/api/albums/{id}": {
+        "/albums/{id}": {
             "get": {
                 "produces": [
                     "application/json"
@@ -152,7 +161,7 @@ const docTemplate = `{
                 }
             }
         },
-        "/api/artists/{id}": {
+        "/artists/{id}": {
             "get": {
                 "produces": [
                     "application/json"
@@ -190,19 +199,29 @@ const docTemplate = `{
                 }
             }
         },
-        "/api/artwork/{id}": {
+        "/artwork/{id}": {
             "get": {
+                "produces": [
+                    "image/png",
+                    "image/jpeg"
+                ],
                 "tags": [
                     "Player"
                 ],
-                "summary": "Get artwork for song",
+                "summary": "Get artwork for song or album",
                 "parameters": [
                     {
                         "type": "integer",
-                        "description": "Song ID",
+                        "description": "Song or Album ID",
                         "name": "id",
                         "in": "path",
                         "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "album to get album artwork directly, otherwise song lookup",
+                        "name": "type",
+                        "in": "query"
                     }
                 ],
                 "responses": {
@@ -224,7 +243,7 @@ const docTemplate = `{
                 }
             }
         },
-        "/api/auth/login": {
+        "/auth/login": {
             "post": {
                 "consumes": [
                     "application/json"
@@ -243,7 +262,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/handlers.loginRequest"
+                            "$ref": "#/definitions/internal_api_handlers.loginRequest"
                         }
                     }
                 ],
@@ -267,7 +286,7 @@ const docTemplate = `{
                 }
             }
         },
-        "/api/auth/logout": {
+        "/auth/logout": {
             "post": {
                 "produces": [
                     "application/json"
@@ -298,7 +317,7 @@ const docTemplate = `{
                 }
             }
         },
-        "/api/auth/me": {
+        "/auth/me": {
             "get": {
                 "produces": [
                     "application/json"
@@ -327,7 +346,7 @@ const docTemplate = `{
                 }
             }
         },
-        "/api/auth/refresh": {
+        "/auth/refresh": {
             "post": {
                 "consumes": [
                     "application/json"
@@ -373,7 +392,7 @@ const docTemplate = `{
                 }
             }
         },
-        "/api/auth/register": {
+        "/auth/register": {
             "post": {
                 "consumes": [
                     "application/json"
@@ -392,7 +411,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/handlers.registerRequest"
+                            "$ref": "#/definitions/internal_api_handlers.registerRequest"
                         }
                     }
                 ],
@@ -416,7 +435,7 @@ const docTemplate = `{
                 }
             }
         },
-        "/api/favorites": {
+        "/favorites": {
             "get": {
                 "produces": [
                     "application/json"
@@ -436,8 +455,11 @@ const docTemplate = `{
                 }
             }
         },
-        "/api/favorites/albums/{id}": {
+        "/favorites/albums/{id}": {
             "post": {
+                "produces": [
+                    "application/json"
+                ],
                 "tags": [
                     "Favorites"
                 ],
@@ -460,10 +482,22 @@ const docTemplate = `{
                                 "type": "boolean"
                             }
                         }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
                     }
                 }
             },
             "delete": {
+                "produces": [
+                    "application/json"
+                ],
                 "tags": [
                     "Favorites"
                 ],
@@ -490,8 +524,11 @@ const docTemplate = `{
                 }
             }
         },
-        "/api/favorites/songs/{id}": {
+        "/favorites/songs/{id}": {
             "post": {
+                "produces": [
+                    "application/json"
+                ],
                 "tags": [
                     "Favorites"
                 ],
@@ -514,10 +551,22 @@ const docTemplate = `{
                                 "type": "boolean"
                             }
                         }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
                     }
                 }
             },
             "delete": {
+                "produces": [
+                    "application/json"
+                ],
                 "tags": [
                     "Favorites"
                 ],
@@ -544,8 +593,11 @@ const docTemplate = `{
                 }
             }
         },
-        "/api/follows/artists/{id}": {
+        "/follows/artists/{id}": {
             "post": {
+                "produces": [
+                    "application/json"
+                ],
                 "tags": [
                     "Favorites"
                 ],
@@ -568,10 +620,22 @@ const docTemplate = `{
                                 "type": "boolean"
                             }
                         }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
                     }
                 }
             },
             "delete": {
+                "produces": [
+                    "application/json"
+                ],
                 "tags": [
                     "Favorites"
                 ],
@@ -598,7 +662,7 @@ const docTemplate = `{
                 }
             }
         },
-        "/api/health": {
+        "/health": {
             "get": {
                 "produces": [
                     "application/json"
@@ -618,7 +682,7 @@ const docTemplate = `{
                 }
             }
         },
-        "/api/history": {
+        "/history": {
             "get": {
                 "produces": [
                     "application/json"
@@ -672,7 +736,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/handlers.historyRequest"
+                            "$ref": "#/definitions/internal_api_handlers.historyRequest"
                         }
                     }
                 ],
@@ -689,7 +753,7 @@ const docTemplate = `{
                 }
             }
         },
-        "/api/home": {
+        "/home": {
             "get": {
                 "produces": [
                     "application/json"
@@ -709,7 +773,7 @@ const docTemplate = `{
                 }
             }
         },
-        "/api/library": {
+        "/library": {
             "get": {
                 "produces": [
                     "application/json"
@@ -737,7 +801,7 @@ const docTemplate = `{
                 }
             }
         },
-        "/api/lyrics/{id}": {
+        "/lyrics/{id}": {
             "get": {
                 "produces": [
                     "application/json"
@@ -775,7 +839,7 @@ const docTemplate = `{
                 }
             }
         },
-        "/api/musicbrainz/recommendations": {
+        "/musicbrainz/recommendations": {
             "get": {
                 "produces": [
                     "application/json"
@@ -795,7 +859,7 @@ const docTemplate = `{
                 }
             }
         },
-        "/api/musicbrainz/submit-listen": {
+        "/musicbrainz/submit-listen": {
             "post": {
                 "consumes": [
                     "application/json"
@@ -831,11 +895,29 @@ const docTemplate = `{
                                 "type": "boolean"
                             }
                         }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "503": {
+                        "description": "Service Unavailable",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
                     }
                 }
             }
         },
-        "/api/playlists": {
+        "/playlists": {
             "get": {
                 "produces": [
                     "application/json"
@@ -889,7 +971,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/handlers.playlistRequest"
+                            "$ref": "#/definitions/internal_api_handlers.playlistRequest"
                         }
                     }
                 ],
@@ -904,7 +986,7 @@ const docTemplate = `{
                 }
             }
         },
-        "/api/playlists/{id}": {
+        "/playlists/{id}": {
             "get": {
                 "produces": [
                     "application/json"
@@ -928,6 +1010,15 @@ const docTemplate = `{
                         "schema": {
                             "type": "object",
                             "additionalProperties": true
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
                         }
                     },
                     "404": {
@@ -966,7 +1057,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/handlers.playlistRequest"
+                            "$ref": "#/definitions/internal_api_handlers.playlistRequest"
                         }
                     }
                 ],
@@ -976,6 +1067,15 @@ const docTemplate = `{
                         "schema": {
                             "type": "object",
                             "additionalProperties": true
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
                         }
                     },
                     "404": {
@@ -990,6 +1090,9 @@ const docTemplate = `{
                 }
             },
             "delete": {
+                "produces": [
+                    "application/json"
+                ],
                 "tags": [
                     "Playlists"
                 ],
@@ -1013,6 +1116,15 @@ const docTemplate = `{
                             }
                         }
                     },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
                     "404": {
                         "description": "Not Found",
                         "schema": {
@@ -1025,7 +1137,7 @@ const docTemplate = `{
                 }
             }
         },
-        "/api/playlists/{id}/reorder": {
+        "/playlists/{id}/reorder": {
             "put": {
                 "consumes": [
                     "application/json"
@@ -1071,11 +1183,29 @@ const docTemplate = `{
                                 "type": "boolean"
                             }
                         }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
                     }
                 }
             }
         },
-        "/api/playlists/{id}/songs": {
+        "/playlists/{id}/songs": {
             "post": {
                 "consumes": [
                     "application/json"
@@ -1118,6 +1248,15 @@ const docTemplate = `{
                             }
                         }
                     },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
                     "404": {
                         "description": "Not Found",
                         "schema": {
@@ -1130,8 +1269,11 @@ const docTemplate = `{
                 }
             }
         },
-        "/api/playlists/{id}/songs/{song_id}": {
+        "/playlists/{id}/songs/{song_id}": {
             "delete": {
+                "produces": [
+                    "application/json"
+                ],
                 "tags": [
                     "Playlists"
                 ],
@@ -1162,6 +1304,15 @@ const docTemplate = `{
                             }
                         }
                     },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
                     "404": {
                         "description": "Not Found",
                         "schema": {
@@ -1174,7 +1325,7 @@ const docTemplate = `{
                 }
             }
         },
-        "/api/scan": {
+        "/scan": {
             "post": {
                 "produces": [
                     "application/json"
@@ -1190,11 +1341,20 @@ const docTemplate = `{
                             "type": "object",
                             "additionalProperties": true
                         }
+                    },
+                    "409": {
+                        "description": "Conflict",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
                     }
                 }
             }
         },
-        "/api/scan/status": {
+        "/scan/status": {
             "get": {
                 "produces": [
                     "application/json"
@@ -1214,7 +1374,7 @@ const docTemplate = `{
                 }
             }
         },
-        "/api/search": {
+        "/search": {
             "get": {
                 "produces": [
                     "application/json"
@@ -1255,7 +1415,7 @@ const docTemplate = `{
                 }
             }
         },
-        "/api/settings": {
+        "/settings": {
             "get": {
                 "produces": [
                     "application/json"
@@ -1268,7 +1428,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/handlers.UserSettings"
+                            "$ref": "#/definitions/internal_api_handlers.UserSettings"
                         }
                     }
                 }
@@ -1291,7 +1451,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/handlers.UserSettings"
+                            "$ref": "#/definitions/internal_api_handlers.UserSettings"
                         }
                     }
                 ],
@@ -1299,13 +1459,13 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/handlers.UserSettings"
+                            "$ref": "#/definitions/internal_api_handlers.UserSettings"
                         }
                     }
                 }
             }
         },
-        "/api/songs/{id}": {
+        "/songs/{id}": {
             "get": {
                 "produces": [
                     "application/json"
@@ -1327,7 +1487,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/models.Song"
+                            "$ref": "#/definitions/github_com_Aunali321_korus_internal_models.Song"
                         }
                     },
                     "404": {
@@ -1342,7 +1502,7 @@ const docTemplate = `{
                 }
             }
         },
-        "/api/stats": {
+        "/stats": {
             "get": {
                 "produces": [
                     "application/json"
@@ -1370,7 +1530,7 @@ const docTemplate = `{
                 }
             }
         },
-        "/api/stats/insights": {
+        "/stats/insights": {
             "get": {
                 "produces": [
                     "application/json"
@@ -1390,7 +1550,7 @@ const docTemplate = `{
                 }
             }
         },
-        "/api/stats/wrapped": {
+        "/stats/wrapped": {
             "get": {
                 "produces": [
                     "application/json"
@@ -1418,8 +1578,11 @@ const docTemplate = `{
                 }
             }
         },
-        "/api/stream/{id}": {
+        "/stream/{id}": {
             "get": {
+                "produces": [
+                    "application/octet-stream"
+                ],
                 "tags": [
                     "Player"
                 ],
@@ -1452,8 +1615,26 @@ const docTemplate = `{
                             "type": "file"
                         }
                     },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
                     "404": {
                         "description": "Not Found",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "503": {
+                        "description": "Service Unavailable",
                         "schema": {
                             "type": "object",
                             "additionalProperties": {
@@ -1464,7 +1645,7 @@ const docTemplate = `{
                 }
             }
         },
-        "/api/streaming/options": {
+        "/streaming/options": {
             "get": {
                 "produces": [
                     "application/json"
@@ -1486,101 +1667,11 @@ const docTemplate = `{
         }
     },
     "definitions": {
-        "handlers.UserSettings": {
-            "type": "object",
-            "properties": {
-                "streaming_bitrate": {
-                    "type": "integer"
-                },
-                "streaming_format": {
-                    "type": "string"
-                },
-                "streaming_preset": {
-                    "type": "string"
-                }
-            }
-        },
-        "handlers.historyRequest": {
-            "type": "object",
-            "required": [
-                "song_id"
-            ],
-            "properties": {
-                "completion_rate": {
-                    "type": "number"
-                },
-                "duration_listened": {
-                    "type": "integer"
-                },
-                "song_id": {
-                    "type": "integer"
-                },
-                "source": {
-                    "type": "string"
-                },
-                "timestamp": {
-                    "type": "integer"
-                }
-            }
-        },
-        "handlers.loginRequest": {
-            "type": "object",
-            "required": [
-                "password",
-                "username"
-            ],
-            "properties": {
-                "password": {
-                    "type": "string"
-                },
-                "username": {
-                    "type": "string"
-                }
-            }
-        },
-        "handlers.playlistRequest": {
-            "type": "object",
-            "required": [
-                "name"
-            ],
-            "properties": {
-                "description": {
-                    "type": "string"
-                },
-                "name": {
-                    "type": "string"
-                },
-                "public": {
-                    "type": "boolean"
-                }
-            }
-        },
-        "handlers.registerRequest": {
-            "type": "object",
-            "required": [
-                "email",
-                "password",
-                "username"
-            ],
-            "properties": {
-                "email": {
-                    "type": "string"
-                },
-                "password": {
-                    "type": "string",
-                    "minLength": 8
-                },
-                "username": {
-                    "type": "string",
-                    "minLength": 3
-                }
-            }
-        },
-        "models.Album": {
+        "github_com_Aunali321_korus_internal_models.Album": {
             "type": "object",
             "properties": {
                 "artist": {
-                    "$ref": "#/definitions/models.Artist"
+                    "$ref": "#/definitions/github_com_Aunali321_korus_internal_models.Artist"
                 },
                 "artist_id": {
                     "type": "integer"
@@ -1605,7 +1696,7 @@ const docTemplate = `{
                 }
             }
         },
-        "models.Artist": {
+        "github_com_Aunali321_korus_internal_models.Artist": {
             "type": "object",
             "properties": {
                 "bio": {
@@ -1628,17 +1719,17 @@ const docTemplate = `{
                 }
             }
         },
-        "models.Song": {
+        "github_com_Aunali321_korus_internal_models.Song": {
             "type": "object",
             "properties": {
                 "album": {
-                    "$ref": "#/definitions/models.Album"
+                    "$ref": "#/definitions/github_com_Aunali321_korus_internal_models.Album"
                 },
                 "album_id": {
                     "type": "integer"
                 },
                 "artist": {
-                    "$ref": "#/definitions/models.Artist"
+                    "$ref": "#/definitions/github_com_Aunali321_korus_internal_models.Artist"
                 },
                 "duration": {
                     "type": "integer"
@@ -1663,6 +1754,96 @@ const docTemplate = `{
                 },
                 "track_number": {
                     "type": "integer"
+                }
+            }
+        },
+        "internal_api_handlers.UserSettings": {
+            "type": "object",
+            "properties": {
+                "streaming_bitrate": {
+                    "type": "integer"
+                },
+                "streaming_format": {
+                    "type": "string"
+                },
+                "streaming_preset": {
+                    "type": "string"
+                }
+            }
+        },
+        "internal_api_handlers.historyRequest": {
+            "type": "object",
+            "required": [
+                "song_id"
+            ],
+            "properties": {
+                "completion_rate": {
+                    "type": "number"
+                },
+                "duration_listened": {
+                    "type": "integer"
+                },
+                "song_id": {
+                    "type": "integer"
+                },
+                "source": {
+                    "type": "string"
+                },
+                "timestamp": {
+                    "type": "integer"
+                }
+            }
+        },
+        "internal_api_handlers.loginRequest": {
+            "type": "object",
+            "required": [
+                "password",
+                "username"
+            ],
+            "properties": {
+                "password": {
+                    "type": "string"
+                },
+                "username": {
+                    "type": "string"
+                }
+            }
+        },
+        "internal_api_handlers.playlistRequest": {
+            "type": "object",
+            "required": [
+                "name"
+            ],
+            "properties": {
+                "description": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "public": {
+                    "type": "boolean"
+                }
+            }
+        },
+        "internal_api_handlers.registerRequest": {
+            "type": "object",
+            "required": [
+                "email",
+                "password",
+                "username"
+            ],
+            "properties": {
+                "email": {
+                    "type": "string"
+                },
+                "password": {
+                    "type": "string",
+                    "minLength": 8
+                },
+                "username": {
+                    "type": "string",
+                    "minLength": 3
                 }
             }
         }

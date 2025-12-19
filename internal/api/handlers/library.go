@@ -18,7 +18,7 @@ import (
 // @Produce json
 // @Param limit query int false "max items (default: all)"
 // @Success 200 {object} map[string]interface{}
-// @Router /api/library [get]
+// @Router /library [get]
 func (h *Handler) Library(c echo.Context) error {
 	ctx := c.Request().Context()
 	limit := parseOptionalLimit(c)
@@ -39,7 +39,7 @@ func (h *Handler) Library(c echo.Context) error {
 // @Param id path int true "Artist ID"
 // @Success 200 {object} map[string]interface{}
 // @Failure 404 {object} map[string]string
-// @Router /api/artists/{id} [get]
+// @Router /artists/{id} [get]
 func (h *Handler) Artist(c echo.Context) error {
 	ctx := c.Request().Context()
 	id, _ := strconv.ParseInt(c.Param("id"), 10, 64)
@@ -79,7 +79,7 @@ func (h *Handler) Artist(c echo.Context) error {
 // @Param id path int true "Album ID"
 // @Success 200 {object} map[string]interface{}
 // @Failure 404 {object} map[string]string
-// @Router /api/albums/{id} [get]
+// @Router /albums/{id} [get]
 func (h *Handler) Album(c echo.Context) error {
 	ctx := c.Request().Context()
 	id, _ := strconv.ParseInt(c.Param("id"), 10, 64)
@@ -120,7 +120,7 @@ func (h *Handler) Album(c echo.Context) error {
 // @Param id path int true "Song ID"
 // @Success 200 {object} models.Song
 // @Failure 404 {object} map[string]string
-// @Router /api/songs/{id} [get]
+// @Router /songs/{id} [get]
 func (h *Handler) Song(c echo.Context) error {
 	ctx := c.Request().Context()
 	id, _ := strconv.ParseInt(c.Param("id"), 10, 64)

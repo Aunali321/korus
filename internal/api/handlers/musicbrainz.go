@@ -14,7 +14,9 @@ import (
 // @Produce json
 // @Param body body map[string]int64 true "song_id"
 // @Success 200 {object} map[string]bool
-// @Router /api/musicbrainz/submit-listen [post]
+// @Failure 404 {object} map[string]string
+// @Failure 503 {object} map[string]string
+// @Router /musicbrainz/submit-listen [post]
 func (h *Handler) SubmitListen(c echo.Context) error {
 	if h.listenBrainz == nil {
 		return echo.NewHTTPError(http.StatusServiceUnavailable, map[string]string{"error": "listenbrainz disabled", "code": "LB_DISABLED"})
@@ -41,7 +43,7 @@ func (h *Handler) SubmitListen(c echo.Context) error {
 // @Tags MusicBrainz
 // @Produce json
 // @Success 200 {object} map[string]interface{}
-// @Router /api/musicbrainz/recommendations [get]
+// @Router /musicbrainz/recommendations [get]
 func (h *Handler) Recommendations(c echo.Context) error {
 	// Placeholder stub.
 	return c.JSON(http.StatusOK, map[string]interface{}{"songs": []interface{}{}})

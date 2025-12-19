@@ -14,9 +14,11 @@ import (
 // FavSong godoc
 // @Summary Favorite song
 // @Tags Favorites
+// @Produce json
 // @Param id path int true "Song ID"
 // @Success 200 {object} map[string]bool
-// @Router /api/favorites/songs/{id} [post]
+// @Failure 404 {object} map[string]string
+// @Router /favorites/songs/{id} [post]
 func (h *Handler) FavSong(c echo.Context) error {
 	user, _ := currentUser(c)
 	id, _ := strconv.ParseInt(c.Param("id"), 10, 64)
@@ -32,9 +34,10 @@ func (h *Handler) FavSong(c echo.Context) error {
 // UnfavSong godoc
 // @Summary Unfavorite song
 // @Tags Favorites
+// @Produce json
 // @Param id path int true "Song ID"
 // @Success 200 {object} map[string]bool
-// @Router /api/favorites/songs/{id} [delete]
+// @Router /favorites/songs/{id} [delete]
 func (h *Handler) UnfavSong(c echo.Context) error {
 	user, _ := currentUser(c)
 	id, _ := strconv.ParseInt(c.Param("id"), 10, 64)
@@ -47,9 +50,11 @@ func (h *Handler) UnfavSong(c echo.Context) error {
 // FavAlbum godoc
 // @Summary Favorite album
 // @Tags Favorites
+// @Produce json
 // @Param id path int true "Album ID"
 // @Success 200 {object} map[string]bool
-// @Router /api/favorites/albums/{id} [post]
+// @Failure 404 {object} map[string]string
+// @Router /favorites/albums/{id} [post]
 func (h *Handler) FavAlbum(c echo.Context) error {
 	user, _ := currentUser(c)
 	id, _ := strconv.ParseInt(c.Param("id"), 10, 64)
@@ -65,9 +70,10 @@ func (h *Handler) FavAlbum(c echo.Context) error {
 // UnfavAlbum godoc
 // @Summary Unfavorite album
 // @Tags Favorites
+// @Produce json
 // @Param id path int true "Album ID"
 // @Success 200 {object} map[string]bool
-// @Router /api/favorites/albums/{id} [delete]
+// @Router /favorites/albums/{id} [delete]
 func (h *Handler) UnfavAlbum(c echo.Context) error {
 	user, _ := currentUser(c)
 	id, _ := strconv.ParseInt(c.Param("id"), 10, 64)
@@ -80,9 +86,11 @@ func (h *Handler) UnfavAlbum(c echo.Context) error {
 // FollowArtist godoc
 // @Summary Follow artist
 // @Tags Favorites
+// @Produce json
 // @Param id path int true "Artist ID"
 // @Success 200 {object} map[string]bool
-// @Router /api/follows/artists/{id} [post]
+// @Failure 404 {object} map[string]string
+// @Router /follows/artists/{id} [post]
 func (h *Handler) FollowArtist(c echo.Context) error {
 	user, _ := currentUser(c)
 	id, _ := strconv.ParseInt(c.Param("id"), 10, 64)
@@ -98,9 +106,10 @@ func (h *Handler) FollowArtist(c echo.Context) error {
 // UnfollowArtist godoc
 // @Summary Unfollow artist
 // @Tags Favorites
+// @Produce json
 // @Param id path int true "Artist ID"
 // @Success 200 {object} map[string]bool
-// @Router /api/follows/artists/{id} [delete]
+// @Router /follows/artists/{id} [delete]
 func (h *Handler) UnfollowArtist(c echo.Context) error {
 	user, _ := currentUser(c)
 	id, _ := strconv.ParseInt(c.Param("id"), 10, 64)
@@ -115,7 +124,7 @@ func (h *Handler) UnfollowArtist(c echo.Context) error {
 // @Tags Favorites
 // @Produce json
 // @Success 200 {object} map[string]interface{}
-// @Router /api/favorites [get]
+// @Router /favorites [get]
 func (h *Handler) ListFavorites(c echo.Context) error {
 	user, _ := currentUser(c)
 	ctx := c.Request().Context()

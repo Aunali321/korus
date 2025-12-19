@@ -12,7 +12,7 @@ import (
 // @Tags Health
 // @Produce json
 // @Success 200 {object} map[string]interface{}
-// @Router /api/health [get]
+// @Router /health [get]
 func (h *Handler) Health(c echo.Context) error {
 	return c.JSON(http.StatusOK, map[string]interface{}{
 		"status":    "ok",

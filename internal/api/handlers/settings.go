@@ -20,7 +20,7 @@ type UserSettings struct {
 // @Tags Settings
 // @Produce json
 // @Success 200 {object} UserSettings
-// @Router /api/settings [get]
+// @Router /settings [get]
 func (h *Handler) GetSettings(c echo.Context) error {
 	user := c.Get("user").(models.User)
 	userID := user.ID
@@ -59,7 +59,7 @@ func (h *Handler) GetSettings(c echo.Context) error {
 // @Produce json
 // @Param settings body UserSettings true "Settings"
 // @Success 200 {object} UserSettings
-// @Router /api/settings [put]
+// @Router /settings [put]
 func (h *Handler) UpdateSettings(c echo.Context) error {
 	user := c.Get("user").(models.User)
 	userID := user.ID

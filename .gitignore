@@ -26,6 +26,7 @@ go.work.sum
 *.db
 *.db-shm
 *.db-wal
+*.db-journal
 *.sqlite
 *.sqlite3
 

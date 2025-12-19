@@ -28,7 +28,7 @@ type loginRequest struct {
 // @Param body body registerRequest true "registration"
 // @Success 200 {object} map[string]interface{}
 // @Failure 400 {object} map[string]string
-// @Router /api/auth/register [post]
+// @Router /auth/register [post]
 func (h *Handler) Register(c echo.Context) error {
 	var req registerRequest
 	if err := c.Bind(&req); err != nil {
@@ -52,7 +52,7 @@ func (h *Handler) Register(c echo.Context) error {
 // @Param body body loginRequest true "login"
 // @Success 200 {object} map[string]interface{}
 // @Failure 401 {object} map[string]string
-// @Router /api/auth/login [post]
+// @Router /auth/login [post]
 func (h *Handler) Login(c echo.Context) error {
 	var req loginRequest
 	if err := c.Bind(&req); err != nil {
@@ -74,7 +74,7 @@ func (h *Handler) Login(c echo.Context) error {
 // @Produce json
 // @Success 200 {object} map[string]bool
 // @Failure 401 {object} map[string]string
-// @Router /api/auth/logout [post]
+// @Router /auth/logout [post]
 func (h *Handler) Logout(c echo.Context) error {
 	token := bearerToken(c.Request().Header.Get("Authorization"))
 	if token == "" {
@@ -94,7 +94,7 @@ func (h *Handler) Logout(c echo.Context) error {
 // @Param body body map[string]string true "refresh token"
 // @Success 200 {object} map[string]interface{}
 // @Failure 401 {object} map[string]string
-// @Router /api/auth/refresh [post]
+// @Router /auth/refresh [post]
 func (h *Handler) Refresh(c echo.Context) error {
 	var payload struct {
 		RefreshToken string `json:"refresh_token" validate:"required"`
@@ -118,7 +118,7 @@ func (h *Handler) Refresh(c echo.Context) error {
 // @Produce json
 // @Success 200 {object} map[string]interface{}
 // @Failure 401 {object} map[string]string
-// @Router /api/auth/me [get]
+// @Router /auth/me [get]
 func (h *Handler) Me(c echo.Context) error {
 	user, err := currentUser(c)
 	if err != nil {

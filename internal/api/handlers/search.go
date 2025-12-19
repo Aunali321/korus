@@ -14,7 +14,7 @@ import (
 // @Param limit query int false "max items (default 25, max 200)"
 // @Param offset query int false "offset"
 // @Success 200 {object} map[string]interface{}
-// @Router /api/search [get]
+// @Router /search [get]
 func (h *Handler) Search(c echo.Context) error {
 	q := c.QueryParam("q")
 	limit, offset := parseLimitOffset(c, 25, 200)

@@ -20,7 +20,7 @@ import (
 // @Tags Player
 // @Produce json
 // @Success 200 {object} map[string]interface{}
-// @Router /api/streaming/options [get]
+// @Router /streaming/options [get]
 func (h *Handler) StreamingOptions(c echo.Context) error {
 	ffmpegAvailable := true
 	if _, err := exec.LookPath(h.transcoder.FFmpegPath); err != nil {
@@ -100,12 +100,15 @@ func parseRangeHeader(rangeHeader string, totalSize int64) (start int64, end int
 // Stream godoc
 // @Summary Stream or transcode song
 // @Tags Player
+// @Produce octet-stream
 // @Param id path int true "Song ID"
 // @Param format query string false "mp3|aac|opus|wav"
 // @Param bitrate query int false "bitrate kbps"
 // @Success 200 {file} binary
+// @Failure 400 {object} map[string]string
 // @Failure 404 {object} map[string]string
-// @Router /api/stream/{id} [get]
+// @Failure 503 {object} map[string]string
+// @Router /stream/{id} [get]
 func (h *Handler) Stream(c echo.Context) error {
 	id, _ := strconv.ParseInt(c.Param("id"), 10, 64)
 
@@ -236,12 +239,15 @@ func (h *Handler) streamTranscode(c echo.Context, path, format string, bitrate i
 }
 
 // Artwork godoc
-// @Summary Get artwork for song
+// @Summary Get artwork for song or album
 // @Tags Player
-// @Param id path int true "Song ID"
+// @Produce png
+// @Produce jpeg
+// @Param id path int true "Song or Album ID"
+// @Param type query string false "album to get album artwork directly, otherwise song lookup"
 // @Success 200 {file} binary
 // @Failure 404 {object} map[string]string
-// @Router /api/artwork/{id} [get]
+// @Router /artwork/{id} [get]
 func (h *Handler) Artwork(c echo.Context) error {
 	ctx := c.Request().Context()
 	id, _ := strconv.ParseInt(c.Param("id"), 10, 64)
@@ -281,7 +287,7 @@ func (h *Handler) Artwork(c echo.Context) error {
 // @Produce json
 // @Success 200 {object} map[string]interface{}
 // @Failure 404 {object} map[string]string
-// @Router /api/lyrics/{id} [get]
+// @Router /lyrics/{id} [get]
 func (h *Handler) Lyrics(c echo.Context) error {
 	ctx := c.Request().Context()
 	id, _ := strconv.ParseInt(c.Param("id"), 10, 64)

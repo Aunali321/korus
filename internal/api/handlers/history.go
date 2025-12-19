@@ -22,7 +22,7 @@ type historyRequest struct {
 // @Produce json
 // @Param body body historyRequest true "history"
 // @Success 200 {object} map[string]bool
-// @Router /api/history [post]
+// @Router /history [post]
 func (h *Handler) RecordHistory(c echo.Context) error {
 	user, _ := currentUser(c)
 	var req historyRequest
@@ -55,7 +55,7 @@ func (h *Handler) RecordHistory(c echo.Context) error {
 // @Param limit query int false "limit (default 50, max 200)"
 // @Param offset query int false "offset"
 // @Success 200 {array} map[string]interface{}
-// @Router /api/history [get]
+// @Router /history [get]
 func (h *Handler) ListHistory(c echo.Context) error {
 	user, _ := currentUser(c)
 	limit, offset := parseLimitOffset(c, 50, 200)

@@ -23,7 +23,7 @@ type playlistRequest struct {
 // @Param limit query int false "max items (default 50, max 200)"
 // @Param offset query int false "offset"
 // @Success 200 {array} map[string]interface{}
-// @Router /api/playlists [get]
+// @Router /playlists [get]
 func (h *Handler) ListPlaylists(c echo.Context) error {
 	user, _ := currentUser(c)
 	limit, offset := parseLimitOffset(c, 50, 200)
@@ -76,7 +76,7 @@ func (h *Handler) ListPlaylists(c echo.Context) error {
 // @Produce json
 // @Param body body playlistRequest true "playlist"
 // @Success 200 {object} map[string]interface{}
-// @Router /api/playlists [post]
+// @Router /playlists [post]
 func (h *Handler) CreatePlaylist(c echo.Context) error {
 	user, _ := currentUser(c)
 	var req playlistRequest
@@ -108,7 +108,8 @@ func (h *Handler) CreatePlaylist(c echo.Context) error {
 // @Param id path int true "Playlist ID"
 // @Success 200 {object} map[string]interface{}
 // @Failure 404 {object} map[string]string
-// @Router /api/playlists/{id} [get]
+// @Failure 403 {object} map[string]string
+// @Router /playlists/{id} [get]
 func (h *Handler) GetPlaylist(c echo.Context) error {
 	user, _ := currentUser(c)
 	id, _ := strconv.ParseInt(c.Param("id"), 10, 64)
@@ -144,7 +145,8 @@ func (h *Handler) GetPlaylist(c echo.Context) error {
 // @Param body body playlistRequest true "playlist"
 // @Success 200 {object} map[string]interface{}
 // @Failure 404 {object} map[string]string
-// @Router /api/playlists/{id} [put]
+// @Failure 403 {object} map[string]string
+// @Router /playlists/{id} [put]
 func (h *Handler) UpdatePlaylist(c echo.Context) error {
 	user, _ := currentUser(c)
 	id, _ := strconv.ParseInt(c.Param("id"), 10, 64)
@@ -179,10 +181,12 @@ func (h *Handler) UpdatePlaylist(c echo.Context) error {
 // DeletePlaylist godoc
 // @Summary Delete playlist
 // @Tags Playlists
+// @Produce json
 // @Param id path int true "Playlist ID"
 // @Success 200 {object} map[string]bool
 // @Failure 404 {object} map[string]string
-// @Router /api/playlists/{id} [delete]
+// @Failure 403 {object} map[string]string
+// @Router /playlists/{id} [delete]
 func (h *Handler) DeletePlaylist(c echo.Context) error {
 	user, _ := currentUser(c)
 	id, _ := strconv.ParseInt(c.Param("id"), 10, 64)
@@ -208,7 +212,8 @@ func (h *Handler) DeletePlaylist(c echo.Context) error {
 // @Param body body map[string]int true "song payload"
 // @Success 200 {object} map[string]bool
 // @Failure 404 {object} map[string]string
-// @Router /api/playlists/{id}/songs [post]
+// @Failure 403 {object} map[string]string
+// @Router /playlists/{id}/songs [post]
 func (h *Handler) AddPlaylistSong(c echo.Context) error {
 	user, _ := currentUser(c)
 	id, _ := strconv.ParseInt(c.Param("id"), 10, 64)
@@ -246,11 +251,13 @@ func (h *Handler) AddPlaylistSong(c echo.Context) error {
 // DeletePlaylistSong godoc
 // @Summary Remove song from playlist
 // @Tags Playlists
+// @Produce json
 // @Param id path int true "Playlist ID"
 // @Param song_id path int true "Song ID"
 // @Success 200 {object} map[string]bool
 // @Failure 404 {object} map[string]string
-// @Router /api/playlists/{id}/songs/{song_id} [delete]
+// @Failure 403 {object} map[string]string
+// @Router /playlists/{id}/songs/{song_id} [delete]
 func (h *Handler) DeletePlaylistSong(c echo.Context) error {
 	user, _ := currentUser(c)
 	id, _ := strconv.ParseInt(c.Param("id"), 10, 64)
@@ -276,7 +283,9 @@ func (h *Handler) DeletePlaylistSong(c echo.Context) error {
 // @Param id path int true "Playlist ID"
 // @Param body body map[string][]int64 true "song ids"
 // @Success 200 {object} map[string]bool
-// @Router /api/playlists/{id}/reorder [put]
+// @Failure 404 {object} map[string]string
+// @Failure 403 {object} map[string]string
+// @Router /playlists/{id}/reorder [put]
 func (h *Handler) ReorderPlaylistSongs(c echo.Context) error {
 	user, _ := currentUser(c)
 	id, _ := strconv.ParseInt(c.Param("id"), 10, 64)

@@ -14,7 +14,8 @@ import (
 // @Tags Library
 // @Produce json
 // @Success 200 {object} map[string]interface{}
-// @Router /api/scan [post]
+// @Failure 409 {object} map[string]string
+// @Router /scan [post]
 func (h *Handler) StartScan(c echo.Context) error {
 	scanID, err := h.scanner.StartScan(c.Request().Context())
 	if err != nil {
@@ -28,7 +29,7 @@ func (h *Handler) StartScan(c echo.Context) error {
 // @Tags Library
 // @Produce json
 // @Success 200 {object} map[string]interface{}
-// @Router /api/scan/status [get]
+// @Router /scan/status [get]
 func (h *Handler) ScanStatus(c echo.Context) error {
 	status, err := h.scanner.Status(c.Request().Context())
 	if err != nil {
@@ -42,7 +43,7 @@ func (h *Handler) ScanStatus(c echo.Context) error {
 // @Tags Admin
 // @Produce json
 // @Success 200 {object} map[string]interface{}
-// @Router /api/admin/system [get]
+// @Router /admin/system [get]
 func (h *Handler) SystemInfo(c echo.Context) error {
 	var users, songs, artists, albums int
 	_ = h.db.QueryRow(`SELECT COUNT(*) FROM users`).Scan(&users)
@@ -78,7 +79,7 @@ func (h *Handler) SystemInfo(c echo.Context) error {
 // @Produce json
 // @Param body body map[string]int true "older_than_days"
 // @Success 200 {object} map[string]int64
-// @Router /api/admin/sessions/cleanup [delete]
+// @Router /admin/sessions/cleanup [delete]
 func (h *Handler) CleanupSessions(c echo.Context) error {
 	var payload struct {
 		OlderThanDays int `json:"older_than_days" validate:"required"`
@@ -103,7 +104,8 @@ func (h *Handler) CleanupSessions(c echo.Context) error {
 // @Produce json
 // @Param body body map[string]string true "type/id"
 // @Success 200 {object} map[string]string
-// @Router /api/admin/musicbrainz/enrich [post]
+// @Failure 503 {object} map[string]string
+// @Router /admin/musicbrainz/enrich [post]
 func (h *Handler) Enrich(c echo.Context) error {
 	if h.musicBrainz == nil {
 		return echo.NewHTTPError(http.StatusServiceUnavailable, map[string]string{"error": "musicbrainz disabled", "code": "MB_DISABLED"})
