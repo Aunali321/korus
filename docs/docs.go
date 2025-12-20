@@ -262,7 +262,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/internal_api_handlers.loginRequest"
+                            "$ref": "#/definitions/handlers.loginRequest"
                         }
                     }
                 ],
@@ -411,7 +411,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/internal_api_handlers.registerRequest"
+                            "$ref": "#/definitions/handlers.registerRequest"
                         }
                     }
                 ],
@@ -736,7 +736,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/internal_api_handlers.historyRequest"
+                            "$ref": "#/definitions/handlers.historyRequest"
                         }
                     }
                 ],
@@ -917,6 +917,93 @@ const docTemplate = `{
                 }
             }
         },
+        "/player/state": {
+            "get": {
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Player"
+                ],
+                "summary": "Get player state",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.PlayerState"
+                        }
+                    }
+                }
+            },
+            "put": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Player"
+                ],
+                "summary": "Save player state",
+                "parameters": [
+                    {
+                        "description": "Player state",
+                        "name": "state",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handlers.PlayerState"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "boolean"
+                            }
+                        }
+                    }
+                }
+            },
+            "post": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Player"
+                ],
+                "summary": "Save player state",
+                "parameters": [
+                    {
+                        "description": "Player state",
+                        "name": "state",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handlers.PlayerState"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "boolean"
+                            }
+                        }
+                    }
+                }
+            }
+        },
         "/playlists": {
             "get": {
                 "produces": [
@@ -971,7 +1058,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/internal_api_handlers.playlistRequest"
+                            "$ref": "#/definitions/handlers.playlistRequest"
                         }
                     }
                 ],
@@ -1057,7 +1144,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/internal_api_handlers.playlistRequest"
+                            "$ref": "#/definitions/handlers.playlistRequest"
                         }
                     }
                 ],
@@ -1428,7 +1515,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/internal_api_handlers.UserSettings"
+                            "$ref": "#/definitions/handlers.UserSettings"
                         }
                     }
                 }
@@ -1451,7 +1538,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/internal_api_handlers.UserSettings"
+                            "$ref": "#/definitions/handlers.UserSettings"
                         }
                     }
                 ],
@@ -1459,7 +1546,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/internal_api_handlers.UserSettings"
+                            "$ref": "#/definitions/handlers.UserSettings"
                         }
                     }
                 }
@@ -1487,7 +1574,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/github_com_Aunali321_korus_internal_models.Song"
+                            "$ref": "#/definitions/models.Song"
                         }
                     },
                     "404": {
@@ -1667,11 +1754,118 @@ const docTemplate = `{
         }
     },
     "definitions": {
-        "github_com_Aunali321_korus_internal_models.Album": {
+        "handlers.PlayerState": {
+            "type": "object",
+            "properties": {
+                "current_song_id": {
+                    "type": "integer"
+                },
+                "progress": {
+                    "type": "number"
+                },
+                "queue": {
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
+                },
+                "queue_index": {
+                    "type": "integer"
+                }
+            }
+        },
+        "handlers.UserSettings": {
+            "type": "object",
+            "properties": {
+                "repeat": {
+                    "type": "string"
+                },
+                "shuffle": {
+                    "type": "boolean"
+                }
+            }
+        },
+        "handlers.historyRequest": {
+            "type": "object",
+            "required": [
+                "song_id"
+            ],
+            "properties": {
+                "completion_rate": {
+                    "type": "number"
+                },
+                "duration_listened": {
+                    "type": "integer"
+                },
+                "song_id": {
+                    "type": "integer"
+                },
+                "source": {
+                    "type": "string"
+                },
+                "timestamp": {
+                    "type": "integer"
+                }
+            }
+        },
+        "handlers.loginRequest": {
+            "type": "object",
+            "required": [
+                "password",
+                "username"
+            ],
+            "properties": {
+                "password": {
+                    "type": "string"
+                },
+                "username": {
+                    "type": "string"
+                }
+            }
+        },
+        "handlers.playlistRequest": {
+            "type": "object",
+            "required": [
+                "name"
+            ],
+            "properties": {
+                "description": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "public": {
+                    "type": "boolean"
+                }
+            }
+        },
+        "handlers.registerRequest": {
+            "type": "object",
+            "required": [
+                "email",
+                "password",
+                "username"
+            ],
+            "properties": {
+                "email": {
+                    "type": "string"
+                },
+                "password": {
+                    "type": "string",
+                    "minLength": 8
+                },
+                "username": {
+                    "type": "string",
+                    "minLength": 3
+                }
+            }
+        },
+        "models.Album": {
             "type": "object",
             "properties": {
                 "artist": {
-                    "$ref": "#/definitions/github_com_Aunali321_korus_internal_models.Artist"
+                    "$ref": "#/definitions/models.Artist"
                 },
                 "artist_id": {
                     "type": "integer"
@@ -1696,7 +1890,7 @@ const docTemplate = `{
                 }
             }
         },
-        "github_com_Aunali321_korus_internal_models.Artist": {
+        "models.Artist": {
             "type": "object",
             "properties": {
                 "bio": {
@@ -1719,17 +1913,17 @@ const docTemplate = `{
                 }
             }
         },
-        "github_com_Aunali321_korus_internal_models.Song": {
+        "models.Song": {
             "type": "object",
             "properties": {
                 "album": {
-                    "$ref": "#/definitions/github_com_Aunali321_korus_internal_models.Album"
+                    "$ref": "#/definitions/models.Album"
                 },
                 "album_id": {
                     "type": "integer"
                 },
                 "artist": {
-                    "$ref": "#/definitions/github_com_Aunali321_korus_internal_models.Artist"
+                    "$ref": "#/definitions/models.Artist"
                 },
                 "duration": {
                     "type": "integer"
@@ -1754,96 +1948,6 @@ const docTemplate = `{
                 },
                 "track_number": {
                     "type": "integer"
-                }
-            }
-        },
-        "internal_api_handlers.UserSettings": {
-            "type": "object",
-            "properties": {
-                "streaming_bitrate": {
-                    "type": "integer"
-                },
-                "streaming_format": {
-                    "type": "string"
-                },
-                "streaming_preset": {
-                    "type": "string"
-                }
-            }
-        },
-        "internal_api_handlers.historyRequest": {
-            "type": "object",
-            "required": [
-                "song_id"
-            ],
-            "properties": {
-                "completion_rate": {
-                    "type": "number"
-                },
-                "duration_listened": {
-                    "type": "integer"
-                },
-                "song_id": {
-                    "type": "integer"
-                },
-                "source": {
-                    "type": "string"
-                },
-                "timestamp": {
-                    "type": "integer"
-                }
-            }
-        },
-        "internal_api_handlers.loginRequest": {
-            "type": "object",
-            "required": [
-                "password",
-                "username"
-            ],
-            "properties": {
-                "password": {
-                    "type": "string"
-                },
-                "username": {
-                    "type": "string"
-                }
-            }
-        },
-        "internal_api_handlers.playlistRequest": {
-            "type": "object",
-            "required": [
-                "name"
-            ],
-            "properties": {
-                "description": {
-                    "type": "string"
-                },
-                "name": {
-                    "type": "string"
-                },
-                "public": {
-                    "type": "boolean"
-                }
-            }
-        },
-        "internal_api_handlers.registerRequest": {
-            "type": "object",
-            "required": [
-                "email",
-                "password",
-                "username"
-            ],
-            "properties": {
-                "email": {
-                    "type": "string"
-                },
-                "password": {
-                    "type": "string",
-                    "minLength": 8
-                },
-                "username": {
-                    "type": "string",
-                    "minLength": 3
                 }
             }
         }

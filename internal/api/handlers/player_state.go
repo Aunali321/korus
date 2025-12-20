@@ -73,6 +73,7 @@ func (h *Handler) GetPlayerState(c echo.Context) error {
 // @Param state body PlayerState true "Player state"
 // @Success 200 {object} map[string]bool
 // @Router /player/state [put]
+// @Router /player/state [post]
 func (h *Handler) SavePlayerState(c echo.Context) error {
 	user := c.Get("user").(models.User)
 

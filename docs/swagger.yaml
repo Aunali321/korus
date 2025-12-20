@@ -1,9 +1,80 @@
 basePath: /api
 definitions:
-  github_com_Aunali321_korus_internal_models.Album:
+  handlers.PlayerState:
+    properties:
+      current_song_id:
+        type: integer
+      progress:
+        type: number
+      queue:
+        items:
+          type: integer
+        type: array
+      queue_index:
+        type: integer
+    type: object
+  handlers.UserSettings:
+    properties:
+      repeat:
+        type: string
+      shuffle:
+        type: boolean
+    type: object
+  handlers.historyRequest:
+    properties:
+      completion_rate:
+        type: number
+      duration_listened:
+        type: integer
+      song_id:
+        type: integer
+      source:
+        type: string
+      timestamp:
+        type: integer
+    required:
+    - song_id
+    type: object
+  handlers.loginRequest:
+    properties:
+      password:
+        type: string
+      username:
+        type: string
+    required:
+    - password
+    - username
+    type: object
+  handlers.playlistRequest:
+    properties:
+      description:
+        type: string
+      name:
+        type: string
+      public:
+        type: boolean
+    required:
+    - name
+    type: object
+  handlers.registerRequest:
+    properties:
+      email:
+        type: string
+      password:
+        minLength: 8
+        type: string
+      username:
+        minLength: 3
+        type: string
+    required:
+    - email
+    - password
+    - username
+    type: object
+  models.Album:
     properties:
       artist:
-        $ref: '#/definitions/github_com_Aunali321_korus_internal_models.Artist'
+        $ref: '#/definitions/models.Artist'
       artist_id:
         type: integer
       cover_path:
@@ -19,7 +90,7 @@ definitions:
       year:
         type: integer
     type: object
-  github_com_Aunali321_korus_internal_models.Artist:
+  models.Artist:
     properties:
       bio:
         type: string
@@ -34,14 +105,14 @@ definitions:
       name:
         type: string
     type: object
-  github_com_Aunali321_korus_internal_models.Song:
+  models.Song:
     properties:
       album:
-        $ref: '#/definitions/github_com_Aunali321_korus_internal_models.Album'
+        $ref: '#/definitions/models.Album'
       album_id:
         type: integer
       artist:
-        $ref: '#/definitions/github_com_Aunali321_korus_internal_models.Artist'
+        $ref: '#/definitions/models.Artist'
       duration:
         type: integer
       file_path:
@@ -58,66 +129,6 @@ definitions:
         type: string
       track_number:
         type: integer
-    type: object
-  internal_api_handlers.UserSettings:
-    properties:
-      streaming_bitrate:
-        type: integer
-      streaming_format:
-        type: string
-      streaming_preset:
-        type: string
-    type: object
-  internal_api_handlers.historyRequest:
-    properties:
-      completion_rate:
-        type: number
-      duration_listened:
-        type: integer
-      song_id:
-        type: integer
-      source:
-        type: string
-      timestamp:
-        type: integer
-    required:
-    - song_id
-    type: object
-  internal_api_handlers.loginRequest:
-    properties:
-      password:
-        type: string
-      username:
-        type: string
-    required:
-    - password
-    - username
-    type: object
-  internal_api_handlers.playlistRequest:
-    properties:
-      description:
-        type: string
-      name:
-        type: string
-      public:
-        type: boolean
-    required:
-    - name
-    type: object
-  internal_api_handlers.registerRequest:
-    properties:
-      email:
-        type: string
-      password:
-        minLength: 8
-        type: string
-      username:
-        minLength: 3
-        type: string
-    required:
-    - email
-    - password
-    - username
     type: object
 info:
   contact: {}
@@ -284,7 +295,7 @@ paths:
         name: body
         required: true
         schema:
-          $ref: '#/definitions/internal_api_handlers.loginRequest'
+          $ref: '#/definitions/handlers.loginRequest'
       produces:
       - application/json
       responses:
@@ -381,7 +392,7 @@ paths:
         name: body
         required: true
         schema:
-          $ref: '#/definitions/internal_api_handlers.registerRequest'
+          $ref: '#/definitions/handlers.registerRequest'
       produces:
       - application/json
       responses:
@@ -593,7 +604,7 @@ paths:
         name: body
         required: true
         schema:
-          $ref: '#/definitions/internal_api_handlers.historyRequest'
+          $ref: '#/definitions/handlers.historyRequest'
       produces:
       - application/json
       responses:
@@ -713,6 +724,62 @@ paths:
       summary: Submit listen to ListenBrainz
       tags:
       - MusicBrainz
+  /player/state:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.PlayerState'
+      summary: Get player state
+      tags:
+      - Player
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Player state
+        in: body
+        name: state
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.PlayerState'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              type: boolean
+            type: object
+      summary: Save player state
+      tags:
+      - Player
+    put:
+      consumes:
+      - application/json
+      parameters:
+      - description: Player state
+        in: body
+        name: state
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.PlayerState'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              type: boolean
+            type: object
+      summary: Save player state
+      tags:
+      - Player
   /playlists:
     get:
       parameters:
@@ -746,7 +813,7 @@ paths:
         name: body
         required: true
         schema:
-          $ref: '#/definitions/internal_api_handlers.playlistRequest'
+          $ref: '#/definitions/handlers.playlistRequest'
       produces:
       - application/json
       responses:
@@ -834,7 +901,7 @@ paths:
         name: body
         required: true
         schema:
-          $ref: '#/definitions/internal_api_handlers.playlistRequest'
+          $ref: '#/definitions/handlers.playlistRequest'
       produces:
       - application/json
       responses:
@@ -1049,7 +1116,7 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/internal_api_handlers.UserSettings'
+            $ref: '#/definitions/handlers.UserSettings'
       summary: Get user settings
       tags:
       - Settings
@@ -1062,14 +1129,14 @@ paths:
         name: settings
         required: true
         schema:
-          $ref: '#/definitions/internal_api_handlers.UserSettings'
+          $ref: '#/definitions/handlers.UserSettings'
       produces:
       - application/json
       responses:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/internal_api_handlers.UserSettings'
+            $ref: '#/definitions/handlers.UserSettings'
       summary: Update user settings
       tags:
       - Settings
@@ -1087,7 +1154,7 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/github_com_Aunali321_korus_internal_models.Song'
+            $ref: '#/definitions/models.Song'
         "404":
           description: Not Found
           schema:
