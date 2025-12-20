@@ -1,4 +1,5 @@
 <script lang="ts">
+    import { VList } from "virtua/svelte";
     import { X, Play } from "lucide-svelte";
     import { player } from "$lib/stores/player.svelte";
     import { api } from "$lib/api";
@@ -12,6 +13,8 @@
         const secs = Math.floor(seconds % 60);
         return `${mins}:${secs.toString().padStart(2, "0")}`;
     }
+
+    const upNextTracks = $derived(player.queue.slice(player.queueIndex + 1));
 </script>
 
 {#if isOpen}
@@ -39,41 +42,40 @@
         </button>
     </div>
 
-    {#if player.currentSong}
-        <div class="p-6 border-b border-zinc-800">
-            <img
-                src={api.getArtworkUrl(player.currentSong.id)}
-                alt={player.currentSong.title}
-                class="w-full aspect-square object-cover rounded-lg mb-4 bg-zinc-800"
-            />
-            <h3 class="font-bold text-xl mb-1">{player.currentSong.title}</h3>
-            <p class="text-zinc-400">
-                {player.currentSong.artist?.name || "Unknown"}
-            </p>
-        </div>
-    {/if}
+    {#if isOpen}
+        {#if player.currentSong}
+            <div class="p-6 border-b border-zinc-800">
+                <img
+                    src={api.getArtworkUrl(player.currentSong.id)}
+                    alt={player.currentSong.title}
+                    class="w-full aspect-square object-cover rounded-lg mb-4 bg-zinc-800"
+                />
+                <h3 class="font-bold text-xl mb-1">{player.currentSong.title}</h3>
+                <p class="text-zinc-400">
+                    {player.currentSong.artist?.name || "Unknown"}
+                </p>
+            </div>
+        {/if}
 
-    <div class="flex-1">
-        <div class="px-6 py-4 border-b border-zinc-800">
-            <h3
-                class="text-sm font-semibold text-zinc-400 uppercase tracking-wider"
-            >
-                Up Next
-            </h3>
-        </div>
-        <div class="overflow-y-auto h-[calc(100vh-28rem)] scrollbar-thin">
-            <div class="px-3 py-2">
-                {#each player.queue as track, index}
-                    {#if index > player.queueIndex}
+        <div class="flex-1 flex flex-col">
+            <div class="px-6 py-4 border-b border-zinc-800">
+                <h3
+                    class="text-sm font-semibold text-zinc-400 uppercase tracking-wider"
+                >
+                    Up Next ({upNextTracks.length})
+                </h3>
+            </div>
+            {#if upNextTracks.length > 0}
+                <VList data={upNextTracks} style="height: calc(100vh - 28rem);" getKey={(track) => track.id}>
+                    {#snippet children(track, index)}
                         <button
-                            onclick={() =>
-                                player.playQueue(player.queue, index)}
-                            class="w-full flex items-center gap-3 p-3 rounded-lg hover:bg-zinc-900 group cursor-pointer text-left"
+                            onclick={() => player.playQueue(player.queue, player.queueIndex + 1 + index)}
+                            class="w-full flex items-center gap-3 p-3 mx-3 rounded-lg hover:bg-zinc-900 group cursor-pointer text-left"
                         >
                             <div
                                 class="text-sm text-zinc-500 w-6 text-center group-hover:hidden"
                             >
-                                {index - player.queueIndex}
+                                {index + 1}
                             </div>
                             <div
                                 class="hidden group-hover:flex w-6 h-6 items-center justify-center"
@@ -97,14 +99,13 @@
                                 {formatTime(track.duration)}
                             </div>
                         </button>
-                    {/if}
-                {/each}
-                {#if player.queue.length <= player.queueIndex + 1}
-                    <p class="text-center text-zinc-500 py-8 text-sm">
-                        Queue is empty
-                    </p>
-                {/if}
-            </div>
+                    {/snippet}
+                </VList>
+            {:else}
+                <p class="text-center text-zinc-500 py-8 text-sm">
+                    Queue is empty
+                </p>
+            {/if}
         </div>
-    </div>
+    {/if}
 </div>

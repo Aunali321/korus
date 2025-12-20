@@ -5,6 +5,7 @@
 	import { page } from "$app/stores";
 	import { auth } from "$lib/stores/auth.svelte";
 	import { player } from "$lib/stores/player.svelte";
+	import { settings } from "$lib/stores/settings.svelte";
 	import Sidebar from "$lib/components/Sidebar.svelte";
 	import Player from "$lib/components/Player.svelte";
 	import Queue from "$lib/components/Queue.svelte";
@@ -25,6 +26,10 @@
 
 	onMount(async () => {
 		await auth.init();
+		if (auth.isAuthenticated) {
+			await settings.load();
+			await player.loadState();
+		}
 	});
 
 	$effect(() => {

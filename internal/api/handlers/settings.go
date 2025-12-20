@@ -10,9 +10,8 @@ import (
 )
 
 type UserSettings struct {
-	StreamingPreset  string `json:"streaming_preset"`
-	StreamingFormat  string `json:"streaming_format,omitempty"`
-	StreamingBitrate int    `json:"streaming_bitrate,omitempty"`
+	Shuffle bool   `json:"shuffle"`
+	Repeat  string `json:"repeat"`
 }
 
 // GetSettings godoc
@@ -25,31 +24,22 @@ func (h *Handler) GetSettings(c echo.Context) error {
 	user := c.Get("user").(models.User)
 	userID := user.ID
 
-	var settings UserSettings
-	var format sql.NullString
-	var bitrate sql.NullInt64
+	var shuffle int
+	var repeat string
 
 	err := h.db.QueryRowContext(c.Request().Context(), `
-		SELECT streaming_preset, streaming_format, streaming_bitrate
-		FROM user_settings WHERE user_id = ?
-	`, userID).Scan(&settings.StreamingPreset, &format, &bitrate)
+		SELECT shuffle, repeat FROM user_settings WHERE user_id = ?
+	`, userID).Scan(&shuffle, &repeat)
 
 	if err == sql.ErrNoRows {
-		return c.JSON(http.StatusOK, UserSettings{StreamingPreset: "original"})
+		return c.JSON(http.StatusOK, UserSettings{Shuffle: false, Repeat: "off"})
 	}
 	if err != nil {
 		slog.Error("failed to get settings", "error", err, "user_id", userID)
 		return echo.NewHTTPError(http.StatusInternalServerError, map[string]string{"error": "failed to get settings"})
 	}
 
-	if format.Valid {
-		settings.StreamingFormat = format.String
-	}
-	if bitrate.Valid {
-		settings.StreamingBitrate = int(bitrate.Int64)
-	}
-
-	return c.JSON(http.StatusOK, settings)
+	return c.JSON(http.StatusOK, UserSettings{Shuffle: shuffle == 1, Repeat: repeat})
 }
 
 // UpdateSettings godoc
@@ -69,34 +59,24 @@ func (h *Handler) UpdateSettings(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusBadRequest, map[string]string{"error": "invalid request"})
 	}
 
-	if req.StreamingPreset == "" {
-		req.StreamingPreset = "original"
+	validRepeats := map[string]bool{"off": true, "one": true, "all": true}
+	if !validRepeats[req.Repeat] {
+		req.Repeat = "off"
 	}
 
-	validPresets := map[string]bool{"original": true, "lossless": true, "very_high": true, "high": true, "medium": true, "low": true, "custom": true}
-	if !validPresets[req.StreamingPreset] {
-		return echo.NewHTTPError(http.StatusBadRequest, map[string]string{"error": "invalid preset"})
-	}
-
-	var format any = nil
-	var bitrate any = nil
-	if req.StreamingPreset == "custom" || req.StreamingFormat != "" {
-		if _, err := h.transcoder.Validate(req.StreamingFormat, req.StreamingBitrate); err != nil {
-			return echo.NewHTTPError(http.StatusBadRequest, map[string]string{"error": err.Error()})
-		}
-		format = req.StreamingFormat
-		bitrate = req.StreamingBitrate
+	shuffleInt := 0
+	if req.Shuffle {
+		shuffleInt = 1
 	}
 
 	_, err := h.db.ExecContext(c.Request().Context(), `
-		INSERT INTO user_settings (user_id, streaming_preset, streaming_format, streaming_bitrate, updated_at)
-		VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
+		INSERT INTO user_settings (user_id, shuffle, repeat, updated_at)
+		VALUES (?, ?, ?, CURRENT_TIMESTAMP)
 		ON CONFLICT(user_id) DO UPDATE SET
-			streaming_preset = excluded.streaming_preset,
-			streaming_format = excluded.streaming_format,
-			streaming_bitrate = excluded.streaming_bitrate,
+			shuffle = excluded.shuffle,
+			repeat = excluded.repeat,
 			updated_at = CURRENT_TIMESTAMP
-	`, userID, req.StreamingPreset, format, bitrate)
+	`, userID, shuffleInt, req.Repeat)
 
 	if err != nil {
 		slog.Error("failed to save settings", "error", err, "user_id", userID)

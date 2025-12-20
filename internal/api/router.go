@@ -77,7 +77,7 @@ func New(deps Deps) *echo.Echo {
 
 	api.GET("/stream/:id", h.Stream, middleware.Auth(deps.Auth))
 	api.GET("/streaming/options", h.StreamingOptions, middleware.Auth(deps.Auth))
-	api.GET("/artwork/:id", h.Artwork, middleware.Auth(deps.Auth))
+	api.GET("/artwork/:id", h.Artwork)
 	api.GET("/lyrics/:id", h.Lyrics, middleware.Auth(deps.Auth))
 
 	api.GET("/playlists", h.ListPlaylists, middleware.Auth(deps.Auth))
@@ -107,6 +107,10 @@ func New(deps Deps) *echo.Echo {
 
 	api.GET("/settings", h.GetSettings, middleware.Auth(deps.Auth))
 	api.PUT("/settings", h.UpdateSettings, middleware.Auth(deps.Auth))
+
+	api.GET("/player/state", h.GetPlayerState, middleware.Auth(deps.Auth))
+	api.PUT("/player/state", h.SavePlayerState, middleware.Auth(deps.Auth))
+	api.POST("/player/state", h.SavePlayerState, middleware.Auth(deps.Auth))
 
 	api.POST("/scan", h.StartScan, middleware.Auth(deps.Auth))
 	api.GET("/scan/status", h.ScanStatus, middleware.Auth(deps.Auth))

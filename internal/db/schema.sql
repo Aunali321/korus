@@ -145,10 +145,20 @@ CREATE INDEX IF NOT EXISTS idx_play_history_user_time ON play_history(user_id, p
 
 CREATE TABLE IF NOT EXISTS user_settings (
     user_id INTEGER PRIMARY KEY,
-    streaming_preset TEXT NOT NULL DEFAULT 'original',
-    streaming_format TEXT,
-    streaming_bitrate INTEGER,
+    shuffle INTEGER NOT NULL DEFAULT 0,
+    repeat TEXT NOT NULL DEFAULT 'off',
     updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS player_state (
+    user_id INTEGER PRIMARY KEY,
+    current_song_id INTEGER,
+    queue_song_ids TEXT,
+    queue_index INTEGER NOT NULL DEFAULT 0,
+    progress REAL NOT NULL DEFAULT 0,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    FOREIGN KEY (current_song_id) REFERENCES songs(id) ON DELETE SET NULL
 );
 

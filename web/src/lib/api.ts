@@ -23,7 +23,7 @@ function getApiUrl(): string {
   return localStorage.getItem(API_URL_KEY) || "/api";
 }
 
-function getAccessToken(): string | null {
+export function getAccessToken(): string | null {
   if (typeof localStorage === "undefined") return null;
   return localStorage.getItem(ACCESS_TOKEN_KEY);
 }
@@ -171,12 +171,9 @@ export const api = {
     ),
 
   getArtworkUrl: (id: number, type?: 'song' | 'album') => {
-    const token = getAccessToken();
     let url = `${getApiUrl()}/artwork/${id}`;
-    const params: string[] = [];
-    if (token) params.push(`token=${token}`);
-    if (type === 'album') params.push('type=album');
-    return params.length ? `${url}?${params.join('&')}` : url;
+    if (type === 'album') url += '?type=album';
+    return url;
   },
 
   getStreamUrl: (id: number, format?: string, bitrate?: number) => {
@@ -195,12 +192,21 @@ export const api = {
 
   getStreamingOptions: () => request<StreamingOptions>("/streaming/options"),
 
-  getSettings: () => request<{ streaming_preset: string; streaming_format?: string; streaming_bitrate?: number }>("/settings"),
+  getSettings: () => request<{ shuffle: boolean; repeat: string }>("/settings"),
 
-  updateSettings: (settings: { streaming_preset: string; streaming_format?: string; streaming_bitrate?: number }) =>
-    request<{ streaming_preset: string; streaming_format?: string; streaming_bitrate?: number }>("/settings", {
+  updateSettings: (settings: { shuffle: boolean; repeat: string }) =>
+    request<{ shuffle: boolean; repeat: string }>("/settings", {
       method: "PUT",
       body: JSON.stringify(settings),
+    }),
+
+  getPlayerState: () =>
+    request<{ current_song_id: number | null; queue: number[]; queue_index: number; progress: number }>("/player/state"),
+
+  savePlayerState: (state: { current_song_id: number | null; queue: number[]; queue_index: number; progress: number }) =>
+    request<{ success: boolean }>("/player/state", {
+      method: "PUT",
+      body: JSON.stringify(state),
     }),
 
   getPlaylists: (limit = 50, offset = 0) =>

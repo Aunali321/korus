@@ -3,6 +3,7 @@ import { api, setTokens, clearTokens } from '$lib/api';
 import { favorites } from './favorites.svelte';
 import { library } from './library.svelte';
 import { settings } from './settings.svelte';
+import { player } from './player.svelte';
 
 let initPromise: Promise<void> | null = null;
 
@@ -29,7 +30,7 @@ function createAuthStore() {
             try {
                 user = await api.me();
                 isAuthenticated = true;
-                settings.load();
+                await settings.load();
             } catch {
                 clearTokens();
             } finally {
@@ -49,7 +50,8 @@ function createAuthStore() {
         setTokens(res.access_token, res.refresh_token);
         user = res.user;
         isAuthenticated = true;
-        settings.load();
+        await settings.load();
+        await player.loadState();
     }
 
     async function register(username: string, email: string, password: string) {
@@ -57,7 +59,8 @@ function createAuthStore() {
         setTokens(res.access_token, res.refresh_token);
         user = res.user;
         isAuthenticated = true;
-        settings.load();
+        await settings.load();
+        await player.loadState();
     }
 
     function logout() {
@@ -69,6 +72,7 @@ function createAuthStore() {
         favorites.reset();
         library.reset();
         settings.reset();
+        player.reset();
     }
 
     return {

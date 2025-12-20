@@ -1,7 +1,8 @@
-import type { StreamingQuality, StreamingPreset } from '$lib/types';
+import type { StreamingQuality, StreamingPreset, RepeatMode } from '$lib/types';
 import { api } from '$lib/api';
 
-const STORAGE_KEY = 'korus_streaming_quality';
+const STREAMING_KEY = 'korus_streaming_quality';
+const PLAYBACK_KEY = 'korus_playback_settings';
 
 const PRESETS: Record<Exclude<StreamingPreset, 'custom'>, { format: string; bitrate: number } | null> = {
     original: null,
@@ -13,16 +14,24 @@ const PRESETS: Record<Exclude<StreamingPreset, 'custom'>, { format: string; bitr
 };
 
 function createSettingsStore() {
-    let quality = $state<StreamingQuality>({ preset: 'original' });
+    let streamingQuality = $state<StreamingQuality>({ preset: 'original' });
+    let shuffle = $state(false);
+    let repeat = $state<RepeatMode>('off');
     let loaded = $state(false);
     let syncing = $state(false);
 
     function loadLocal() {
         if (typeof localStorage === 'undefined') return;
         try {
-            const stored = localStorage.getItem(STORAGE_KEY);
-            if (stored) {
-                quality = JSON.parse(stored);
+            const streaming = localStorage.getItem(STREAMING_KEY);
+            if (streaming) {
+                streamingQuality = JSON.parse(streaming);
+            }
+            const playback = localStorage.getItem(PLAYBACK_KEY);
+            if (playback) {
+                const parsed = JSON.parse(playback);
+                shuffle = parsed.shuffle ?? false;
+                repeat = parsed.repeat ?? 'off';
             }
         } catch {
             // ignore
@@ -31,24 +40,21 @@ function createSettingsStore() {
 
     function saveLocal() {
         if (typeof localStorage === 'undefined') return;
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(quality));
+        localStorage.setItem(STREAMING_KEY, JSON.stringify(streamingQuality));
+        localStorage.setItem(PLAYBACK_KEY, JSON.stringify({ shuffle, repeat }));
     }
 
     async function load() {
         if (loaded) return;
-        loadLocal(); // Load local first for instant UI
+        loadLocal();
         
         try {
             const remote = await api.getSettings();
-            quality = {
-                preset: remote.streaming_preset as StreamingPreset,
-                format: remote.streaming_format,
-                bitrate: remote.streaming_bitrate,
-            };
+            shuffle = remote.shuffle;
+            repeat = remote.repeat as RepeatMode;
             saveLocal();
             loaded = true;
         } catch {
-            // Use local settings if API fails
             loaded = true;
         }
     }
@@ -57,11 +63,7 @@ function createSettingsStore() {
         if (syncing) return;
         syncing = true;
         try {
-            await api.updateSettings({
-                streaming_preset: quality.preset,
-                streaming_format: quality.format,
-                streaming_bitrate: quality.bitrate,
-            });
+            await api.updateSettings({ shuffle, repeat });
         } catch (err) {
             console.error('Failed to sync settings:', err);
         } finally {
@@ -72,46 +74,74 @@ function createSettingsStore() {
     async function setPreset(preset: StreamingPreset) {
         if (preset === 'custom') return;
         const config = PRESETS[preset];
-        quality = config
+        streamingQuality = config
             ? { preset, format: config.format, bitrate: config.bitrate }
             : { preset };
         saveLocal();
-        await syncToServer();
     }
 
     async function setCustom(format: string, bitrate: number) {
-        quality = { preset: 'custom', format, bitrate };
+        streamingQuality = { preset: 'custom', format, bitrate };
+        saveLocal();
+    }
+
+    function getStreamParams(): { format?: string; bitrate?: number } {
+        if (streamingQuality.preset === 'original') {
+            return {};
+        }
+        return { format: streamingQuality.format, bitrate: streamingQuality.bitrate };
+    }
+
+    async function setShuffle(value: boolean) {
+        shuffle = value;
         saveLocal();
         await syncToServer();
     }
 
-    function getStreamParams(): { format?: string; bitrate?: number } {
-        if (quality.preset === 'original') {
-            return {};
-        }
-        return { format: quality.format, bitrate: quality.bitrate };
+    async function setRepeat(value: RepeatMode) {
+        repeat = value;
+        saveLocal();
+        await syncToServer();
+    }
+
+    async function toggleShuffle() {
+        await setShuffle(!shuffle);
+    }
+
+    async function toggleRepeat() {
+        const modes: RepeatMode[] = ['off', 'all', 'one'];
+        const idx = modes.indexOf(repeat);
+        await setRepeat(modes[(idx + 1) % modes.length]);
     }
 
     function reset() {
-        quality = { preset: 'original' };
+        streamingQuality = { preset: 'original' };
+        shuffle = false;
+        repeat = 'off';
         loaded = false;
         if (typeof localStorage !== 'undefined') {
-            localStorage.removeItem(STORAGE_KEY);
+            localStorage.removeItem(STREAMING_KEY);
+            localStorage.removeItem(PLAYBACK_KEY);
         }
     }
 
-    // Load local on init for instant availability
     loadLocal();
 
     return {
-        get quality() { return quality; },
-        get preset() { return quality.preset; },
-        get format() { return quality.format; },
-        get bitrate() { return quality.bitrate; },
+        get quality() { return streamingQuality; },
+        get preset() { return streamingQuality.preset; },
+        get format() { return streamingQuality.format; },
+        get bitrate() { return streamingQuality.bitrate; },
+        get shuffle() { return shuffle; },
+        get repeat() { return repeat; },
         get loaded() { return loaded; },
         setPreset,
         setCustom,
         getStreamParams,
+        setShuffle,
+        setRepeat,
+        toggleShuffle,
+        toggleRepeat,
         load,
         reset,
     };
