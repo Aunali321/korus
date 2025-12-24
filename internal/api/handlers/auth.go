@@ -127,6 +127,25 @@ func (h *Handler) Me(c echo.Context) error {
 	return c.JSON(http.StatusOK, sanitizeUser(user))
 }
 
+// CompleteOnboarding godoc
+// @Summary Mark user as onboarded
+// @Tags Auth
+// @Produce json
+// @Success 200 {object} map[string]bool
+// @Failure 401 {object} map[string]string
+// @Router /auth/onboarded [post]
+func (h *Handler) CompleteOnboarding(c echo.Context) error {
+	user, err := currentUser(c)
+	if err != nil {
+		return echo.NewHTTPError(http.StatusUnauthorized, map[string]string{"error": "unauthorized", "code": "UNAUTHORIZED"})
+	}
+	_, err = h.db.ExecContext(c.Request().Context(), `UPDATE users SET onboarded = 1 WHERE id = ?`, user.ID)
+	if err != nil {
+		return echo.NewHTTPError(http.StatusInternalServerError, map[string]string{"error": "failed to update", "code": "UPDATE_FAILED"})
+	}
+	return c.JSON(http.StatusOK, map[string]bool{"success": true})
+}
+
 func currentUser(c echo.Context) (models.User, error) {
 	v := c.Get("user")
 	if v == nil {
@@ -145,6 +164,7 @@ func sanitizeUser(u models.User) map[string]interface{} {
 		"username":   u.Username,
 		"email":      u.Email,
 		"role":       u.Role,
+		"onboarded":  u.Onboarded,
 		"created_at": u.CreatedAt,
 	}
 }

@@ -1,7 +1,11 @@
 package handlers
 
 import (
+	"fmt"
+	"io"
 	"net/http"
+	"os"
+	"path/filepath"
 	"strconv"
 	"time"
 
@@ -28,7 +32,7 @@ func (h *Handler) ListPlaylists(c echo.Context) error {
 	user, _ := currentUser(c)
 	limit, offset := parseLimitOffset(c, 50, 200)
 	rows, err := h.db.QueryContext(c.Request().Context(), `
-		SELECT p.id, p.user_id, p.name, p.description, p.public, p.created_at, u.username,
+		SELECT p.id, p.user_id, p.name, p.description, p.cover_path, p.public, p.created_at, u.username,
 		       (SELECT COUNT(*) FROM playlist_songs ps WHERE ps.playlist_id = p.id) as song_count,
 		       (SELECT ps2.song_id FROM playlist_songs ps2 WHERE ps2.playlist_id = p.id ORDER BY ps2.position LIMIT 1) as first_song_id
 		FROM playlists p
@@ -45,12 +49,13 @@ func (h *Handler) ListPlaylists(c echo.Context) error {
 	for rows.Next() {
 		var id, uid int64
 		var name, desc string
+		var coverPath *string
 		var pub bool
 		var created string
 		var owner string
 		var songCount int
 		var firstSongID *int64
-		if err := rows.Scan(&id, &uid, &name, &desc, &pub, &created, &owner, &songCount, &firstSongID); err == nil {
+		if err := rows.Scan(&id, &uid, &name, &desc, &coverPath, &pub, &created, &owner, &songCount, &firstSongID); err == nil {
 			item := map[string]any{
 				"id":          id,
 				"user_id":     uid,
@@ -61,7 +66,9 @@ func (h *Handler) ListPlaylists(c echo.Context) error {
 				"owner":       map[string]any{"id": uid, "username": owner},
 				"song_count":  songCount,
 			}
-			if firstSongID != nil {
+			if coverPath != nil && *coverPath != "" {
+				item["cover_path"] = *coverPath
+			} else if firstSongID != nil {
 				item["first_song_id"] = *firstSongID
 			}
 			res = append(res, item)
@@ -117,13 +124,14 @@ func (h *Handler) GetPlaylist(c echo.Context) error {
 	id, _ := strconv.ParseInt(c.Param("id"), 10, 64)
 	var name, desc, ownerUsername string
 	var ownerID int64
+	var coverPath *string
 	var pub bool
 	err := h.db.QueryRowContext(c.Request().Context(), `
-		SELECT p.id, p.user_id, p.name, p.description, p.public, u.username
+		SELECT p.id, p.user_id, p.name, p.description, p.cover_path, p.public, u.username
 		FROM playlists p
 		JOIN users u ON u.id = p.user_id
 		WHERE p.id = ?
-	`, id).Scan(&id, &ownerID, &name, &desc, &pub, &ownerUsername)
+	`, id).Scan(&id, &ownerID, &name, &desc, &coverPath, &pub, &ownerUsername)
 	if err != nil {
 		return echo.NewHTTPError(http.StatusNotFound, map[string]string{"error": "playlist not found", "code": "NOT_FOUND"})
 	}
@@ -131,7 +139,8 @@ func (h *Handler) GetPlaylist(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusForbidden, map[string]string{"error": "forbidden", "code": "FORBIDDEN"})
 	}
 	songs, _ := db.GetSongsByPlaylist(c.Request().Context(), h.db, id)
-	return c.JSON(http.StatusOK, map[string]any{
+
+	result := map[string]any{
 		"id":          id,
 		"user_id":     ownerID,
 		"name":        name,
@@ -139,7 +148,15 @@ func (h *Handler) GetPlaylist(c echo.Context) error {
 		"public":      pub,
 		"songs":       songs,
 		"owner":       map[string]interface{}{"id": ownerID, "username": ownerUsername},
-	})
+	}
+
+	if coverPath != nil && *coverPath != "" {
+		result["cover_path"] = *coverPath
+	} else if len(songs) > 0 {
+		result["first_song_id"] = songs[0].ID
+	}
+
+	return c.JSON(http.StatusOK, result)
 }
 
 // UpdatePlaylist godoc
@@ -183,6 +200,99 @@ func (h *Handler) UpdatePlaylist(c echo.Context) error {
 		"description": req.Description,
 		"public":      req.Public,
 	})
+}
+
+// UploadPlaylistCover godoc
+// @Summary Upload playlist cover
+// @Tags Playlists
+// @Accept multipart/form-data
+// @Produce json
+// @Param id path int true "Playlist ID"
+// @Param cover formData file true "Cover image"
+// @Success 200 {object} map[string]string
+// @Failure 400 {object} map[string]string
+// @Failure 403 {object} map[string]string
+// @Failure 404 {object} map[string]string
+// @Router /playlists/{id}/cover [post]
+func (h *Handler) UploadPlaylistCover(c echo.Context) error {
+	user, _ := currentUser(c)
+	id, _ := strconv.ParseInt(c.Param("id"), 10, 64)
+
+	var owner int64
+	if err := h.db.QueryRowContext(c.Request().Context(), `SELECT user_id FROM playlists WHERE id = ?`, id).Scan(&owner); err != nil {
+		return echo.NewHTTPError(http.StatusNotFound, map[string]string{"error": "playlist not found", "code": "NOT_FOUND"})
+	}
+	if owner != user.ID {
+		return echo.NewHTTPError(http.StatusForbidden, map[string]string{"error": "forbidden", "code": "FORBIDDEN"})
+	}
+
+	file, err := c.FormFile("cover")
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, map[string]string{"error": "no file provided", "code": "BAD_REQUEST"})
+	}
+
+	src, err := file.Open()
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, map[string]string{"error": "failed to read file", "code": "BAD_REQUEST"})
+	}
+	defer src.Close()
+
+	coversDir := filepath.Join(h.mediaRoot, ".korus", "covers")
+	if err := os.MkdirAll(coversDir, 0755); err != nil {
+		return echo.NewHTTPError(http.StatusInternalServerError, map[string]string{"error": "failed to create covers dir", "code": "INTERNAL_ERROR"})
+	}
+
+	ext := filepath.Ext(file.Filename)
+	if ext == "" {
+		ext = ".jpg"
+	}
+	filename := fmt.Sprintf("playlist_%d%s", id, ext)
+	destPath := filepath.Join(coversDir, filename)
+
+	dst, err := os.Create(destPath)
+	if err != nil {
+		return echo.NewHTTPError(http.StatusInternalServerError, map[string]string{"error": "failed to save file", "code": "INTERNAL_ERROR"})
+	}
+	defer dst.Close()
+
+	if _, err := io.Copy(dst, src); err != nil {
+		return echo.NewHTTPError(http.StatusInternalServerError, map[string]string{"error": "failed to save file", "code": "INTERNAL_ERROR"})
+	}
+
+	_, err = h.db.ExecContext(c.Request().Context(), `UPDATE playlists SET cover_path = ? WHERE id = ?`, destPath, id)
+	if err != nil {
+		return echo.NewHTTPError(http.StatusInternalServerError, map[string]string{"error": "failed to update playlist", "code": "INTERNAL_ERROR"})
+	}
+
+	return c.JSON(http.StatusOK, map[string]string{"cover_path": destPath})
+}
+
+// GetPlaylistCover godoc
+// @Summary Get playlist cover
+// @Tags Playlists
+// @Produce image/*
+// @Param id path int true "Playlist ID"
+// @Success 200 {file} binary
+// @Failure 404 {object} map[string]string
+// @Router /playlists/{id}/cover [get]
+func (h *Handler) GetPlaylistCover(c echo.Context) error {
+	id, _ := strconv.ParseInt(c.Param("id"), 10, 64)
+
+	var coverPath *string
+	err := h.db.QueryRowContext(c.Request().Context(), `SELECT cover_path FROM playlists WHERE id = ?`, id).Scan(&coverPath)
+	if err != nil {
+		return echo.NewHTTPError(http.StatusNotFound, map[string]string{"error": "playlist not found", "code": "NOT_FOUND"})
+	}
+
+	if coverPath == nil || *coverPath == "" {
+		return echo.NewHTTPError(http.StatusNotFound, map[string]string{"error": "no cover", "code": "NOT_FOUND"})
+	}
+
+	if _, err := os.Stat(*coverPath); os.IsNotExist(err) {
+		return echo.NewHTTPError(http.StatusNotFound, map[string]string{"error": "cover file not found", "code": "NOT_FOUND"})
+	}
+
+	return c.File(*coverPath)
 }
 
 // DeletePlaylist godoc

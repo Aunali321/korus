@@ -38,10 +38,11 @@ export interface Playlist {
     description?: string;
     public: boolean;
     user_id: number;
+    cover_path?: string;
+    first_song_id?: number;
     owner?: { id: number; username: string };
     songs?: Song[];
     song_count?: number;
-    first_song_id?: number;
     created_at?: string;
     updated_at?: string;
 }
@@ -51,6 +52,7 @@ export interface User {
     username: string;
     email: string;
     role: 'user' | 'admin';
+    onboarded: boolean;
     created_at?: string;
 }
 

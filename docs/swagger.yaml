@@ -47,6 +47,8 @@ definitions:
     type: object
   handlers.playlistRequest:
     properties:
+      cover_song_id:
+        type: integer
       description:
         type: string
       name:
@@ -350,6 +352,26 @@ paths:
               type: string
             type: object
       summary: Current user
+      tags:
+      - Auth
+  /auth/onboarded:
+    post:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              type: boolean
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Mark user as onboarded
       tags:
       - Auth
   /auth/refresh:

@@ -68,6 +68,7 @@ func New(deps Deps) *echo.Echo {
 	authGroup.POST("/refresh", h.Refresh)
 	authGroup.POST("/logout", h.Logout, middleware.Auth(deps.Auth))
 	authGroup.GET("/me", h.Me, middleware.Auth(deps.Auth))
+	authGroup.POST("/onboarded", h.CompleteOnboarding, middleware.Auth(deps.Auth))
 
 	api.GET("/library", h.Library, middleware.Auth(deps.Auth))
 	api.GET("/artists/:id", h.Artist, middleware.Auth(deps.Auth))
@@ -88,6 +89,8 @@ func New(deps Deps) *echo.Echo {
 	api.POST("/playlists/:id/songs", h.AddPlaylistSong, middleware.Auth(deps.Auth))
 	api.DELETE("/playlists/:id/songs/:song_id", h.DeletePlaylistSong, middleware.Auth(deps.Auth))
 	api.PUT("/playlists/:id/reorder", h.ReorderPlaylistSongs, middleware.Auth(deps.Auth))
+	api.POST("/playlists/:id/cover", h.UploadPlaylistCover, middleware.Auth(deps.Auth))
+	api.GET("/playlists/:id/cover", h.GetPlaylistCover)
 
 	api.POST("/favorites/songs/:id", h.FavSong, middleware.Auth(deps.Auth))
 	api.DELETE("/favorites/songs/:id", h.UnfavSong, middleware.Auth(deps.Auth))

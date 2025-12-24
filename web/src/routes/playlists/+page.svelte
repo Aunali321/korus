@@ -92,7 +92,7 @@
                 <Card
                     title={playlist.name}
                     subtitle="{playlist.song_count || 0} songs"
-                    image={playlist.first_song_id ? api.getArtworkUrl(playlist.first_song_id) : undefined}
+                    image={playlist.cover_path ? api.getPlaylistCoverUrl(playlist.id) : (playlist.first_song_id ? api.getArtworkUrl(playlist.first_song_id) : undefined)}
                     href="/playlists/{playlist.id}"
                 />
             {/each}

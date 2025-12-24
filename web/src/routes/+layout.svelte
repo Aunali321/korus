@@ -11,10 +11,12 @@
 	import Queue from "$lib/components/Queue.svelte";
 	import Lyrics from "$lib/components/Lyrics.svelte";
 	import Toast from "$lib/components/Toast.svelte";
+	import Onboarding from "$lib/components/Onboarding.svelte";
 
 	let { children } = $props();
 	let showQueue = $state(false);
 	let showLyrics = $state(false);
+	let showOnboarding = $state(false);
 
 	const publicRoutes = ["/login", "/register", "/setup"];
 
@@ -33,6 +35,12 @@
 	});
 
 	$effect(() => {
+		if (auth.isAuthenticated && auth.user && !auth.user.onboarded) {
+			showOnboarding = true;
+		}
+	});
+
+	$effect(() => {
 		if (!auth.isLoading && !auth.isAuthenticated) {
 			const isPublic = publicRoutes.some((r) =>
 				$page.url.pathname.startsWith(r),
@@ -42,6 +50,13 @@
 			}
 		}
 	});
+
+	function handleOnboardingComplete() {
+		showOnboarding = false;
+		if (auth.user) {
+			auth.user.onboarded = true;
+		}
+	}
 </script>
 
 <svelte:head>
@@ -69,6 +84,9 @@
 		</div>
 		<Player onToggleQueue={() => (showQueue = !showQueue)} onToggleLyrics={() => (showLyrics = !showLyrics)} />
 		<Toast />
+		{#if showOnboarding}
+			<Onboarding onComplete={handleOnboardingComplete} />
+		{/if}
 	</div>
 {:else}
 	<div class="min-h-screen bg-black text-zinc-100 font-sans">

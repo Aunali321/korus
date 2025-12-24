@@ -1,12 +1,12 @@
 <script lang="ts">
     import { page } from "$app/stores";
     import { goto } from "$app/navigation";
-    import { Play, Trash2, Edit2, Clock } from "lucide-svelte";
+    import { Play, Trash2, Edit2, Clock, Upload } from "lucide-svelte";
     import { api } from "$lib/api";
     import { auth } from "$lib/stores/auth.svelte";
     import { player } from "$lib/stores/player.svelte";
     import { toast } from "$lib/stores/toast.svelte";
-    import type { Playlist, Song } from "$lib/types";
+    import type { Playlist } from "$lib/types";
     import TrackRow from "$lib/components/TrackRow.svelte";
 
     let playlist = $state<Playlist | null>(null);
@@ -14,6 +14,8 @@
     let loadedId = $state<number | null>(null);
     let editing = $state(false);
     let editName = $state("");
+    let coverFileInput = $state<HTMLInputElement | null>(null);
+    let uploadingCover = $state(false);
 
     $effect(() => {
         const idParam = $page.params.id;
@@ -55,6 +57,25 @@
         }
     }
 
+    async function handleCoverUpload(e: Event) {
+        const input = e.target as HTMLInputElement;
+        const file = input.files?.[0];
+        if (!file || !playlist) return;
+
+        uploadingCover = true;
+        try {
+            const result = await api.uploadPlaylistCover(playlist.id, file);
+            playlist.cover_path = result.cover_path;
+            playlist = playlist;
+            toast.success("Cover updated");
+        } catch {
+            toast.error("Failed to upload cover");
+        } finally {
+            uploadingCover = false;
+            input.value = "";
+        }
+    }
+
     async function deletePlaylist() {
         if (!playlist || !confirm("Delete this playlist?")) return;
         try {
@@ -78,6 +99,22 @@
     }
 
     const songs = $derived(playlist?.songs || []);
+    
+    function getCoverUrl(): string | null {
+        if (!playlist) return null;
+        if (playlist.cover_path) {
+            return api.getPlaylistCoverUrl(playlist.id);
+        }
+        if (playlist.first_song_id) {
+            return api.getArtworkUrl(playlist.first_song_id);
+        }
+        if (songs.length > 0) {
+            return api.getArtworkUrl(songs[0].id);
+        }
+        return null;
+    }
+    
+    const coverUrl = $derived(getCoverUrl());
 </script>
 
 {#if loading}
@@ -87,19 +124,44 @@
 {:else if playlist}
     <div class="p-6">
         <div class="flex gap-6 mb-8">
-            {#if songs.length > 0}
-                <img
-                    src={api.getArtworkUrl(songs[0].id)}
-                    alt={playlist.name}
-                    class="w-56 h-56 rounded-lg object-cover shadow-xl bg-zinc-800"
-                />
-            {:else}
-                <div
-                    class="w-56 h-56 rounded-lg bg-gradient-to-br from-zinc-700 to-zinc-800 flex items-center justify-center shadow-xl"
-                >
-                    <span class="text-6xl">🎵</span>
-                </div>
-            {/if}
+            <div class="relative group">
+                {#if coverUrl}
+                    <img
+                        src={coverUrl}
+                        alt={playlist.name}
+                        class="w-56 h-56 rounded-lg object-cover shadow-xl bg-zinc-800"
+                    />
+                {:else}
+                    <div
+                        class="w-56 h-56 rounded-lg bg-gradient-to-br from-zinc-700 to-zinc-800 flex items-center justify-center shadow-xl"
+                    >
+                        <span class="text-6xl">🎵</span>
+                    </div>
+                {/if}
+                {#if editing}
+                    <button
+                        onclick={() => coverFileInput?.click()}
+                        disabled={uploadingCover}
+                        class="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center rounded-lg"
+                    >
+                        <div class="text-center">
+                            {#if uploadingCover}
+                                <div class="text-sm">Uploading...</div>
+                            {:else}
+                                <Upload size={32} class="mx-auto mb-2" />
+                                <span class="text-sm">Upload Cover</span>
+                            {/if}
+                        </div>
+                    </button>
+                    <input
+                        bind:this={coverFileInput}
+                        type="file"
+                        accept="image/*"
+                        class="hidden"
+                        onchange={handleCoverUpload}
+                    />
+                {/if}
+            </div>
             <div class="flex flex-col justify-end">
                 <p class="text-sm text-zinc-400 uppercase tracking-wider">
                     Playlist

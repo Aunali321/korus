@@ -346,6 +346,37 @@ const docTemplate = `{
                 }
             }
         },
+        "/auth/onboarded": {
+            "post": {
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Auth"
+                ],
+                "summary": "Mark user as onboarded",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "boolean"
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        },
         "/auth/refresh": {
             "post": {
                 "consumes": [
@@ -1835,6 +1866,9 @@ const docTemplate = `{
                 "name"
             ],
             "properties": {
+                "cover_song_id": {
+                    "type": "integer"
+                },
                 "description": {
                     "type": "string"
                 },

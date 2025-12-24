@@ -6,6 +6,7 @@ CREATE TABLE IF NOT EXISTS users (
     password_hash TEXT NOT NULL,
     email TEXT NOT NULL UNIQUE,
     role TEXT NOT NULL DEFAULT 'user',
+    onboarded INTEGER NOT NULL DEFAULT 0,
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -69,6 +70,7 @@ CREATE TABLE IF NOT EXISTS playlists (
     user_id INTEGER NOT NULL,
     name TEXT NOT NULL,
     description TEXT,
+    cover_path TEXT,
     public INTEGER NOT NULL DEFAULT 0,
     source_path TEXT,
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,

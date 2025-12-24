@@ -150,6 +150,9 @@ export const api = {
 
   me: () => request<User>("/auth/me"),
 
+  completeOnboarding: () =>
+    request<{ success: boolean }>("/auth/onboarded", { method: "POST" }),
+
   getLibrary: () =>
     request<{ songs: Song[]; albums: Album[]; artists: Artist[] }>(
       `/library`,
@@ -230,6 +233,26 @@ export const api = {
       method: "PUT",
       body: JSON.stringify({ name, description, public: isPublic }),
     }),
+
+  uploadPlaylistCover: async (id: number, file: File): Promise<{ cover_path: string }> => {
+    const formData = new FormData();
+    formData.append("cover", file);
+    const token = getAccessToken();
+    const headers: Record<string, string> = {};
+    if (token) headers["Authorization"] = `Bearer ${token}`;
+    const res = await fetch(`${getApiUrl()}/playlists/${id}/cover`, {
+      method: "POST",
+      headers,
+      body: formData,
+    });
+    if (!res.ok) {
+      const error = await res.json().catch(() => ({ error: res.statusText }));
+      throw new Error(error.error || error.message || res.statusText);
+    }
+    return res.json();
+  },
+
+  getPlaylistCoverUrl: (id: number) => `${getApiUrl()}/playlists/${id}/cover`,
 
   deletePlaylist: (id: number) =>
     request<{ success: boolean }>(`/playlists/${id}`, { method: "DELETE" }),

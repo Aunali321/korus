@@ -8,6 +8,7 @@ type User struct {
 	Email        string    `json:"email"`
 	PasswordHash string    `json:"-"`
 	Role         string    `json:"role"`
+	Onboarded    bool      `json:"onboarded"`
 	CreatedAt    time.Time `json:"created_at"`
 }
 

@@ -194,13 +194,6 @@ function createPlayerStore() {
         // Only add global listeners once
         if (!globalListenersAdded) {
             globalListenersAdded = true;
-            
-            document.addEventListener('visibilitychange', () => {
-                if (document.visibilityState === 'hidden') {
-                    recordHistory();
-                    saveStateImmediate();
-                }
-            });
 
             window.addEventListener('beforeunload', () => {
                 recordHistory();
@@ -261,6 +254,60 @@ function createPlayerStore() {
             isPlaying = false;
             saveStateDebounced();
         });
+
+        setupMediaSession();
+    }
+
+    function setupMediaSession() {
+        if (typeof navigator === 'undefined' || !('mediaSession' in navigator)) return;
+
+        navigator.mediaSession.setActionHandler('play', () => {
+            audio?.play().catch(console.error);
+        });
+
+        navigator.mediaSession.setActionHandler('pause', () => {
+            audio?.pause();
+        });
+
+        navigator.mediaSession.setActionHandler('previoustrack', () => {
+            prev();
+        });
+
+        navigator.mediaSession.setActionHandler('nexttrack', () => {
+            next();
+        });
+
+        navigator.mediaSession.setActionHandler('seekto', (details) => {
+            if (audio && details.seekTime !== undefined) {
+                audio.currentTime = details.seekTime;
+            }
+        });
+
+        navigator.mediaSession.setActionHandler('seekbackward', (details) => {
+            if (audio) {
+                audio.currentTime = Math.max(0, audio.currentTime - (details.seekOffset || 10));
+            }
+        });
+
+        navigator.mediaSession.setActionHandler('seekforward', (details) => {
+            if (audio) {
+                audio.currentTime = Math.min(duration, audio.currentTime + (details.seekOffset || 10));
+            }
+        });
+    }
+
+    function updateMediaSessionMetadata(song: Song) {
+        if (typeof navigator === 'undefined' || !('mediaSession' in navigator)) return;
+
+        const artwork = api.getArtworkUrl(song.id);
+        navigator.mediaSession.metadata = new MediaMetadata({
+            title: song.title,
+            artist: song.artist?.name || 'Unknown Artist',
+            album: song.album?.title || 'Unknown Album',
+            artwork: [
+                { src: artwork, sizes: '512x512', type: 'image/jpeg' },
+            ],
+        });
     }
 
     function loadSong(song: Song) {
@@ -275,6 +322,7 @@ function createPlayerStore() {
 
         audio.src = streamUrl;
         audio.load();
+        updateMediaSessionMetadata(song);
     }
 
     function shuffleQueue(songs: Song[], currentIndex: number): { shuffled: Song[], newIndex: number } {

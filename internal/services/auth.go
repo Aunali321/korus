@@ -66,10 +66,10 @@ func (s *AuthService) Register(ctx context.Context, username, email, password st
 func (s *AuthService) Login(ctx context.Context, username, password string) (models.User, Tokens, error) {
 	var user models.User
 	err := s.db.QueryRowContext(ctx, `
-		SELECT id, username, password_hash, email, role, created_at
+		SELECT id, username, password_hash, email, role, onboarded, created_at
 		FROM users
 		WHERE username = ?
-	`, username).Scan(&user.ID, &user.Username, &user.PasswordHash, &user.Email, &user.Role, &user.CreatedAt)
+	`, username).Scan(&user.ID, &user.Username, &user.PasswordHash, &user.Email, &user.Role, &user.Onboarded, &user.CreatedAt)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return models.User{}, Tokens{}, errors.New("invalid credentials")
@@ -135,11 +135,11 @@ func (s *AuthService) ValidateToken(ctx context.Context, tokenStr string) (model
 	var user models.User
 	var expires time.Time
 	err = s.db.QueryRowContext(ctx, `
-		SELECT u.id, u.username, u.password_hash, u.email, u.role, u.created_at, s.expires_at
+		SELECT u.id, u.username, u.password_hash, u.email, u.role, u.onboarded, u.created_at, s.expires_at
 		FROM users u
 		JOIN sessions s ON s.user_id = u.id
 		WHERE u.id = ? AND s.token = ?
-	`, uidStr, sid).Scan(&user.ID, &user.Username, &user.PasswordHash, &user.Email, &user.Role, &user.CreatedAt, &expires)
+	`, uidStr, sid).Scan(&user.ID, &user.Username, &user.PasswordHash, &user.Email, &user.Role, &user.Onboarded, &user.CreatedAt, &expires)
 	if err != nil {
 		return models.User{}, errors.New("session not found")
 	}
@@ -186,11 +186,11 @@ func (s *AuthService) Refresh(ctx context.Context, refreshToken string) (models.
 	var sessionToken string
 	var expires time.Time
 	err := s.db.QueryRowContext(ctx, `
-		SELECT rt.session_token, rt.expires_at, u.id, u.username, u.password_hash, u.email, u.role, u.created_at
+		SELECT rt.session_token, rt.expires_at, u.id, u.username, u.password_hash, u.email, u.role, u.onboarded, u.created_at
 		FROM refresh_tokens rt
 		JOIN users u ON u.id = rt.user_id
 		WHERE rt.token_hash = ? AND rt.revoked = 0
-	`, hash).Scan(&sessionToken, &expires, &user.ID, &user.Username, &user.PasswordHash, &user.Email, &user.Role, &user.CreatedAt)
+	`, hash).Scan(&sessionToken, &expires, &user.ID, &user.Username, &user.PasswordHash, &user.Email, &user.Role, &user.Onboarded, &user.CreatedAt)
 	if err != nil {
 		return models.User{}, Tokens{}, errors.New("invalid refresh token")
 	}
