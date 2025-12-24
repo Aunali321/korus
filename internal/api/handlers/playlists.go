@@ -53,6 +53,7 @@ func (h *Handler) ListPlaylists(c echo.Context) error {
 		if err := rows.Scan(&id, &uid, &name, &desc, &pub, &created, &owner, &songCount, &firstSongID); err == nil {
 			item := map[string]any{
 				"id":          id,
+				"user_id":     uid,
 				"name":        name,
 				"description": desc,
 				"public":      pub,
@@ -95,6 +96,7 @@ func (h *Handler) CreatePlaylist(c echo.Context) error {
 	id, _ := res.LastInsertId()
 	return c.JSON(http.StatusOK, map[string]interface{}{
 		"id":          id,
+		"user_id":     user.ID,
 		"name":        req.Name,
 		"description": req.Description,
 		"public":      req.Public,
@@ -113,12 +115,15 @@ func (h *Handler) CreatePlaylist(c echo.Context) error {
 func (h *Handler) GetPlaylist(c echo.Context) error {
 	user, _ := currentUser(c)
 	id, _ := strconv.ParseInt(c.Param("id"), 10, 64)
-	var name, desc string
+	var name, desc, ownerUsername string
 	var ownerID int64
 	var pub bool
 	err := h.db.QueryRowContext(c.Request().Context(), `
-		SELECT id, user_id, name, description, public FROM playlists WHERE id = ?
-	`, id).Scan(&id, &ownerID, &name, &desc, &pub)
+		SELECT p.id, p.user_id, p.name, p.description, p.public, u.username
+		FROM playlists p
+		JOIN users u ON u.id = p.user_id
+		WHERE p.id = ?
+	`, id).Scan(&id, &ownerID, &name, &desc, &pub, &ownerUsername)
 	if err != nil {
 		return echo.NewHTTPError(http.StatusNotFound, map[string]string{"error": "playlist not found", "code": "NOT_FOUND"})
 	}
@@ -128,11 +133,12 @@ func (h *Handler) GetPlaylist(c echo.Context) error {
 	songs, _ := db.GetSongsByPlaylist(c.Request().Context(), h.db, id)
 	return c.JSON(http.StatusOK, map[string]any{
 		"id":          id,
+		"user_id":     ownerID,
 		"name":        name,
 		"description": desc,
 		"public":      pub,
 		"songs":       songs,
-		"owner":       map[string]interface{}{"id": ownerID},
+		"owner":       map[string]interface{}{"id": ownerID, "username": ownerUsername},
 	})
 }
 
@@ -172,6 +178,7 @@ func (h *Handler) UpdatePlaylist(c echo.Context) error {
 	}
 	return c.JSON(http.StatusOK, map[string]interface{}{
 		"id":          id,
+		"user_id":     user.ID,
 		"name":        req.Name,
 		"description": req.Description,
 		"public":      req.Public,

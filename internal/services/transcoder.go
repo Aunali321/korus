@@ -9,6 +9,7 @@ type TranscodeRequest struct {
 	Format  string
 	Bitrate int
 	Path    string
+	SeekSec float64 // Time offset in seconds for seeking
 	// For WAV: needed to calculate Content-Length and seeking
 	DurationMs int
 	SampleRate int
@@ -152,34 +153,44 @@ func (t *Transcoder) Args(req TranscodeRequest) ([]string, error) {
 	if _, err := t.Validate(req.Format, req.Bitrate); err != nil {
 		return nil, err
 	}
+
+	// Build seek args if seeking is requested
+	var seekArgs []string
+	if req.SeekSec > 0 {
+		seekArgs = []string{"-ss", fmt.Sprintf("%.3f", req.SeekSec)}
+	}
+
 	switch req.Format {
 	case "wav":
 		codec := pcmCodec(req.BitDepth)
+		args := append(seekArgs, "-i", req.Path, "-vn", "-c:a", codec)
 		if req.SampleRate > 0 {
-			return []string{"-i", req.Path, "-vn", "-c:a", codec,
-				"-ar", fmt.Sprintf("%d", req.SampleRate),
-				"-ac", fmt.Sprintf("%d", req.Channels),
-				"-f", "wav", "-"}, nil
+			args = append(args, "-ar", fmt.Sprintf("%d", req.SampleRate),
+				"-ac", fmt.Sprintf("%d", req.Channels))
 		}
-		return []string{"-i", req.Path, "-vn", "-c:a", codec, "-f", "wav", "-"}, nil
+		args = append(args, "-f", "wav", "-")
+		return args, nil
 	case "mp3":
 		br := req.Bitrate
 		if br == 0 {
 			br = allowedFormats["mp3"][len(allowedFormats["mp3"])-1]
 		}
-		return []string{"-i", req.Path, "-vn", "-acodec", "libmp3lame", "-b:a", fmt.Sprintf("%dk", br), "-f", "mp3", "-"}, nil
+		args := append(seekArgs, "-i", req.Path, "-vn", "-acodec", "libmp3lame", "-b:a", fmt.Sprintf("%dk", br), "-f", "mp3", "-")
+		return args, nil
 	case "aac":
 		br := req.Bitrate
 		if br == 0 {
 			br = allowedFormats["aac"][len(allowedFormats["aac"])-1]
 		}
-		return []string{"-i", req.Path, "-vn", "-c:a", "aac", "-b:a", fmt.Sprintf("%dk", br), "-f", "adts", "-"}, nil
+		args := append(seekArgs, "-i", req.Path, "-vn", "-c:a", "aac", "-b:a", fmt.Sprintf("%dk", br), "-f", "adts", "-")
+		return args, nil
 	case "opus":
 		br := req.Bitrate
 		if br == 0 {
 			br = allowedFormats["opus"][len(allowedFormats["opus"])-1]
 		}
-		return []string{"-i", req.Path, "-vn", "-c:a", "libopus", "-b:a", fmt.Sprintf("%dk", br), "-f", "opus", "-"}, nil
+		args := append(seekArgs, "-i", req.Path, "-vn", "-c:a", "libopus", "-b:a", fmt.Sprintf("%dk", br), "-f", "opus", "-")
+		return args, nil
 	default:
 		return nil, errors.New("unsupported format")
 	}

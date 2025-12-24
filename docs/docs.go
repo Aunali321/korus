@@ -1693,6 +1693,12 @@ const docTemplate = `{
                         "description": "bitrate kbps",
                         "name": "bitrate",
                         "in": "query"
+                    },
+                    {
+                        "type": "number",
+                        "description": "seek position in seconds",
+                        "name": "seek",
+                        "in": "query"
                     }
                 ],
                 "responses": {

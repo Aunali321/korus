@@ -38,6 +38,7 @@ export interface Playlist {
     description?: string;
     public: boolean;
     user_id: number;
+    owner?: { id: number; username: string };
     songs?: Song[];
     song_count?: number;
     first_song_id?: number;
@@ -74,9 +75,9 @@ export interface Stats {
     total_duration: number;
     unique_songs: number;
     unique_artists: number;
-    top_songs: Array<{ song: Song; play_count: number }>;
-    top_artists: Array<{ artist: Artist; play_count: number }>;
-    top_albums: Array<{ album: Album; play_count: number }>;
+    top_songs: Array<{ song: Song; play_count: number; total_time?: number; avg_completion?: number }>;
+    top_artists: Array<{ artist: Artist; play_count: number; total_time?: number }>;
+    top_albums: Array<{ album: Album; play_count: number; total_time?: number; completion_rate?: number }>;
     top_genres?: Array<{ genre: string; play_count: number }>;
     listening_by_hour?: Record<string, number>;
     listening_by_day?: Record<string, number>;

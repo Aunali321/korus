@@ -1229,6 +1229,10 @@ paths:
         in: query
         name: bitrate
         type: integer
+      - description: seek position in seconds
+        in: query
+        name: seek
+        type: number
       produces:
       - application/octet-stream
       responses:

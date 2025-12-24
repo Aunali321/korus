@@ -104,6 +104,7 @@ func parseRangeHeader(rangeHeader string, totalSize int64) (start int64, end int
 // @Param id path int true "Song ID"
 // @Param format query string false "mp3|aac|opus|wav"
 // @Param bitrate query int false "bitrate kbps"
+// @Param seek query number false "seek position in seconds"
 // @Success 200 {file} binary
 // @Failure 400 {object} map[string]string
 // @Failure 404 {object} map[string]string
@@ -119,6 +120,7 @@ func (h *Handler) Stream(c echo.Context) error {
 
 	format := c.QueryParam("format")
 	bitrate, _ := strconv.Atoi(c.QueryParam("bitrate"))
+	seekSec, _ := strconv.ParseFloat(c.QueryParam("seek"), 64)
 
 	// No format = serve original file
 	if format == "" {
@@ -139,8 +141,8 @@ func (h *Handler) Stream(c echo.Context) error {
 		return h.streamWAV(c, meta, contentType)
 	}
 
-	// Other formats: simple pipe
-	return h.streamTranscode(c, meta.Path, format, bitrate, contentType)
+	// Other formats: transcode with optional seek
+	return h.streamTranscode(c, meta.Path, format, bitrate, contentType, seekSec)
 }
 
 func (h *Handler) streamWAV(c echo.Context, meta *songMetadata, contentType string) error {
@@ -211,10 +213,10 @@ func (h *Handler) streamWAV(c echo.Context, meta *songMetadata, contentType stri
 	return cmd.Wait()
 }
 
-func (h *Handler) streamTranscode(c echo.Context, path, format string, bitrate int, contentType string) error {
+func (h *Handler) streamTranscode(c echo.Context, path, format string, bitrate int, contentType string, seekSec float64) error {
 	ctx := c.Request().Context()
 
-	args, err := h.transcoder.Args(services.TranscodeRequest{Format: format, Bitrate: bitrate, Path: path})
+	args, err := h.transcoder.Args(services.TranscodeRequest{Format: format, Bitrate: bitrate, Path: path, SeekSec: seekSec})
 	if err != nil {
 		return echo.NewHTTPError(http.StatusBadRequest, map[string]string{"error": err.Error(), "code": "INVALID_TRANSCODE"})
 	}

@@ -255,11 +255,14 @@ func resolvePeriod(period string) (time.Time, time.Time) {
 
 func (h *Handler) rankSongs(ctx context.Context, userID int64, start, end time.Time, limit int) []map[string]interface{} {
 	rows, err := h.db.QueryContext(ctx, `
-		SELECT s.id, s.title, COUNT(*) as plays, COALESCE(SUM(ph.duration_listened),0) as total_time, COALESCE(AVG(ph.completion_rate),0) as avg_comp
+		SELECT s.id, s.title, s.album_id, s.duration, ar.id, ar.name,
+		       COUNT(*) as plays, COALESCE(SUM(ph.duration_listened),0) as total_time, COALESCE(AVG(ph.completion_rate),0) as avg_comp
 		FROM play_history ph
 		JOIN songs s ON s.id = ph.song_id
+		JOIN albums al ON al.id = s.album_id
+		JOIN artists ar ON ar.id = al.artist_id
 		WHERE ph.user_id = ? AND ph.played_at BETWEEN ? AND ?
-		GROUP BY s.id, s.title
+		GROUP BY s.id, s.title, s.album_id, s.duration, ar.id, ar.name
 		ORDER BY plays DESC
 		LIMIT ?
 	`, userID, start.Format(time.RFC3339), end.Format(time.RFC3339), limit)
@@ -269,13 +272,19 @@ func (h *Handler) rankSongs(ctx context.Context, userID int64, start, end time.T
 	defer rows.Close()
 	var res []map[string]interface{}
 	for rows.Next() {
-		var id int64
-		var title string
+		var id, albumID, duration, artistID int64
+		var title, artistName string
 		var plays, totalTime int64
 		var avg float64
-		if err := rows.Scan(&id, &title, &plays, &totalTime, &avg); err == nil {
+		if err := rows.Scan(&id, &title, &albumID, &duration, &artistID, &artistName, &plays, &totalTime, &avg); err == nil {
 			res = append(res, map[string]interface{}{
-				"song":           map[string]interface{}{"id": id, "title": title},
+				"song": map[string]interface{}{
+					"id":       id,
+					"title":    title,
+					"album_id": albumID,
+					"duration": duration,
+					"artist":   map[string]interface{}{"id": artistID, "name": artistName},
+				},
 				"play_count":     plays,
 				"total_time":     totalTime,
 				"avg_completion": avg,
@@ -352,12 +361,14 @@ func (h *Handler) rankArtists(ctx context.Context, userID int64, start, end time
 
 func (h *Handler) rankAlbums(ctx context.Context, userID int64, start, end time.Time, limit int) []map[string]interface{} {
 	rows, err := h.db.QueryContext(ctx, `
-		SELECT al.id, al.title, COUNT(*) as plays, COALESCE(SUM(ph.duration_listened),0) as total_time, COALESCE(AVG(ph.completion_rate),0) as comp
+		SELECT al.id, al.title, al.artist_id, ar.id, ar.name,
+		       COUNT(*) as plays, COALESCE(SUM(ph.duration_listened),0) as total_time, COALESCE(AVG(ph.completion_rate),0) as comp
 		FROM play_history ph
 		JOIN songs s ON s.id = ph.song_id
 		JOIN albums al ON al.id = s.album_id
+		JOIN artists ar ON ar.id = al.artist_id
 		WHERE ph.user_id = ? AND ph.played_at BETWEEN ? AND ?
-		GROUP BY al.id, al.title
+		GROUP BY al.id, al.title, al.artist_id, ar.id, ar.name
 		ORDER BY plays DESC
 		LIMIT ?
 	`, userID, start.Format(time.RFC3339), end.Format(time.RFC3339), limit)
@@ -367,13 +378,18 @@ func (h *Handler) rankAlbums(ctx context.Context, userID int64, start, end time.
 	defer rows.Close()
 	var res []map[string]interface{}
 	for rows.Next() {
-		var id int64
-		var title string
+		var id, artistID, artistIDFromJoin int64
+		var title, artistName string
 		var plays, totalTime int64
 		var comp float64
-		if err := rows.Scan(&id, &title, &plays, &totalTime, &comp); err == nil {
+		if err := rows.Scan(&id, &title, &artistID, &artistIDFromJoin, &artistName, &plays, &totalTime, &comp); err == nil {
 			res = append(res, map[string]interface{}{
-				"album":           map[string]interface{}{"id": id, "title": title},
+				"album": map[string]interface{}{
+					"id":        id,
+					"title":     title,
+					"artist_id": artistID,
+					"artist":    map[string]interface{}{"id": artistIDFromJoin, "name": artistName},
+				},
 				"play_count":      plays,
 				"total_time":      totalTime,
 				"completion_rate": comp,
