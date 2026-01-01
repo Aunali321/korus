@@ -457,6 +457,18 @@ function createPlayerStore() {
         saveStateDebounced();
     }
 
+    function playNext(song: Song) {
+        if (queue.length === 0) {
+            queue = [song];
+        } else {
+            // Insert after current song
+            const before = queue.slice(0, queueIndex + 1);
+            const after = queue.slice(queueIndex + 1);
+            queue = [...before, song, ...after];
+        }
+        saveStateDebounced();
+    }
+
     function clearQueue() {
         queue = [];
         queueIndex = 0;
@@ -573,6 +585,7 @@ function createPlayerStore() {
         toggleShuffle,
         toggleRepeat,
         addToQueue,
+        playNext,
         clearQueue,
         playQueue,
         playShuffled,

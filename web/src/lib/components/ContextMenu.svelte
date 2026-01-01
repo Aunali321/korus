@@ -1,5 +1,5 @@
 <script lang="ts">
-    import { ListPlus, Radio, Plus, Minus, ChevronRight } from "lucide-svelte";
+    import { ListPlus, ListStart, Radio, Plus, Minus, ChevronRight } from "lucide-svelte";
     import type { Playlist } from "$lib/types";
     import { contextMenu } from "$lib/stores/contextMenu.svelte";
     import { settings } from "$lib/stores/settings.svelte";
@@ -35,6 +35,9 @@
         if (!song) return;
 
         switch (id) {
+            case "play-next":
+                player.playNext(song);
+                break;
             case "add-to-queue":
                 player.addToQueue(song);
                 break;
@@ -96,6 +99,15 @@
         oncontextmenu={(e) => { e.preventDefault(); e.stopPropagation(); }}
         role="menu"
     >
+        <button
+            onclick={() => handleSelect("play-next")}
+            class="flex items-center gap-3 w-full px-4 py-2 text-sm text-left hover:bg-zinc-700 transition-colors"
+            role="menuitem"
+        >
+            <ListStart size={16} />
+            Play Next
+        </button>
+
         <button
             onclick={() => handleSelect("add-to-queue")}
             class="flex items-center gap-3 w-full px-4 py-2 text-sm text-left hover:bg-zinc-700 transition-colors"
