@@ -47,8 +47,6 @@ definitions:
     type: object
   handlers.playlistRequest:
     properties:
-      cover_song_id:
-        type: integer
       description:
         type: string
       name:
@@ -193,6 +191,41 @@ paths:
               type: integer
             type: object
       summary: Cleanup sessions
+      tags:
+      - Admin
+  /admin/settings:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+      summary: Get app settings
+      tags:
+      - Admin
+    put:
+      consumes:
+      - application/json
+      parameters:
+      - description: Settings
+        in: body
+        name: settings
+        required: true
+        schema:
+          additionalProperties: true
+          type: object
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+      summary: Update app settings
       tags:
       - Admin
   /admin/system:
@@ -947,6 +980,74 @@ paths:
       summary: Update playlist
       tags:
       - Playlists
+  /playlists/{id}/cover:
+    get:
+      parameters:
+      - description: Playlist ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - image/*
+      responses:
+        "200":
+          description: OK
+          schema:
+            type: file
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Get playlist cover
+      tags:
+      - Playlists
+    post:
+      consumes:
+      - multipart/form-data
+      parameters:
+      - description: Playlist ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Cover image
+        in: formData
+        name: cover
+        required: true
+        type: file
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "403":
+          description: Forbidden
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Upload playlist cover
+      tags:
+      - Playlists
   /playlists/{id}/reorder:
     put:
       consumes:
@@ -1071,6 +1172,39 @@ paths:
       summary: Remove song from playlist
       tags:
       - Playlists
+  /radio/{id}:
+    get:
+      parameters:
+      - description: Song ID to seed radio from
+        in: path
+        name: id
+        required: true
+        type: integer
+      - default: 20
+        description: Number of songs to return
+        in: query
+        name: limit
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              items:
+                $ref: '#/definitions/models.Song'
+              type: array
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Get similar songs for radio playback
+      tags:
+      - Radio
   /scan:
     post:
       produces:

@@ -1,6 +1,6 @@
 <script lang="ts">
     import { VList } from "virtua/svelte";
-    import { X, Play } from "lucide-svelte";
+    import { X, Play, Loader2 } from "lucide-svelte";
     import { player } from "$lib/stores/player.svelte";
     import { api } from "$lib/api";
 
@@ -65,7 +65,12 @@
                     Up Next ({upNextTracks.length})
                 </h3>
             </div>
-            {#if upNextTracks.length > 0}
+            {#if player.radioLoading}
+                <div class="flex items-center justify-center gap-2 py-8 text-zinc-400">
+                    <Loader2 size={16} class="animate-spin" />
+                    <span class="text-sm">Loading radio...</span>
+                </div>
+            {:else if upNextTracks.length > 0}
                 <VList data={upNextTracks} style="height: calc(100vh - 28rem);" getKey={(track) => track.id}>
                     {#snippet children(track, index)}
                         <button

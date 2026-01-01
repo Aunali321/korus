@@ -13,6 +13,7 @@ Self-hosted music streaming server with a web interface.
 - **Listening history** - Track what you've played
 - **Stats** - Listening statistics with time period filters
 - **Wrapped** - Year-in-review style listening summary
+- **Radio** - LLM-powered song recommendations based on your library
 - **Lyrics** - Display lyrics when available
 - **Queue management** - Reorder, add, remove tracks
 - **MusicBrainz integration** - Enrich metadata from MusicBrainz
@@ -121,6 +122,18 @@ Environment variables:
 | `RATE_LIMIT_AUTH_COUNT` | `5` | Auth attempts allowed |
 | `RATE_LIMIT_AUTH_WINDOW` | `1m` | Time window for auth rate limit |
 
+### Radio (LLM Recommendations)
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `RADIO_LLM_ENABLED` | `false` | Enable LLM-powered radio recommendations |
+| `OPENROUTER_API_KEY` | - | OpenRouter API key (required if radio enabled) |
+| `RADIO_LLM_MODEL` | `google/gemini-3-flash-preview` | LLM model to use |
+
+When enabled, the radio feature uses an LLM to find similar songs from your library based on genre, style, mood, and language. The entire library is rendered as a PDF and sent to the model for context.
+
+If disabled or if the LLM fails, radio falls back to metadata-based recommendations (same artist/album/year).
+
 ## API
 
 ### Auth
@@ -164,8 +177,13 @@ Environment variables:
 
 ### Admin
 - `GET /api/admin/system` - System info
-- `POST /api/admin/sessions/cleanup` - Clean expired sessions
+- `DELETE /api/admin/sessions/cleanup` - Clean expired sessions
 - `POST /api/admin/musicbrainz/enrich` - Enrich metadata
+- `GET /api/admin/settings` - Get app settings
+- `PUT /api/admin/settings` - Update app settings
+
+### Radio
+- `GET /api/radio/:id` - Get similar song recommendations
 
 ## Tests
 

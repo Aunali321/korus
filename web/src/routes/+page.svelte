@@ -1,14 +1,14 @@
 <script lang="ts">
-    import { Play, Shuffle } from "lucide-svelte";
+    import { Play, Shuffle, Radio } from "lucide-svelte";
     import { api } from "$lib/api";
     import { auth } from "$lib/stores/auth.svelte";
     import { player } from "$lib/stores/player.svelte";
     import { library } from "$lib/stores/library.svelte";
+    import { settings } from "$lib/stores/settings.svelte";
     import type { Song, Album } from "$lib/types";
     import Card from "$lib/components/Card.svelte";
 
     let recentPlays = $state<Song[]>([]);
-    let recommendations = $state<Song[]>([]);
     let newAdditions = $state<Album[]>([]);
     let loading = $state(true);
     let loaded = $state(false);
@@ -22,9 +22,9 @@
     async function loadHome() {
         loaded = true;
         try {
+            await settings.load();
             const data = await api.getHome();
             recentPlays = data.recent_plays || [];
-            recommendations = data.recommendations || [];
             newAdditions = data.new_additions || [];
         } catch (e) {
             console.error("Failed to load home data:", e);
@@ -38,6 +38,10 @@
             songs,
             songs.findIndex((s) => s.id === song.id),
         );
+    }
+
+    function startRadio(song: Song) {
+        player.startRadio(song);
     }
 
     async function shuffleLibrary() {
@@ -87,6 +91,33 @@
             <div class="text-zinc-500">Loading...</div>
         </div>
     {:else}
+        {#if settings.radioEnabled && recentPlays.length > 0}
+            <section>
+                <h3 class="text-2xl font-bold mb-4">Quick Picks</h3>
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                    {#each recentPlays.slice(0, 9) as song (song.id)}
+                        <button
+                            onclick={() => startRadio(song)}
+                            class="flex items-center gap-3 p-3 rounded-lg bg-zinc-900/50 hover:bg-zinc-800 transition-all group text-left"
+                        >
+                            <img
+                                src={api.getArtworkUrl(song.id)}
+                                alt={song.title}
+                                class="w-12 h-12 rounded object-cover bg-zinc-800 shrink-0"
+                            />
+                            <div class="min-w-0 flex-1">
+                                <p class="font-medium truncate text-sm">{song.title}</p>
+                                <p class="text-xs text-zinc-400 truncate">{song.artist?.name || "Unknown"}</p>
+                            </div>
+                            <div class="opacity-0 group-hover:opacity-100 transition-opacity">
+                                <Radio size={16} class="text-emerald-400" />
+                            </div>
+                        </button>
+                    {/each}
+                </div>
+            </section>
+        {/if}
+
         {#if recentPlays.length > 0}
             <section>
                 <h3 class="text-2xl font-bold mb-4">Recently Played</h3>
@@ -99,24 +130,6 @@
                             subtitle={song.artist?.name || "Unknown"}
                             image={api.getArtworkUrl(song.id)}
                             onPlay={() => playTrack(song, recentPlays)}
-                        />
-                    {/each}
-                </div>
-            </section>
-        {/if}
-
-        {#if recommendations.length > 0}
-            <section>
-                <h3 class="text-2xl font-bold mb-4">Recommended For You</h3>
-                <div
-                    class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4"
-                >
-                    {#each recommendations.slice(0, 6) as song (song.id)}
-                        <Card
-                            title={song.title}
-                            subtitle={song.artist?.name || "Unknown"}
-                            image={api.getArtworkUrl(song.id)}
-                            onPlay={() => playTrack(song, recommendations)}
                         />
                     {/each}
                 </div>
@@ -144,7 +157,7 @@
             </section>
         {/if}
 
-        {#if recentPlays.length === 0 && recommendations.length === 0 && newAdditions.length === 0}
+        {#if recentPlays.length === 0 && newAdditions.length === 0}
             <div class="text-center py-12 text-zinc-500">
                 <p class="text-lg mb-2">No music yet</p>
                 <p class="text-sm">

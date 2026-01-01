@@ -6,6 +6,7 @@ import (
 	"runtime"
 	"time"
 
+	"github.com/Aunali321/korus/internal/db"
 	"github.com/labstack/echo/v4"
 )
 
@@ -135,4 +136,57 @@ func hostname() string {
 		return ""
 	}
 	return h
+}
+
+// GetAppSettings godoc
+// @Summary Get app settings
+// @Tags Admin
+// @Produce json
+// @Success 200 {object} map[string]interface{}
+// @Router /admin/settings [get]
+func (h *Handler) GetAppSettings(c echo.Context) error {
+	ctx := c.Request().Context()
+	radioEnabled := false
+	if val, err := db.GetAppSetting(ctx, h.db, "radio_enabled"); err == nil && val == "true" {
+		radioEnabled = true
+	}
+	return c.JSON(http.StatusOK, map[string]interface{}{
+		"radio_enabled": radioEnabled,
+	})
+}
+
+// UpdateAppSettings godoc
+// @Summary Update app settings
+// @Tags Admin
+// @Accept json
+// @Produce json
+// @Param settings body map[string]interface{} true "Settings"
+// @Success 200 {object} map[string]interface{}
+// @Router /admin/settings [put]
+func (h *Handler) UpdateAppSettings(c echo.Context) error {
+	var payload struct {
+		RadioEnabled *bool `json:"radio_enabled"`
+	}
+	if err := c.Bind(&payload); err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, map[string]string{"error": "invalid payload", "code": "BAD_REQUEST"})
+	}
+
+	ctx := c.Request().Context()
+	if payload.RadioEnabled != nil {
+		val := "false"
+		if *payload.RadioEnabled {
+			val = "true"
+		}
+		if err := db.SetAppSetting(ctx, h.db, "radio_enabled", val); err != nil {
+			return echo.NewHTTPError(http.StatusInternalServerError, map[string]string{"error": "failed to save settings", "code": "INTERNAL_ERROR"})
+		}
+	}
+
+	radioEnabled := false
+	if val, err := db.GetAppSetting(ctx, h.db, "radio_enabled"); err == nil && val == "true" {
+		radioEnabled = true
+	}
+	return c.JSON(http.StatusOK, map[string]interface{}{
+		"radio_enabled": radioEnabled,
+	})
 }

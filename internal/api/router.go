@@ -25,6 +25,7 @@ type Deps struct {
 	Transcoder   *services.Transcoder
 	MusicBrainz  *services.MusicBrainzService
 	ListenBrainz *services.ListenBrainzService
+	Radio        *services.RadioService
 	MediaRoot    string
 	AuthRate     int
 	AuthWindow   time.Duration
@@ -47,7 +48,7 @@ func New(deps Deps) *echo.Echo {
 	e.Use(echomw.Recover())
 	e.Use(echomw.CORS())
 
-	h := handlers.New(deps.DB, deps.Auth, deps.Scanner, deps.Search, deps.Transcoder, deps.MusicBrainz, deps.ListenBrainz, deps.MediaRoot)
+	h := handlers.New(deps.DB, deps.Auth, deps.Scanner, deps.Search, deps.Transcoder, deps.MusicBrainz, deps.ListenBrainz, deps.Radio, deps.MediaRoot)
 
 	api := e.Group("/api")
 	api.GET("/health", h.Health)
@@ -107,6 +108,7 @@ func New(deps Deps) *echo.Echo {
 	api.GET("/stats/wrapped", h.Wrapped, middleware.Auth(deps.Auth))
 	api.GET("/stats/insights", h.Insights, middleware.Auth(deps.Auth))
 	api.GET("/home", h.Home, middleware.Auth(deps.Auth))
+	api.GET("/radio/:id", h.Radio, middleware.Auth(deps.Auth))
 
 	api.GET("/settings", h.GetSettings, middleware.Auth(deps.Auth))
 	api.PUT("/settings", h.UpdateSettings, middleware.Auth(deps.Auth))
@@ -122,6 +124,8 @@ func New(deps Deps) *echo.Echo {
 	admin.GET("/system", h.SystemInfo)
 	admin.DELETE("/sessions/cleanup", h.CleanupSessions)
 	admin.POST("/musicbrainz/enrich", h.Enrich)
+	admin.GET("/settings", h.GetAppSettings)
+	admin.PUT("/settings", h.UpdateAppSettings)
 
 	api.POST("/musicbrainz/submit-listen", h.SubmitListen, middleware.Auth(deps.Auth))
 	api.GET("/musicbrainz/recommendations", h.Recommendations, middleware.Auth(deps.Auth))

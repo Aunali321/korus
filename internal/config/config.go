@@ -30,6 +30,9 @@ type Config struct {
 	ScanWorkers         int
 	ScanAutoPlaylists   bool
 	CoverCachePath      string
+	RadioLLMEnabled     bool
+	RadioLLMAPIKey      string
+	RadioLLMModel       string
 }
 
 // FromEnv builds Config from environment with sane defaults.
@@ -56,6 +59,9 @@ func FromEnv() (Config, error) {
 		ScanWorkers:         intEnv("SCAN_WORKERS", 8),
 		ScanAutoPlaylists:   boolEnv("SCAN_AUTO_PLAYLISTS", true),
 		CoverCachePath:      getenv("COVER_CACHE_PATH", "./cache/covers"),
+		RadioLLMEnabled:     boolEnv("RADIO_LLM_ENABLED", false),
+		RadioLLMAPIKey:      getenv("OPENROUTER_API_KEY", ""),
+		RadioLLMModel:       getenv("RADIO_LLM_MODEL", "google/gemini-3-flash-preview"),
 	}
 	if cfg.JWTSecret == "" {
 		return cfg, errors.New("JWT_SECRET is required")

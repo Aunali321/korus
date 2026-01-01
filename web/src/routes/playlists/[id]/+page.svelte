@@ -1,6 +1,7 @@
 <script lang="ts">
     import { page } from "$app/stores";
     import { goto } from "$app/navigation";
+    import { onMount } from "svelte";
     import { Play, Trash2, Edit2, Clock, Upload } from "lucide-svelte";
     import { api } from "$lib/api";
     import { auth } from "$lib/stores/auth.svelte";
@@ -89,14 +90,22 @@
 
     async function removeSong(songId: number) {
         if (!playlist) return;
-        try {
-            await api.removeSongFromPlaylist(playlist.id, songId);
-            playlist.songs = playlist.songs?.filter((s) => s.id !== songId);
-            toast.success("Song removed");
-        } catch {
-            toast.error("Failed to remove song");
+        playlist.songs = playlist.songs?.filter((s) => s.id !== songId);
+        toast.success("Song removed");
+    }
+
+    function handlePlaylistUpdate(e: CustomEvent<number>) {
+        if (playlist && e.detail === playlist.id) {
+            loadPlaylist(playlist.id);
         }
     }
+
+    onMount(() => {
+        window.addEventListener('playlist-updated', handlePlaylistUpdate as EventListener);
+        return () => {
+            window.removeEventListener('playlist-updated', handlePlaylistUpdate as EventListener);
+        };
+    });
 
     const songs = $derived(playlist?.songs || []);
     
@@ -245,7 +254,6 @@
                         index={i} 
                         {songs} 
                         playlistId={playlist.id}
-                        onRemoveFromPlaylist={() => removeSong(song.id)}
                     />
                 {/each}
             </div>

@@ -1,5 +1,5 @@
 <script lang="ts">
-    import { Shield, Server, Trash2 } from "lucide-svelte";
+    import { Shield, Server, Trash2, Radio } from "lucide-svelte";
     import { api } from "$lib/api";
     import { auth } from "$lib/stores/auth.svelte";
     import { toast } from "$lib/stores/toast.svelte";
@@ -10,6 +10,8 @@
     let loaded = $state(false);
     let cleanupDays = $state(30);
     let cleaning = $state(false);
+    let radioEnabled = $state(false);
+    let savingRadio = $state(false);
 
     $effect(() => {
         if (auth.isAuthenticated && !loaded) {
@@ -21,10 +23,27 @@
         loaded = true;
         try {
             systemInfo = await api.getSystemInfo().catch(() => null);
+            const settings = await api.getAppSettings().catch(() => null);
+            if (settings) {
+                radioEnabled = settings.radio_enabled;
+            }
         } catch (e) {
             console.error("Failed to load admin:", e);
         } finally {
             loading = false;
+        }
+    }
+
+    async function toggleRadio() {
+        savingRadio = true;
+        try {
+            const result = await api.updateAppSettings({ radio_enabled: !radioEnabled });
+            radioEnabled = result.radio_enabled;
+            toast.success(radioEnabled ? "Radio enabled" : "Radio disabled");
+        } catch {
+            toast.error("Failed to update radio setting");
+        } finally {
+            savingRadio = false;
         }
     }
 
@@ -115,6 +134,31 @@
                 </div>
             </section>
         {/if}
+
+        <section>
+            <h3 class="text-xl font-bold mb-4 flex items-center gap-2">
+                <Radio size={20} class="text-emerald-400" />
+                Radio Settings
+            </h3>
+            <div class="bg-zinc-900 border border-zinc-800 rounded-xl p-6">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="font-medium">Enable Radio</p>
+                        <p class="text-sm text-zinc-400">Allow users to start radio stations from songs</p>
+                    </div>
+                    <button
+                        onclick={toggleRadio}
+                        disabled={savingRadio}
+                        aria-label="Toggle radio"
+                        class="relative w-12 h-6 rounded-full transition-colors {radioEnabled ? 'bg-emerald-500' : 'bg-zinc-700'}"
+                    >
+                        <span
+                            class="absolute top-1 left-1 w-4 h-4 bg-white rounded-full transition-transform {radioEnabled ? 'translate-x-6' : ''}"
+                        ></span>
+                    </button>
+                </div>
+            </div>
+        </section>
 
         <section>
             <h3 class="text-xl font-bold mb-4 flex items-center gap-2">

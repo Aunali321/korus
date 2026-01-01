@@ -38,7 +38,7 @@ func main() {
 	defer database.Close()
 
 	ctx := context.Background()
-	if err := db.Migrate(ctx, database); err != nil {
+	if err := db.RunMigrations(database); err != nil {
 		log.Fatalf("migrate: %v", err)
 	}
 
@@ -57,6 +57,9 @@ func main() {
 	authSvc := services.NewAuthService(database, []byte(cfg.JWTSecret), cfg.TokenTTL, cfg.RefreshTTL)
 	if err := seedAdmin(ctx, authSvc, database, adminUser, adminEmail, adminPass); err != nil {
 		log.Fatalf("seed admin: %v", err)
+	}
+	if err := db.SeedAppSettings(ctx, database, cfg.RadioLLMEnabled); err != nil {
+		log.Fatalf("seed app settings: %v", err)
 	}
 
 	if _, err := exec.LookPath(cfg.FFmpegPath); err != nil {
@@ -85,6 +88,12 @@ func main() {
 		lb = services.NewListenBrainzService(cfg.ListenBrainzToken, cfg.ListenBrainzUser)
 	}
 
+	var radio *services.RadioService
+	if cfg.RadioLLMEnabled && cfg.RadioLLMAPIKey != "" {
+		radio = services.NewRadioService(database, cfg.RadioLLMAPIKey, cfg.RadioLLMModel)
+		log.Printf("Radio LLM enabled with model: %s", cfg.RadioLLMModel)
+	}
+
 	e := api.New(api.Deps{
 		DB:           database,
 		Auth:         authSvc,
@@ -93,6 +102,7 @@ func main() {
 		Transcoder:   transcoder,
 		MusicBrainz:  mb,
 		ListenBrainz: lb,
+		Radio:        radio,
 		MediaRoot:    cfg.MediaRoot,
 		AuthRate:     cfg.RateLimitAuthCount,
 		AuthWindow:   cfg.RateLimitAuthWindow,

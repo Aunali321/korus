@@ -352,4 +352,16 @@ export const api = {
     }),
 
   health: () => request<{ status: string }>("/health"),
+
+  getRadio: (songId: number, limit = 20) =>
+    request<{ songs: Song[] }>(`/radio/${songId}?limit=${limit}`),
+
+  getAppSettings: () =>
+    request<{ radio_enabled: boolean }>("/admin/settings"),
+
+  updateAppSettings: (settings: { radio_enabled?: boolean }) =>
+    request<{ radio_enabled: boolean }>("/admin/settings", {
+      method: "PUT",
+      body: JSON.stringify(settings),
+    }),
 };

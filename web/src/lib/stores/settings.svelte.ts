@@ -17,6 +17,7 @@ function createSettingsStore() {
     let streamingQuality = $state<StreamingQuality>({ preset: 'original' });
     let shuffle = $state(false);
     let repeat = $state<RepeatMode>('off');
+    let radioEnabled = $state(false);
     let loaded = $state(false);
     let syncing = $state(false);
 
@@ -49,9 +50,13 @@ function createSettingsStore() {
         loadLocal();
         
         try {
-            const remote = await api.getSettings();
+            const [remote, health] = await Promise.all([
+                api.getSettings(),
+                api.health(),
+            ]);
             shuffle = remote.shuffle;
             repeat = remote.repeat as RepeatMode;
+            radioEnabled = (health as { radio_enabled?: boolean }).radio_enabled ?? false;
             saveLocal();
             loaded = true;
         } catch {
@@ -134,6 +139,7 @@ function createSettingsStore() {
         get bitrate() { return streamingQuality.bitrate; },
         get shuffle() { return shuffle; },
         get repeat() { return repeat; },
+        get radioEnabled() { return radioEnabled; },
         get loaded() { return loaded; },
         setPreset,
         setCustom,

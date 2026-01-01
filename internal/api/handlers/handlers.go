@@ -14,10 +14,11 @@ type Handler struct {
 	transcoder   *services.Transcoder
 	musicBrainz  *services.MusicBrainzService
 	listenBrainz *services.ListenBrainzService
+	radio        *services.RadioService
 	mediaRoot    string
 }
 
-func New(db *sql.DB, auth *services.AuthService, scanner *services.ScannerService, search *services.SearchService, transcoder *services.Transcoder, mb *services.MusicBrainzService, lb *services.ListenBrainzService, mediaRoot string) *Handler {
+func New(db *sql.DB, auth *services.AuthService, scanner *services.ScannerService, search *services.SearchService, transcoder *services.Transcoder, mb *services.MusicBrainzService, lb *services.ListenBrainzService, radio *services.RadioService, mediaRoot string) *Handler {
 	return &Handler{
 		db:           db,
 		auth:         auth,
@@ -26,6 +27,7 @@ func New(db *sql.DB, auth *services.AuthService, scanner *services.ScannerServic
 		transcoder:   transcoder,
 		musicBrainz:  mb,
 		listenBrainz: lb,
+		radio:        radio,
 		mediaRoot:    mediaRoot,
 	}
 }

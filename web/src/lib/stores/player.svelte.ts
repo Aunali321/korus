@@ -23,6 +23,7 @@ function createPlayerStore() {
     let volume = $state(0.7);
     let progress = $state(0);
     let duration = $state(0);
+    let radioLoading = $state(false);
     let audio: HTMLAudioElement | null = null;
     let playStartTime = 0;
     let initialized = $state(false);
@@ -498,6 +499,33 @@ function createPlayerStore() {
         audio?.play().catch(console.error);
     }
 
+    async function startRadio(song: Song) {
+        recordHistory();
+        currentSong = song;
+        queue = [song];
+        originalQueue = [song];
+        queueIndex = 0;
+        playStartTime = 0;
+        radioLoading = true;
+        loadSong(song);
+        saveStateDebounced();
+        audio?.play().catch(console.error);
+
+        try {
+            const { songs: radioSongs } = await api.getRadio(song.id, 20);
+            if (radioSongs && radioSongs.length > 0) {
+                const newSongs = radioSongs.filter(s => s.id !== song.id);
+                queue = [song, ...newSongs];
+                originalQueue = [...queue];
+                saveStateDebounced();
+            }
+        } catch (err) {
+            console.error('Failed to fetch radio songs:', err);
+        } finally {
+            radioLoading = false;
+        }
+    }
+
     function reset() {
         if (audio) {
             audio.pause();
@@ -534,6 +562,7 @@ function createPlayerStore() {
         get shuffle() { return settings.shuffle; },
         get repeat() { return settings.repeat; },
         get initialized() { return initialized; },
+        get radioLoading() { return radioLoading; },
         play,
         pause,
         toggle,
@@ -547,6 +576,7 @@ function createPlayerStore() {
         clearQueue,
         playQueue,
         playShuffled,
+        startRadio,
         loadState,
         reset,
     };

@@ -3,6 +3,7 @@
     import { Search as SearchIcon } from "lucide-svelte";
     import { api } from "$lib/api";
     import { player } from "$lib/stores/player.svelte";
+    import { settings } from "$lib/stores/settings.svelte";
     import type { SearchResults, Song } from "$lib/types";
     import Card from "$lib/components/Card.svelte";
     import TrackRow from "$lib/components/TrackRow.svelte";
@@ -36,11 +37,12 @@
         }
     }
 
-    function playSong(song: Song, songs: Song[]) {
-        player.playQueue(
-            songs,
-            songs.findIndex((s) => s.id === song.id),
-        );
+    function playSong(song: Song) {
+        if (settings.radioEnabled) {
+            player.startRadio(song);
+        } else {
+            player.play(song);
+        }
     }
 </script>
 
@@ -86,8 +88,8 @@
                 <section>
                     <h3 class="text-xl font-bold mb-4">Songs</h3>
                     <div class="space-y-1">
-                        {#each results.songs.slice(0, activeTab === "all" ? 5 : undefined) as song, i (song.id)}
-                            <TrackRow {song} index={i} songs={results.songs} />
+                        {#each results.songs.slice(0, activeTab === "all" ? 5 : undefined) as song (song.id)}
+                            <TrackRow {song} />
                         {/each}
                     </div>
                 </section>

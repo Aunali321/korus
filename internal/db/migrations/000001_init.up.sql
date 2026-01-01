@@ -164,3 +164,8 @@ CREATE TABLE IF NOT EXISTS player_state (
     FOREIGN KEY (current_song_id) REFERENCES songs(id) ON DELETE SET NULL
 );
 
+CREATE TABLE IF NOT EXISTS app_settings (
+    key TEXT PRIMARY KEY,
+    value TEXT NOT NULL,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
