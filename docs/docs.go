@@ -1622,6 +1622,13 @@ const docTemplate = `{
                         "description": "Number of songs to return",
                         "name": "limit",
                         "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "default": "curator",
+                        "description": "Radio mode: curator or mainstream",
+                        "name": "mode",
+                        "in": "query"
                     }
                 ],
                 "responses": {

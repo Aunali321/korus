@@ -1185,6 +1185,11 @@ paths:
         in: query
         name: limit
         type: integer
+      - default: curator
+        description: 'Radio mode: curator or mainstream'
+        in: query
+        name: mode
+        type: string
       produces:
       - application/json
       responses:
