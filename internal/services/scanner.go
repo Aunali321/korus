@@ -8,8 +8,10 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"io/fs"
 	"log"
+	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -33,6 +35,7 @@ func isLRCFormat(text string) bool {
 
 type ScanStatus struct {
 	Status      string     `json:"status"`
+	Phase       string     `json:"phase"`
 	Progress    int        `json:"progress"`
 	StartedAt   time.Time  `json:"started_at"`
 	CompletedAt *time.Time `json:"completed_at,omitempty"`
@@ -41,20 +44,23 @@ type ScanStatus struct {
 }
 
 type ScannerService struct {
-	db             *sql.DB
-	mediaRoot      string
-	excludePattern *regexp.Regexp
-	scanEmbedded   bool
-	ffprobePath    string
-	ffmpegPath     string
-	scanning       int32
-	watchEnabled   bool
-	workers        int
-	coverCachePath string
-	autoPlaylists  bool
+	db              *sql.DB
+	mediaRoot       string
+	excludePattern  *regexp.Regexp
+	scanEmbedded    bool
+	ffprobePath     string
+	ffmpegPath      string
+	scanning        int32
+	watchEnabled    bool
+	workers         int
+	coverCachePath  string
+	autoPlaylists   bool
+	enrichEnabled   bool
+	metadataService *MetadataService
+	artistImgCache  string
 }
 
-func NewScannerService(db *sql.DB, mediaRoot, ffprobePath, ffmpegPath, exclude string, scanEmbeddedCover bool, watch bool, workers int, coverCachePath string, autoPlaylists bool) *ScannerService {
+func NewScannerService(db *sql.DB, mediaRoot, ffprobePath, ffmpegPath, exclude string, scanEmbeddedCover bool, watch bool, workers int, coverCachePath string, autoPlaylists bool, enrichEnabled bool, metadataURL string) *ScannerService {
 	var re *regexp.Regexp
 	if exclude != "" {
 		re = regexp.MustCompile(exclude)
@@ -62,21 +68,29 @@ func NewScannerService(db *sql.DB, mediaRoot, ffprobePath, ffmpegPath, exclude s
 	if workers < 1 {
 		workers = 8
 	}
-	// Default cover cache path if not specified
 	if coverCachePath == "" {
 		coverCachePath = "./cache/covers"
 	}
+
+	var metaSvc *MetadataService
+	if enrichEnabled && metadataURL != "" {
+		metaSvc = NewMetadataService(metadataURL)
+	}
+
 	return &ScannerService{
-		db:             db,
-		mediaRoot:      mediaRoot,
-		excludePattern: re,
-		scanEmbedded:   scanEmbeddedCover,
-		ffprobePath:    ffprobePath,
-		ffmpegPath:     ffmpegPath,
-		watchEnabled:   watch,
-		workers:        workers,
-		coverCachePath: coverCachePath,
-		autoPlaylists:  autoPlaylists,
+		db:              db,
+		mediaRoot:       mediaRoot,
+		excludePattern:  re,
+		scanEmbedded:    scanEmbeddedCover,
+		ffprobePath:     ffprobePath,
+		ffmpegPath:      ffmpegPath,
+		watchEnabled:    watch,
+		workers:         workers,
+		coverCachePath:  coverCachePath,
+		autoPlaylists:   autoPlaylists,
+		enrichEnabled:   enrichEnabled,
+		metadataService: metaSvc,
+		artistImgCache:  filepath.Join(coverCachePath, "artists"),
 	}
 }
 
@@ -88,7 +102,7 @@ func (s *ScannerService) StartScan(ctx context.Context) (int64, error) {
 	}
 
 	// Insert scan status row immediately so it's visible to status queries
-	res, err := s.db.ExecContext(ctx, `INSERT INTO scan_status(status, progress, total) VALUES ('running', 0, 0)`)
+	res, err := s.db.ExecContext(ctx, `INSERT INTO scan_status(status, phase, progress, total) VALUES ('running', 'scanning', 0, 0)`)
 	if err != nil {
 		atomic.StoreInt32(&s.scanning, 0)
 		return 0, fmt.Errorf("insert scan status: %w", err)
@@ -139,6 +153,7 @@ func (s *ScannerService) runScan(scanID int64) {
 	seenSongs := map[int64]struct{}{}
 	seenAlbums := map[int64]struct{}{}
 	seenArtists := map[int64]struct{}{}
+	var enrichInfos []songEnrichInfo
 
 	var processedCount int64
 	var currentFile atomic.Value
@@ -183,7 +198,8 @@ func (s *ScannerService) runScan(scanID int64) {
 
 				currentFile.Store(file)
 
-				if err := s.ingestFile(ctx, file, localSongs, localAlbums, localArtists); err != nil {
+				info, err := s.ingestFile(ctx, file, localSongs, localAlbums, localArtists)
+				if err != nil {
 					atomic.AddInt64(&processedCount, 1)
 				} else {
 					mu.Lock()
@@ -195,6 +211,9 @@ func (s *ScannerService) runScan(scanID int64) {
 					}
 					for id := range localArtists {
 						seenArtists[id] = struct{}{}
+					}
+					if info != nil {
+						enrichInfos = append(enrichInfos, *info)
 					}
 					mu.Unlock()
 
@@ -214,46 +233,74 @@ func (s *ScannerService) runScan(scanID int64) {
 	close(progressDone)
 	time.Sleep(100 * time.Millisecond)
 
+	// Enrich songs with metadata (if enabled)
+	if s.enrichEnabled && len(enrichInfos) > 0 {
+		_, _ = s.db.ExecContext(ctx, `UPDATE scan_status SET phase = 'enriching' WHERE id = ?`, scanID)
+		s.enrichSongs(ctx, scanID, enrichInfos)
+	} else if len(enrichInfos) > 0 {
+		// Fallback to conservative parsing when enrichment is disabled
+		_, _ = s.db.ExecContext(ctx, `UPDATE scan_status SET phase = 'processing' WHERE id = ?`, scanID)
+		s.fallbackArtistParsing(ctx, scanID, enrichInfos, nil)
+	}
+
+	log.Printf("scan: starting cleanup phase")
+	_, _ = s.db.ExecContext(ctx, `UPDATE scan_status SET phase = 'cleanup' WHERE id = ?`, scanID)
 	if err := s.cleanup(ctx, seenSongs, seenAlbums, seenArtists); err != nil {
+		log.Printf("scan: cleanup failed: %v", err)
 		_, _ = s.db.ExecContext(ctx, `UPDATE scan_status SET status='failed' WHERE id=?`, scanID)
 		return
 	}
+	log.Printf("scan: cleanup complete")
 
 	if s.autoPlaylists {
+		log.Printf("scan: starting playlist import")
+		_, _ = s.db.ExecContext(ctx, `UPDATE scan_status SET phase = 'playlists' WHERE id = ?`, scanID)
 		s.importPlaylists(ctx, playlists)
+		log.Printf("scan: playlist import complete")
 	}
 
 	now := time.Now()
-	_, _ = s.db.ExecContext(ctx, `UPDATE scan_status SET status='completed', progress=?, completed_at=? WHERE id=?`, len(files), now, scanID)
+	_, _ = s.db.ExecContext(ctx, `UPDATE scan_status SET status='completed', phase='completed', progress=?, completed_at=? WHERE id=?`, len(files), now, scanID)
+	log.Printf("scan: completed successfully")
 }
 
-func (s *ScannerService) ingestFile(ctx context.Context, path string, seenSongs map[int64]struct{}, seenAlbums map[int64]struct{}, seenArtists map[int64]struct{}) error {
+func (s *ScannerService) ingestFile(ctx context.Context, path string, seenSongs map[int64]struct{}, seenAlbums map[int64]struct{}, seenArtists map[int64]struct{}) (*songEnrichInfo, error) {
 	f, err := os.Open(path)
 	if err != nil {
-		return fmt.Errorf("open file: %w", err)
+		return nil, fmt.Errorf("open file: %w", err)
 	}
 	defer f.Close()
 	meta, err := tag.ReadFrom(f)
 	if err != nil {
-		return fmt.Errorf("read tags: %w", err)
+		return nil, fmt.Errorf("read tags: %w", err)
 	}
 	artistName := meta.Artist()
 	albumTitle := meta.Album()
 	title := meta.Title()
 	if artistName == "" || albumTitle == "" || title == "" {
-		return errors.New("missing metadata")
+		return nil, errors.New("missing metadata")
 	}
+
+	// Extract ISRC for enrichment
+	isrc := extractISRC(meta)
+
+	// Use album artist for grouping if available, otherwise use artist
+	albumArtist := meta.AlbumArtist()
+	if albumArtist == "" {
+		albumArtist = artistName
+	}
+
 	var artistID int64
-	err = s.db.QueryRowContext(ctx, `SELECT id FROM artists WHERE name = ?`, artistName).Scan(&artistID)
+	err = s.db.QueryRowContext(ctx, `SELECT id FROM artists WHERE name = ?`, albumArtist).Scan(&artistID)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			res, err := s.db.ExecContext(ctx, `INSERT INTO artists(name) VALUES (?)`, artistName)
+			res, err := s.db.ExecContext(ctx, `INSERT INTO artists(name) VALUES (?)`, albumArtist)
 			if err != nil {
-				return err
+				return nil, err
 			}
 			artistID, _ = res.LastInsertId()
 		} else {
-			return err
+			return nil, err
 		}
 	}
 	seenArtists[artistID] = struct{}{}
@@ -265,11 +312,11 @@ func (s *ScannerService) ingestFile(ctx context.Context, path string, seenSongs 
 			year := meta.Year()
 			res, err := s.db.ExecContext(ctx, `INSERT INTO albums(artist_id, title, year) VALUES (?, ?, ?)`, artistID, albumTitle, year)
 			if err != nil {
-				return err
+				return nil, err
 			}
 			albumID, _ = res.LastInsertId()
 		} else {
-			return err
+			return nil, err
 		}
 	}
 	seenAlbums[albumID] = struct{}{}
@@ -302,7 +349,7 @@ func (s *ScannerService) ingestFile(ctx context.Context, path string, seenSongs 
 		)
 	`, path, albumID, title, trackNo, audioMeta.DurationMs, audioMeta.SampleRate, audioMeta.BitDepth, audioMeta.Channels, path, lyrics, lyricsSynced, mbid)
 	if err != nil {
-		return fmt.Errorf("insert song: %w", err)
+		return nil, fmt.Errorf("insert song: %w", err)
 	}
 
 	var songID int64
@@ -321,55 +368,82 @@ func (s *ScannerService) ingestFile(ctx context.Context, path string, seenSongs 
 		}
 	}
 
-	return nil
+	return &songEnrichInfo{
+		songID:     songID,
+		isrc:       isrc,
+		artistName: artistName,
+		filePath:   path,
+	}, nil
 }
 
 func (s *ScannerService) cleanup(ctx context.Context, songs map[int64]struct{}, albums map[int64]struct{}, artists map[int64]struct{}) error {
-	// remove songs not seen
+	// Collect IDs to delete first, then delete in separate operations
+	// This avoids holding open cursors while writing
+
+	// Remove songs not seen
+	var songsToDelete []int64
 	rows, err := s.db.QueryContext(ctx, `SELECT id FROM songs`)
 	if err != nil {
 		return err
 	}
-	defer rows.Close()
 	for rows.Next() {
 		var id int64
 		if err := rows.Scan(&id); err == nil {
 			if _, ok := songs[id]; !ok {
-				_, _ = s.db.ExecContext(ctx, `DELETE FROM songs WHERE id = ?`, id)
-				_, _ = s.db.ExecContext(ctx, `DELETE FROM songs_fts WHERE rowid = ?`, id)
+				songsToDelete = append(songsToDelete, id)
 			}
 		}
 	}
+	rows.Close()
 
-	// remove albums with no songs
+	for _, id := range songsToDelete {
+		_, _ = s.db.ExecContext(ctx, `DELETE FROM songs WHERE id = ?`, id)
+		_, _ = s.db.ExecContext(ctx, `DELETE FROM songs_fts WHERE rowid = ?`, id)
+	}
+
+	// Remove albums not seen
+	var albumsToDelete []int64
 	albRows, err := s.db.QueryContext(ctx, `SELECT id FROM albums`)
 	if err != nil {
 		return err
 	}
-	defer albRows.Close()
 	for albRows.Next() {
 		var id int64
 		if err := albRows.Scan(&id); err == nil {
 			if _, ok := albums[id]; !ok {
-				_, _ = s.db.ExecContext(ctx, `DELETE FROM albums WHERE id = ?`, id)
+				albumsToDelete = append(albumsToDelete, id)
 			}
 		}
 	}
+	albRows.Close()
 
-	// remove artists without albums
-	artRows, err := s.db.QueryContext(ctx, `SELECT id FROM artists`)
+	for _, id := range albumsToDelete {
+		_, _ = s.db.ExecContext(ctx, `DELETE FROM albums WHERE id = ?`, id)
+	}
+
+	// Remove artists not seen AND not referenced in song_artists
+	// Artists created by enrichment are linked via song_artists, so we must preserve them
+	var artistsToDelete []int64
+	artRows, err := s.db.QueryContext(ctx, `
+		SELECT id FROM artists 
+		WHERE id NOT IN (SELECT DISTINCT artist_id FROM song_artists)
+		AND id NOT IN (SELECT DISTINCT artist_id FROM albums)
+	`)
 	if err != nil {
 		return err
 	}
-	defer artRows.Close()
 	for artRows.Next() {
 		var id int64
 		if err := artRows.Scan(&id); err == nil {
-			if _, ok := artists[id]; !ok {
-				_, _ = s.db.ExecContext(ctx, `DELETE FROM artists WHERE id = ?`, id)
-			}
+			artistsToDelete = append(artistsToDelete, id)
 		}
 	}
+	artRows.Close()
+
+	for _, id := range artistsToDelete {
+		_, _ = s.db.ExecContext(ctx, `DELETE FROM artists WHERE id = ?`, id)
+	}
+
 	return nil
 }
 
@@ -377,8 +451,8 @@ func (s *ScannerService) Status(ctx context.Context) (ScanStatus, error) {
 	var st ScanStatus
 	var currentFile sql.NullString
 	err := s.db.QueryRowContext(ctx, `
-		SELECT status, progress, started_at, completed_at, total, current_file FROM scan_status ORDER BY id DESC LIMIT 1
-	`).Scan(&st.Status, &st.Progress, &st.StartedAt, &st.CompletedAt, &st.Total, &currentFile)
+		SELECT status, phase, progress, started_at, completed_at, total, current_file FROM scan_status ORDER BY id DESC LIMIT 1
+	`).Scan(&st.Status, &st.Phase, &st.Progress, &st.StartedAt, &st.CompletedAt, &st.Total, &currentFile)
 	if err != nil {
 		return st, err
 	}
@@ -615,5 +689,407 @@ func (s *ScannerService) cleanupPlaylists(ctx context.Context, seenPaths map[str
 		if _, ok := seenPaths[sourcePath]; !ok {
 			_, _ = s.db.ExecContext(ctx, `DELETE FROM playlists WHERE id = ?`, id)
 		}
+	}
+}
+
+// songEnrichInfo holds info needed for enrichment
+type songEnrichInfo struct {
+	songID     int64
+	isrc       string
+	artistName string
+	filePath   string
+}
+
+// extractISRC extracts ISRC from tag metadata
+func extractISRC(meta tag.Metadata) string {
+	raw := meta.Raw()
+
+	// Try common ISRC tag names across formats
+	for _, key := range []string{"ISRC", "isrc", "TSRC", "tsrc", "©isr"} {
+		if v, ok := raw[key]; ok {
+			if s, ok := v.(string); ok && s != "" {
+				// Strip null bytes and other non-printable characters
+				clean := strings.Map(func(r rune) rune {
+					if r < 32 || r == 127 {
+						return -1 // drop
+					}
+					return r
+				}, s)
+				clean = strings.TrimSpace(clean)
+				if clean != "" {
+					return clean
+				}
+			}
+		}
+	}
+	return ""
+}
+
+// featurePatterns are patterns that indicate a featured artist
+var featurePatterns = []string{
+	" feat. ", " feat ", " ft. ", " featuring ",
+	" Feat. ", " Feat ", " Ft. ", " Featuring ",
+	" (feat. ", " (ft. ", " [feat. ", " [ft. ",
+}
+
+// parseArtistsConservative parses artists using safe patterns only
+func parseArtistsConservative(artistStr string) []string {
+	artistStr = strings.TrimSpace(artistStr)
+	if artistStr == "" {
+		return nil
+	}
+
+	// Semicolon is the MusicBrainz standard - always safe
+	if strings.Contains(artistStr, ";") {
+		parts := strings.Split(artistStr, ";")
+		result := make([]string, 0, len(parts))
+		for _, p := range parts {
+			p = strings.TrimSpace(p)
+			if p != "" {
+				result = append(result, p)
+			}
+		}
+		if len(result) > 0 {
+			return result
+		}
+	}
+
+	// Try feature patterns
+	for _, pattern := range featurePatterns {
+		if idx := strings.Index(artistStr, pattern); idx > 0 {
+			main := strings.TrimSpace(artistStr[:idx])
+			feat := strings.TrimSpace(artistStr[idx+len(pattern):])
+			// Clean up trailing parenthesis/bracket
+			feat = strings.TrimSuffix(feat, ")")
+			feat = strings.TrimSuffix(feat, "]")
+			if main != "" && feat != "" {
+				return []string{main, feat}
+			}
+		}
+	}
+
+	// No safe split found
+	return []string{artistStr}
+}
+
+// enrichSongs enriches songs with metadata from the enrichment API
+func (s *ScannerService) enrichSongs(ctx context.Context, scanID int64, songs []songEnrichInfo) {
+	if s.metadataService == nil || len(songs) == 0 {
+		return
+	}
+
+	// Collect ISRCs
+	isrcToSongs := make(map[string][]songEnrichInfo)
+	for _, song := range songs {
+		if song.isrc != "" {
+			isrcToSongs[song.isrc] = append(isrcToSongs[song.isrc], song)
+		}
+	}
+
+	if len(isrcToSongs) == 0 {
+		log.Printf("enrichment: no songs with ISRCs found, using fallback parsing")
+		s.fallbackArtistParsing(ctx, scanID, songs, nil)
+		return
+	}
+
+	isrcs := make([]string, 0, len(isrcToSongs))
+	for isrc := range isrcToSongs {
+		isrcs = append(isrcs, isrc)
+	}
+
+	log.Printf("enrichment: looking up %d ISRCs", len(isrcs))
+
+	// Log first few ISRCs for debugging
+	if len(isrcs) > 0 {
+		sample := isrcs
+		if len(sample) > 5 {
+			sample = sample[:5]
+		}
+		log.Printf("enrichment: sample ISRCs: %v", sample)
+	}
+
+	// Update total for enriching phase
+	_, _ = s.db.ExecContext(ctx, `UPDATE scan_status SET progress = 0, total = ? WHERE id = ?`, len(isrcs), scanID)
+
+	// Batch lookup ISRCs
+	resp, err := s.metadataService.BatchLookupISRCs(ctx, isrcs)
+	if err != nil {
+		log.Printf("metadata enrichment failed: %v", err)
+		return
+	}
+
+	log.Printf("enrichment: got %d ISRC results", len(resp.ISRCs))
+
+	// Collect artist external IDs that need image fetching
+	artistsToFetch := make(map[string]MetadataArtist)
+
+	// Process results
+	processed := 0
+	for isrc, tracks := range resp.ISRCs {
+		if len(tracks) == 0 {
+			continue
+		}
+
+		// Use most popular track
+		track := tracks[0]
+		songsWithISRC := isrcToSongs[isrc]
+
+		for _, songInfo := range songsWithISRC {
+			// Create song_artists relationships
+			for pos, artist := range track.Artists {
+				artistID, err := s.getOrCreateArtistByExternal(ctx, artist)
+				if err != nil {
+					continue
+				}
+
+				role := "primary"
+				if pos > 0 {
+					role = "featured"
+				}
+
+				_, _ = s.db.ExecContext(ctx, `
+					INSERT OR REPLACE INTO song_artists(song_id, artist_id, role, position)
+					VALUES (?, ?, ?, ?)
+				`, songInfo.songID, artistID, role, pos)
+
+				// Queue artist for image fetch if they have images
+				if len(artist.Images) > 0 {
+					artistsToFetch[artist.ID] = artist
+				}
+			}
+		}
+		processed++
+		// Update progress
+		_, _ = s.db.ExecContext(ctx, `UPDATE scan_status SET progress = ? WHERE id = ?`, processed, scanID)
+	}
+
+	log.Printf("enrichment: fetching images for %d artists", len(artistsToFetch))
+
+	// Fetch artist images
+	s.fetchArtistImages(ctx, artistsToFetch)
+
+	// For songs without enrichment, fall back to conservative parsing
+	s.fallbackArtistParsing(ctx, scanID, songs, resp.ISRCs)
+}
+
+// getOrCreateArtistByExternal finds or creates an artist by external ID
+func (s *ScannerService) getOrCreateArtistByExternal(ctx context.Context, meta MetadataArtist) (int64, error) {
+	var artistID int64
+
+	// Try to find by external_id first
+	err := s.db.QueryRowContext(ctx, `SELECT id FROM artists WHERE external_id = ?`, meta.ID).Scan(&artistID)
+	if err == nil {
+		return artistID, nil
+	}
+
+	if !errors.Is(err, sql.ErrNoRows) {
+		return 0, err
+	}
+
+	// Try to find by exact name match (might already exist without external_id)
+	err = s.db.QueryRowContext(ctx, `SELECT id FROM artists WHERE name = ? AND external_id IS NULL`, meta.Name).Scan(&artistID)
+	if err == nil {
+		// Update with external_id
+		_, _ = s.db.ExecContext(ctx, `UPDATE artists SET external_id = ? WHERE id = ?`, meta.ID, artistID)
+		return artistID, nil
+	}
+
+	// Create new artist
+	res, err := s.db.ExecContext(ctx, `INSERT INTO artists(name, external_id) VALUES (?, ?)`, meta.Name, meta.ID)
+	if err != nil {
+		return 0, err
+	}
+
+	return res.LastInsertId()
+}
+
+// fetchArtistImages downloads and caches artist images concurrently
+func (s *ScannerService) fetchArtistImages(ctx context.Context, artists map[string]MetadataArtist) {
+	if len(artists) == 0 {
+		return
+	}
+
+	if err := os.MkdirAll(s.artistImgCache, 0o755); err != nil {
+		return
+	}
+
+	// Use worker pool for concurrent downloads
+	workers := s.workers
+	if workers > 10 {
+		workers = 10 // Cap at 10 for external HTTP requests
+	}
+	type job struct {
+		extID  string
+		artist MetadataArtist
+	}
+
+	jobs := make(chan job, len(artists))
+	var wg sync.WaitGroup
+
+	client := &http.Client{Timeout: 10 * time.Second}
+
+	for w := 0; w < workers; w++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for j := range jobs {
+				if len(j.artist.Images) == 0 {
+					continue
+				}
+
+				// Get artist ID from database
+				var artistID int64
+				err := s.db.QueryRowContext(ctx, `SELECT id FROM artists WHERE external_id = ?`, j.extID).Scan(&artistID)
+				if err != nil {
+					continue
+				}
+
+				// Check if already has image
+				var existingImg sql.NullString
+				_ = s.db.QueryRowContext(ctx, `SELECT image_path FROM artists WHERE id = ?`, artistID).Scan(&existingImg)
+				if existingImg.Valid && existingImg.String != "" {
+					if _, err := os.Stat(existingImg.String); err == nil {
+						continue
+					}
+				}
+
+				// Find best image (largest available)
+				var bestImg MetadataImage
+				for _, img := range j.artist.Images {
+					if img.Width > bestImg.Width {
+						bestImg = img
+					}
+				}
+				if bestImg.URL == "" {
+					continue
+				}
+
+				// Download image
+				imgPath := filepath.Join(s.artistImgCache, fmt.Sprintf("%d.jpg", artistID))
+				if err := s.downloadImage(ctx, client, bestImg.URL, imgPath); err != nil {
+					continue
+				}
+
+				_, _ = s.db.ExecContext(ctx, `UPDATE artists SET image_path = ? WHERE id = ?`, imgPath, artistID)
+			}
+		}()
+	}
+
+	for extID, artist := range artists {
+		jobs <- job{extID: extID, artist: artist}
+	}
+	close(jobs)
+
+	wg.Wait()
+	log.Printf("enrichment: finished fetching artist images")
+}
+
+func (s *ScannerService) downloadImage(ctx context.Context, client *http.Client, url, destPath string) error {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		return err
+	}
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("status %d", resp.StatusCode)
+	}
+
+	f, err := os.Create(destPath)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+
+	_, err = io.Copy(f, resp.Body)
+	return err
+}
+
+// fallbackArtistParsing creates song_artists for songs that weren't enriched
+func (s *ScannerService) fallbackArtistParsing(ctx context.Context, scanID int64, allSongs []songEnrichInfo, enrichedISRCs map[string][]MetadataTrack) {
+	// Count songs that need processing (not already enriched)
+	var songsToProcess []songEnrichInfo
+	for _, song := range allSongs {
+		if enrichedISRCs != nil {
+			if _, ok := enrichedISRCs[song.isrc]; ok {
+				continue
+			}
+		}
+		songsToProcess = append(songsToProcess, song)
+	}
+
+	if len(songsToProcess) == 0 {
+		return
+	}
+
+	log.Printf("fallback: processing %d songs", len(songsToProcess))
+
+	// Update phase and total for processing
+	_, _ = s.db.ExecContext(ctx, `UPDATE scan_status SET phase = 'processing', progress = 0, total = ? WHERE id = ?`, len(songsToProcess), scanID)
+
+	processed := 0
+	for _, song := range songsToProcess {
+		// Verify songID matches expected file
+		var dbFilePath string
+		var dbTitle string
+		err := s.db.QueryRowContext(ctx, `SELECT file_path, title FROM songs WHERE id = ?`, song.songID).Scan(&dbFilePath, &dbTitle)
+		if err != nil {
+			log.Printf("fallback: song %d NOT FOUND in DB! expected file=%s", song.songID, song.filePath)
+			processed++
+			_, _ = s.db.ExecContext(ctx, `UPDATE scan_status SET progress = ? WHERE id = ?`, processed, scanID)
+			continue
+		}
+		if dbFilePath != song.filePath {
+			log.Printf("fallback: ID MISMATCH! songID=%d expected=%s actual=%s (title=%s)", song.songID, song.filePath, dbFilePath, dbTitle)
+			processed++
+			_, _ = s.db.ExecContext(ctx, `UPDATE scan_status SET progress = ? WHERE id = ?`, processed, scanID)
+			continue
+		}
+
+		// Check if song already has artists in song_artists table
+		var count int
+		err = s.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM song_artists WHERE song_id = ?`, song.songID).Scan(&count)
+		if count > 0 {
+			processed++
+			_, _ = s.db.ExecContext(ctx, `UPDATE scan_status SET progress = ? WHERE id = ?`, processed, scanID)
+			continue
+		}
+
+		// Parse artists conservatively
+		artists := parseArtistsConservative(song.artistName)
+
+		for pos, artistName := range artists {
+			var artistID int64
+			err := s.db.QueryRowContext(ctx, `SELECT id FROM artists WHERE name = ?`, artistName).Scan(&artistID)
+			if err != nil {
+				if errors.Is(err, sql.ErrNoRows) {
+					res, err := s.db.ExecContext(ctx, `INSERT INTO artists(name) VALUES (?)`, artistName)
+					if err != nil {
+						continue
+					}
+					artistID, _ = res.LastInsertId()
+				} else {
+					continue
+				}
+			}
+
+			role := "primary"
+			if pos > 0 {
+				role = "featured"
+			}
+
+			_, _ = s.db.ExecContext(ctx, `
+				INSERT OR IGNORE INTO song_artists(song_id, artist_id, role, position)
+				VALUES (?, ?, ?, ?)
+			`, song.songID, artistID, role, pos)
+		}
+
+		processed++
+		_, _ = s.db.ExecContext(ctx, `UPDATE scan_status SET progress = ? WHERE id = ?`, processed, scanID)
 	}
 }

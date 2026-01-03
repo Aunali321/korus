@@ -1,5 +1,6 @@
 <script lang="ts">
     import { VList } from "virtua/svelte";
+    import { api } from "$lib/api";
     import { auth } from "$lib/stores/auth.svelte";
     import { library } from "$lib/stores/library.svelte";
     import Card from "$lib/components/Card.svelte";
@@ -48,7 +49,7 @@
                             <Card
                                 title={artist.name}
                                 subtitle="Artist"
-                                image={artist.image_path}
+                                image={artist.image_path ? api.getArtistImageUrl(artist.id) : undefined}
                                 href="/artists/{artist.id}"
                                 rounded
                             />

@@ -179,6 +179,8 @@ export const api = {
     return url;
   },
 
+  getArtistImageUrl: (id: number) => `${getApiUrl()}/artist-image/${id}`,
+
   getStreamUrl: (id: number, format?: string, bitrate?: number) => {
     const token = getAccessToken();
     let url = `${getApiUrl()}/stream/${id}`;

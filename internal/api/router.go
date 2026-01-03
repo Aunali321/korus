@@ -81,6 +81,7 @@ func New(deps Deps) *echo.Echo {
 	api.GET("/stream/:id", h.Stream, middleware.Auth(deps.Auth))
 	api.GET("/streaming/options", h.StreamingOptions, middleware.Auth(deps.Auth))
 	api.GET("/artwork/:id", h.Artwork)
+	api.GET("/artist-image/:id", h.ArtistImage)
 	api.GET("/lyrics/:id", h.Lyrics, middleware.Auth(deps.Auth))
 
 	api.GET("/playlists", h.ListPlaylists, middleware.Auth(deps.Auth))

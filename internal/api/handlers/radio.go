@@ -121,7 +121,7 @@ func (h *Handler) getSongsByIDs(c echo.Context, ids []int64) error {
 		al.ArtistID = ar.ID
 		al.Artist = &ar
 		s.Album = &al
-		s.Artist = &ar
+		s.Artists = []models.Artist{ar}
 		songs = append(songs, s)
 	}
 
@@ -201,7 +201,7 @@ func (h *Handler) radioByMetadata(c echo.Context, seedID, artistID, albumID int6
 		al.ArtistID = ar.ID
 		al.Artist = &ar
 		s.Album = &al
-		s.Artist = &ar
+		s.Artists = []models.Artist{ar}
 		songs = append(songs, s)
 	}
 

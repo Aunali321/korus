@@ -25,6 +25,7 @@ func (h *Handler) Library(c echo.Context) error {
 	artists, _ := h.fetchArtists(ctx, limit)
 	albums, _ := h.fetchAlbums(ctx, limit)
 	songs, _ := db.GetSongsRecent(ctx, h.db, limit)
+	_ = db.PopulateSongArtists(ctx, h.db, songs)
 	return c.JSON(http.StatusOK, map[string]any{
 		"artists": artists,
 		"albums":  albums,
@@ -61,6 +62,7 @@ func (h *Handler) Artist(c echo.Context) error {
 	}
 	albums, _ := h.fetchAlbumsByArtist(ctx, id)
 	songs, _ := db.GetSongsByArtist(ctx, h.db, id)
+	_ = db.PopulateSongArtists(ctx, h.db, songs)
 	return c.JSON(http.StatusOK, map[string]any{
 		"id":         a.ID,
 		"name":       a.Name,
@@ -100,6 +102,7 @@ func (h *Handler) Album(c echo.Context) error {
 		al.MBID = &mbid.String
 	}
 	songs, _ := db.GetSongsByAlbum(ctx, h.db, id)
+	_ = db.PopulateSongArtists(ctx, h.db, songs)
 	artist, _ := h.fetchArtist(ctx, al.ArtistID)
 	al.Artist = artist
 	return c.JSON(http.StatusOK, map[string]any{
@@ -148,9 +151,10 @@ func (h *Handler) Song(c echo.Context) error {
 	}
 	album, _ := h.fetchAlbum(ctx, s.AlbumID)
 	s.Album = album
-	if album != nil {
-		artist, _ := h.fetchArtist(ctx, album.ArtistID)
-		s.Artist = artist
+	// Populate all artists from song_artists
+	artists, _ := db.GetArtistsForSong(ctx, h.db, s.ID)
+	if len(artists) > 0 {
+		s.Artists = artists
 	}
 	return c.JSON(http.StatusOK, s)
 }

@@ -214,7 +214,7 @@
                                 <Card
                                     title={item.artist.name}
                                     subtitle="{item.play_count} plays"
-                                    image={item.artist.image_path}
+                                    image={item.artist.image_path ? api.getArtistImageUrl(item.artist.id) : undefined}
                                     href="/artists/{item.artist.id}"
                                     rounded
                                 />

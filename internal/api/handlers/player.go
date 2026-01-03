@@ -282,6 +282,35 @@ func (h *Handler) Artwork(c echo.Context) error {
 	return c.File(cover)
 }
 
+// ArtistImage godoc
+// @Summary Get artist image
+// @Tags Player
+// @Param id path int true "Artist ID"
+// @Produce image/jpeg
+// @Success 200 {file} binary
+// @Failure 404 {object} map[string]string
+// @Router /artist-image/{id} [get]
+func (h *Handler) ArtistImage(c echo.Context) error {
+	ctx := c.Request().Context()
+	id, _ := strconv.ParseInt(c.Param("id"), 10, 64)
+
+	var imagePath string
+	err := h.db.QueryRowContext(ctx, `SELECT image_path FROM artists WHERE id = ?`, id).Scan(&imagePath)
+	if err != nil || imagePath == "" {
+		return echo.NewHTTPError(http.StatusNotFound, map[string]string{"error": "artist image not found", "code": "NOT_FOUND"})
+	}
+
+	info, err := os.Stat(imagePath)
+	if err != nil {
+		return echo.NewHTTPError(http.StatusNotFound, map[string]string{"error": "artist image not found", "code": "NOT_FOUND"})
+	}
+
+	c.Response().Header().Set("Cache-Control", "public, max-age=31536000, immutable")
+	c.Response().Header().Set("Last-Modified", info.ModTime().UTC().Format(http.TimeFormat))
+
+	return c.File(imagePath)
+}
+
 // Lyrics godoc
 // @Summary Get lyrics for song
 // @Tags Player

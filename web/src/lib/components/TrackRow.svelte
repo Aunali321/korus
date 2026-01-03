@@ -106,7 +106,17 @@
             {song.title}
         </h4>
         <p class="text-sm text-zinc-400 truncate">
-            {song.artist?.name || "Unknown"}
+            {#if song.artists && song.artists.length > 0}
+                {#each song.artists as artist, i}
+                    <a
+                        href="/artists/{artist.id}"
+                        onclick={(e) => e.stopPropagation()}
+                        class="hover:underline hover:text-zinc-300"
+                    >{artist.name}</a>{#if i < song.artists.length - 1}, {/if}
+                {/each}
+            {:else}
+                Unknown Artist
+            {/if}
             {#if showAlbum && song.album}
                 <span class="text-zinc-500"> - {song.album.title}</span>
             {/if}

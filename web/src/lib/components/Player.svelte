@@ -86,7 +86,16 @@
                     {player.currentSong.title}
                 </h4>
                 <p class="text-xs text-zinc-400 truncate">
-                    {player.currentSong.artist?.name || "Unknown"}
+                    {#if player.currentSong.artists && player.currentSong.artists.length > 0}
+                        {#each player.currentSong.artists as artist, i}
+                            <a
+                                href="/artists/{artist.id}"
+                                class="hover:text-zinc-100 hover:underline"
+                            >{artist.name}</a>{#if i < player.currentSong.artists.length - 1}, {/if}
+                        {/each}
+                    {:else}
+                        Unknown
+                    {/if}
                 </p>
             </div>
             <button

@@ -4,6 +4,7 @@
     import { api } from "$lib/api";
     import { auth } from "$lib/stores/auth.svelte";
     import { player } from "$lib/stores/player.svelte";
+    import { favorites } from "$lib/stores/favorites.svelte";
     import type { Album, Song } from "$lib/types";
     import TrackRow from "$lib/components/TrackRow.svelte";
 
@@ -97,9 +98,15 @@
                 <Play size={24} fill="currentColor" class="text-black ml-1" />
             </button>
             <button
+                onclick={() => album && favorites.toggleAlbum(album.id)}
                 class="p-3 hover:bg-zinc-800 rounded-full transition-colors"
             >
-                <Heart size={24} class="text-zinc-400 hover:text-red-400" />
+                <Heart
+                    size={24}
+                    class={album && favorites.isAlbumFavorite(album.id)
+                        ? "text-red-500 fill-red-500"
+                        : "text-zinc-400 hover:text-red-400"}
+                />
             </button>
         </div>
 

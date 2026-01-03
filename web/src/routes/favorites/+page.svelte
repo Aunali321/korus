@@ -93,7 +93,7 @@
                     <Card
                         title={artist.name}
                         subtitle="Artist"
-                        image={artist.image_path}
+                        image={artist.image_path ? api.getArtistImageUrl(artist.id) : undefined}
                         href="/artists/{artist.id}"
                         rounded
                     />

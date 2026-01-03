@@ -1,9 +1,10 @@
 <script lang="ts">
     import { page } from "$app/stores";
-    import { Play, UserPlus } from "lucide-svelte";
+    import { Play, UserPlus, UserCheck } from "lucide-svelte";
     import { api } from "$lib/api";
     import { auth } from "$lib/stores/auth.svelte";
     import { player } from "$lib/stores/player.svelte";
+    import { favorites } from "$lib/stores/favorites.svelte";
     import type { Artist, Album, Song } from "$lib/types";
     import Card from "$lib/components/Card.svelte";
     import TrackRow from "$lib/components/TrackRow.svelte";
@@ -13,6 +14,7 @@
     let topSongs = $state<Song[]>([]);
     let loading = $state(true);
     let loadedId = $state<number | null>(null);
+    let showAllSongs = $state(false);
 
     $effect(() => {
         const idParam = $page.params.id;
@@ -27,6 +29,7 @@
     async function loadArtist(id: number) {
         loadedId = id;
         loading = true;
+        showAllSongs = false;
         try {
             const data = await api.getArtist(id);
             // API returns flat object with artist fields at root level
@@ -56,7 +59,7 @@
         <div class="flex gap-6 items-end">
             {#if artist.image_path}
                 <img
-                    src={artist.image_path}
+                    src={api.getArtistImageUrl(artist.id)}
                     alt={artist.name}
                     class="w-56 h-56 rounded-full object-cover bg-zinc-800 shadow-xl"
                 />
@@ -84,9 +87,14 @@
                         Play
                     </button>
                     <button
+                        onclick={() => artist && favorites.toggleArtist(artist.id)}
                         class="p-3 hover:bg-zinc-800 rounded-full transition-colors"
                     >
-                        <UserPlus size={20} class="text-zinc-400" />
+                        {#if artist && favorites.isArtistFollowed(artist.id)}
+                            <UserCheck size={20} class="text-emerald-500" />
+                        {:else}
+                            <UserPlus size={20} class="text-zinc-400" />
+                        {/if}
                     </button>
                 </div>
             </div>
@@ -101,9 +109,19 @@
 
         {#if topSongs.length > 0}
             <section>
-                <h3 class="text-xl font-bold mb-4">Popular Tracks</h3>
+                <div class="flex items-center justify-between mb-4">
+                    <h3 class="text-xl font-bold">Popular Tracks</h3>
+                    {#if topSongs.length > 5}
+                        <button
+                            onclick={() => (showAllSongs = !showAllSongs)}
+                            class="text-sm text-zinc-400 hover:text-white transition-colors"
+                        >
+                            {showAllSongs ? "Show less" : "See all"}
+                        </button>
+                    {/if}
+                </div>
                 <div class="space-y-1">
-                    {#each topSongs.slice(0, 5) as song, i (song.id)}
+                    {#each (showAllSongs ? topSongs : topSongs.slice(0, 5)) as song, i (song.id)}
                         <TrackRow {song} index={i} songs={topSongs} />
                     {/each}
                 </div>

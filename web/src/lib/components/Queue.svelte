@@ -52,7 +52,7 @@
                 />
                 <h3 class="font-bold text-xl mb-1">{player.currentSong.title}</h3>
                 <p class="text-zinc-400">
-                    {player.currentSong.artist?.name || "Unknown"}
+                    {player.currentSong.artists?.map(a => a.name).join(', ') || "Unknown"}
                 </p>
             </div>
         {/if}
@@ -97,7 +97,7 @@
                                     {track.title}
                                 </h4>
                                 <p class="text-xs text-zinc-400 truncate">
-                                    {track.artist?.name || "Unknown"}
+                                    {track.artists?.map(a => a.name).join(', ') || "Unknown"}
                                 </p>
                             </div>
                             <div class="text-xs text-zinc-500">

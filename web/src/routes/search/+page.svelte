@@ -1,35 +1,33 @@
 <script lang="ts">
-    import { onMount } from "svelte";
     import { Search as SearchIcon } from "lucide-svelte";
     import { api } from "$lib/api";
     import { player } from "$lib/stores/player.svelte";
     import { settings } from "$lib/stores/settings.svelte";
-    import type { SearchResults, Song } from "$lib/types";
+    import { search } from "$lib/stores/search.svelte";
+    import type { Song } from "$lib/types";
     import Card from "$lib/components/Card.svelte";
     import TrackRow from "$lib/components/TrackRow.svelte";
 
-    let query = $state("");
-    let results = $state<SearchResults | null>(null);
     let loading = $state(false);
-    let activeTab = $state<
-        "all" | "songs" | "albums" | "artists" | "playlists"
-    >("all");
     let debounceTimer: ReturnType<typeof setTimeout>;
 
-    function handleInput() {
+    function handleInput(e: Event) {
+        const target = e.target as HTMLInputElement;
+        search.setQuery(target.value);
         clearTimeout(debounceTimer);
-        if (!query.trim()) {
-            results = null;
+        if (!search.query.trim()) {
+            search.setResults(null);
             return;
         }
-        debounceTimer = setTimeout(search, 300);
+        debounceTimer = setTimeout(doSearch, 300);
     }
 
-    async function search() {
-        if (!query.trim()) return;
+    async function doSearch() {
+        if (!search.query.trim()) return;
         loading = true;
         try {
-            results = await api.search(query);
+            const results = await api.search(search.query);
+            search.setResults(results);
         } catch (e) {
             console.error("Search failed:", e);
         } finally {
@@ -56,7 +54,7 @@
             />
             <input
                 type="text"
-                bind:value={query}
+                value={search.query}
                 oninput={handleInput}
                 placeholder="Search songs, albums, artists..."
                 class="w-full pl-12 pr-4 py-3 bg-zinc-900 border border-zinc-800 rounded-full focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
@@ -68,12 +66,12 @@
         <div class="flex justify-center py-12">
             <div class="text-zinc-500">Searching...</div>
         </div>
-    {:else if results}
+    {:else if search.results}
         <div class="flex gap-2 border-b border-zinc-800 pb-2">
             {#each ["all", "songs", "albums", "artists", "playlists"] as tab}
                 <button
-                    onclick={() => (activeTab = tab as typeof activeTab)}
-                    class="px-4 py-2 rounded-full text-sm transition-colors {activeTab ===
+                    onclick={() => search.setActiveTab(tab as "all" | "songs" | "albums" | "artists" | "playlists")}
+                    class="px-4 py-2 rounded-full text-sm transition-colors {search.activeTab ===
                     tab
                         ? 'bg-emerald-500 text-black'
                         : 'text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800'}"
@@ -83,12 +81,12 @@
             {/each}
         </div>
 
-        {#if activeTab === "all" || activeTab === "songs"}
-            {#if results.songs.length > 0}
+        {#if search.activeTab === "all" || search.activeTab === "songs"}
+            {#if search.results.songs.length > 0}
                 <section>
                     <h3 class="text-xl font-bold mb-4">Songs</h3>
                     <div class="space-y-1">
-                        {#each results.songs.slice(0, activeTab === "all" ? 5 : undefined) as song (song.id)}
+                        {#each search.results.songs.slice(0, search.activeTab === "all" ? 5 : undefined) as song (song.id)}
                             <TrackRow {song} />
                         {/each}
                     </div>
@@ -96,14 +94,14 @@
             {/if}
         {/if}
 
-        {#if activeTab === "all" || activeTab === "albums"}
-            {#if results.albums.length > 0}
+        {#if search.activeTab === "all" || search.activeTab === "albums"}
+            {#if search.results.albums.length > 0}
                 <section>
                     <h3 class="text-xl font-bold mb-4">Albums</h3>
                     <div
                         class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4"
                     >
-                        {#each results.albums.slice(0, activeTab === "all" ? 6 : undefined) as album (album.id)}
+                        {#each search.results.albums.slice(0, search.activeTab === "all" ? 6 : undefined) as album (album.id)}
                             <Card
                                 title={album.title}
                                 subtitle={album.artist?.name || "Unknown"}
@@ -118,18 +116,18 @@
             {/if}
         {/if}
 
-        {#if activeTab === "all" || activeTab === "artists"}
-            {#if results.artists.length > 0}
+        {#if search.activeTab === "all" || search.activeTab === "artists"}
+            {#if search.results.artists.length > 0}
                 <section>
                     <h3 class="text-xl font-bold mb-4">Artists</h3>
                     <div
                         class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4"
                     >
-                        {#each results.artists.slice(0, activeTab === "all" ? 6 : undefined) as artist (artist.id)}
+                        {#each search.results.artists.slice(0, search.activeTab === "all" ? 6 : undefined) as artist (artist.id)}
                             <Card
                                 title={artist.name}
                                 subtitle="Artist"
-                                image={artist.image_path}
+                                image={artist.image_path ? api.getArtistImageUrl(artist.id) : undefined}
                                 href="/artists/{artist.id}"
                                 rounded
                             />
@@ -139,14 +137,14 @@
             {/if}
         {/if}
 
-        {#if activeTab === "all" || activeTab === "playlists"}
-            {#if results.playlists.length > 0}
+        {#if search.activeTab === "all" || search.activeTab === "playlists"}
+            {#if search.results.playlists.length > 0}
                 <section>
                     <h3 class="text-xl font-bold mb-4">Playlists</h3>
                     <div
                         class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4"
                     >
-                        {#each results.playlists as playlist (playlist.id)}
+                        {#each search.results.playlists as playlist (playlist.id)}
                             <Card
                                 title={playlist.name}
                                 subtitle="{playlist.song_count || 0} songs"
@@ -158,12 +156,12 @@
             {/if}
         {/if}
 
-        {#if results.songs.length === 0 && results.albums.length === 0 && results.artists.length === 0 && results.playlists.length === 0}
+        {#if search.results.songs.length === 0 && search.results.albums.length === 0 && search.results.artists.length === 0 && search.results.playlists.length === 0}
             <div class="text-center py-12 text-zinc-500">
-                <p>No results found for "{query}"</p>
+                <p>No results found for "{search.query}"</p>
             </div>
         {/if}
-    {:else if query}
+    {:else if search.query}
         <div class="text-center py-12 text-zinc-500">
             <p>Type to search...</p>
         </div>

@@ -23,7 +23,7 @@
 
 	const pageTitle = $derived(
 		player.currentSong
-			? `${player.currentSong.title} - ${player.currentSong.artist?.name || "Unknown"} | Korus`
+			? `${player.currentSong.title} - ${player.currentSong.artists?.map(a => a.name).join(', ') || "Unknown"} | Korus`
 			: "Korus"
 	);
 

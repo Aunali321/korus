@@ -129,6 +129,7 @@ func (h *Handler) ListFavorites(c echo.Context) error {
 	user, _ := currentUser(c)
 	ctx := c.Request().Context()
 	songs, _ := db.GetSongsByFavorites(ctx, h.db, user.ID)
+	_ = db.PopulateSongArtists(ctx, h.db, songs)
 	albums, _ := h.fetchAlbumsByFav(ctx, user.ID)
 	artists, _ := h.fetchArtistsByFollow(ctx, user.ID)
 	return c.JSON(http.StatusOK, map[string]any{

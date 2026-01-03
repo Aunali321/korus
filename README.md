@@ -14,6 +14,7 @@ Self-hosted music streaming server with a web interface.
 - **Stats** - Listening statistics with time period filters
 - **Wrapped** - Year-in-review style listening summary
 - **Radio** - LLM-powered song recommendations based on your library
+- **Metadata enrichment** - Automatic artist images and multi-artist support via ISRC lookup
 - **Lyrics** - Display lyrics when available
 - **Queue management** - Reorder, add, remove tracks
 - **MusicBrainz integration** - Enrich metadata from MusicBrainz
@@ -55,6 +56,8 @@ Self-hosted music streaming server with a web interface.
 - Go 1.24+
 - Node.js / Bun (for frontend)
 - FFmpeg and FFprobe in PATH (or set `FFMPEG_PATH` / `FFPROBE_PATH`)
+
+**Note:** Korus can run fully offline with no external service dependencies. All integrations (metadata enrichment, radio, MusicBrainz, ListenBrainz) are optional and disabled by default except metadata enrichment. To run completely standalone, set `METADATA_ENRICH_ENABLED=false`. However, enabling radio (requires an OpenRouter API key) is recommended for the best music discovery experience.
 
 ## Setup
 
@@ -109,11 +112,17 @@ Environment variables:
 
 | Variable | Default | Description |
 |----------|---------|-------------|
+| `METADATA_ENRICH_ENABLED` | `true` | Enable metadata enrichment (artist images, multi-artist) |
+| `METADATA_ENRICH_URL` | `https://metadata.aun.rest` | Metadata enrichment API URL |
 | `ENABLE_MUSICBRAINZ` | `false` | Enable MusicBrainz metadata enrichment |
 | `MUSICBRAINZ_AGENT` | - | User agent for MusicBrainz API |
 | `ENABLE_LISTENBRAINZ` | `false` | Enable ListenBrainz scrobbling |
 | `LISTENBRAINZ_TOKEN` | - | ListenBrainz API token |
 | `LISTENBRAINZ_USER` | - | ListenBrainz username |
+
+Metadata enrichment uses ISRC codes embedded in your audio files to fetch artist images and properly split multi-artist tracks (e.g., "Artist A feat. Artist B"). This runs automatically during library scans.
+
+The default metadata API is hosted at `https://metadata.aun.rest`. You can self-host your own instance using the [open source metadata API](https://github.com/Aunali321/spotify-metadata-api).
 
 ### Rate Limiting
 
@@ -162,6 +171,7 @@ If disabled or if the LLM fails, radio falls back to metadata-based recommendati
 ### Streaming
 - `GET /api/stream/:id` - Stream audio (optional `?format=&bitrate=`)
 - `GET /api/artwork/:id` - Album/song artwork
+- `GET /api/artist-image/:id` - Artist image
 - `GET /api/lyrics/:id` - Song lyrics
 
 ### Playlists

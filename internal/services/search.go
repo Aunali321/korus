@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"fmt"
 
+	"github.com/Aunali321/korus/internal/db"
 	"github.com/Aunali321/korus/internal/models"
 )
 
@@ -59,11 +60,13 @@ func (s *SearchService) Search(ctx context.Context, q string, limit, offset int)
 				d := int(duration.Int64)
 				song.Duration = &d
 			}
-			song.Artist = &models.Artist{ID: artistID, Name: artistName}
 			song.Album = &models.Album{ID: albumID, Title: albumTitle}
 			res.Songs = append(res.Songs, song)
 		}
 	}
+	// Populate artists for songs
+	_ = db.PopulateSongArtists(ctx, s.db, res.Songs)
+
 	// Artists
 	artistRows, err := s.db.QueryContext(ctx, `
 		SELECT id, name, bio, image_path, mbid, created_at

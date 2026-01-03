@@ -4,6 +4,7 @@ export interface Artist {
     bio?: string;
     image_path?: string;
     mbid?: string;
+    external_id?: string;
     created_at?: string;
 }
 
@@ -23,7 +24,7 @@ export interface Song {
     title: string;
     album_id: number;
     album?: Album;
-    artist?: Artist;
+    artists?: Artist[];
     duration: number;
     track_number?: number;
     file_path?: string;
@@ -130,6 +131,7 @@ export interface Insights {
 export interface ScanJob {
     id: string;
     status: 'pending' | 'running' | 'completed' | 'failed';
+    phase: 'scanning' | 'enriching' | 'processing' | 'cleanup' | 'playlists' | 'completed';
     progress: number;
     total: number;
     current_file?: string;
@@ -169,4 +171,11 @@ export interface StreamingQuality {
     preset: StreamingPreset;
     format?: string;
     bitrate?: number;
+}
+
+export function getArtistNames(song: Song): string {
+    if (song.artists && song.artists.length > 0) {
+        return song.artists.map(a => a.name).join(', ');
+    }
+    return 'Unknown Artist';
 }

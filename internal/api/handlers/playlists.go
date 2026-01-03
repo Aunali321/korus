@@ -139,6 +139,7 @@ func (h *Handler) GetPlaylist(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusForbidden, map[string]string{"error": "forbidden", "code": "FORBIDDEN"})
 	}
 	songs, _ := db.GetSongsByPlaylist(c.Request().Context(), h.db, id)
+	_ = db.PopulateSongArtists(c.Request().Context(), h.db, songs)
 
 	result := map[string]any{
 		"id":          id,

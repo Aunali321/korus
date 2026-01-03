@@ -16,6 +16,15 @@
     let scanJob = $state<ScanJob | null>(null);
     let scanning = $state(false);
 
+    const phaseLabels: Record<string, string> = {
+        scanning: "Scanning files",
+        enriching: "Enriching metadata",
+        processing: "Processing artists",
+        cleanup: "Cleaning up",
+        playlists: "Importing playlists",
+        completed: "Complete",
+    };
+
     const presets: { value: StreamingPreset; label: string; description: string }[] = [
         { value: "original", label: "Original", description: "No transcoding (~600 MB/hr for lossless)" },
         { value: "lossless", label: "Lossless", description: "WAV transcoding (~635-950 MB/hr)" },
@@ -321,20 +330,22 @@
                 <div class="text-sm text-zinc-400">
                     <div>
                         Status: <span class="text-zinc-200"
-                            >{scanJob.status}</span
+                            >{scanJob.status === "running" ? (phaseLabels[scanJob.phase] || scanJob.phase) : scanJob.status}</span
                         >
                     </div>
                     {#if scanJob.status === "running"}
                         <div class="mt-2">
                             <div class="flex justify-between text-xs mb-1">
                                 <span
-                                    >{scanJob.current_file ||
-                                        "Scanning..."}</span
+                                    >{scanJob.phase === "scanning" ? (scanJob.current_file || "Scanning...") : (phaseLabels[scanJob.phase] || scanJob.phase)}</span
                                 >
+                                {#if scanJob.phase === "scanning" || scanJob.phase === "enriching" || scanJob.phase === "processing"}
                                 <span
                                     >{scanJob.progress} / {scanJob.total}</span
                                 >
+                                {/if}
                             </div>
+                            {#if scanJob.phase === "scanning" || scanJob.phase === "enriching" || scanJob.phase === "processing"}
                             <div
                                 class="h-2 bg-zinc-800 rounded-full overflow-hidden"
                             >
@@ -347,6 +358,7 @@
                                         : 0}%"
                                 ></div>
                             </div>
+                            {/if}
                         </div>
                     {/if}
                     {#if scanJob.error}

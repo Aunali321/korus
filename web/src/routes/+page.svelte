@@ -52,40 +52,6 @@
 </script>
 
 <div class="p-6 space-y-8">
-    <div
-        class="relative h-64 rounded-2xl overflow-hidden bg-gradient-to-r from-emerald-600/20 to-cyan-600/20 border border-emerald-500/20"
-    >
-        <div
-            class="absolute inset-0 bg-gradient-to-br from-emerald-900/50 to-cyan-900/50"
-        ></div>
-        <div class="relative h-full flex items-end p-8">
-            <div>
-                <p class="text-sm text-emerald-400 font-medium mb-2">
-                    Welcome Back
-                </p>
-                <h2 class="text-5xl font-bold mb-3">Your Music</h2>
-                <p class="text-zinc-400 mb-4">{recentPlays.length > 0 ? "Pick up where you left off" : "Discover something new"}</p>
-                {#if recentPlays.length > 0}
-                    <button
-                        onclick={() => player.playQueue(recentPlays, 0)}
-                        class="px-6 py-3 bg-emerald-500 hover:bg-emerald-600 text-black font-semibold rounded-full flex items-center gap-2 transition-all hover:scale-105"
-                    >
-                        <Play size={20} fill="currentColor" />
-                        Play Recent
-                    </button>
-                {:else if !loading}
-                    <button
-                        onclick={shuffleLibrary}
-                        class="px-6 py-3 bg-emerald-500 hover:bg-emerald-600 text-black font-semibold rounded-full flex items-center gap-2 transition-all hover:scale-105"
-                    >
-                        <Shuffle size={20} />
-                        Shuffle Library
-                    </button>
-                {/if}
-            </div>
-        </div>
-    </div>
-
     {#if loading}
         <div class="flex justify-center py-12">
             <div class="text-zinc-500">Loading...</div>
@@ -94,7 +60,9 @@
         {#if settings.radioEnabled && recentPlays.length > 0}
             <section>
                 <h3 class="text-2xl font-bold mb-4">Quick Picks</h3>
-                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                <div
+                    class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3"
+                >
                     {#each recentPlays.slice(0, 9) as song (song.id)}
                         <button
                             onclick={() => startRadio(song)}
@@ -106,10 +74,16 @@
                                 class="w-12 h-12 rounded object-cover bg-zinc-800 shrink-0"
                             />
                             <div class="min-w-0 flex-1">
-                                <p class="font-medium truncate text-sm">{song.title}</p>
-                                <p class="text-xs text-zinc-400 truncate">{song.artist?.name || "Unknown"}</p>
+                                <p class="font-medium truncate text-sm">
+                                    {song.title}
+                                </p>
+                                <p class="text-xs text-zinc-400 truncate">
+                                    {song.artists?.map(a => a.name).join(', ') || "Unknown"}
+                                </p>
                             </div>
-                            <div class="opacity-0 group-hover:opacity-100 transition-opacity">
+                            <div
+                                class="opacity-0 group-hover:opacity-100 transition-opacity"
+                            >
                                 <Radio size={16} class="text-emerald-400" />
                             </div>
                         </button>

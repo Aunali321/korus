@@ -9,61 +9,65 @@ import (
 
 // Config holds runtime configuration.
 type Config struct {
-	Addr                string
-	DBPath              string
-	MediaRoot           string
-	JWTSecret           string
-	TokenTTL            time.Duration
-	RefreshTTL          time.Duration
-	FFmpegPath          string
-	FFprobePath         string
-	ListenBrainzToken   string
-	ListenBrainzUser    string
-	MusicBrainzAgent    string
-	EnableListenBrainz  bool
-	EnableMusicBrainz   bool
-	RateLimitAuthCount  int
-	RateLimitAuthWindow time.Duration
-	ScanWatch           bool
-	ScanExcludePattern  string
-	ScanEmbeddedCover   bool
-	ScanWorkers         int
-	ScanAutoPlaylists   bool
-	CoverCachePath      string
-	RadioLLMEnabled     bool
-	RadioLLMAPIKey      string
-	RadioLLMModel       string
-	RadioDefaultLimit   int
+	Addr                  string
+	DBPath                string
+	MediaRoot             string
+	JWTSecret             string
+	TokenTTL              time.Duration
+	RefreshTTL            time.Duration
+	FFmpegPath            string
+	FFprobePath           string
+	ListenBrainzToken     string
+	ListenBrainzUser      string
+	MusicBrainzAgent      string
+	EnableListenBrainz    bool
+	EnableMusicBrainz     bool
+	RateLimitAuthCount    int
+	RateLimitAuthWindow   time.Duration
+	ScanWatch             bool
+	ScanExcludePattern    string
+	ScanEmbeddedCover     bool
+	ScanWorkers           int
+	ScanAutoPlaylists     bool
+	CoverCachePath        string
+	RadioLLMEnabled       bool
+	RadioLLMAPIKey        string
+	RadioLLMModel         string
+	RadioDefaultLimit     int
+	MetadataEnrichEnabled bool
+	MetadataEnrichURL     string
 }
 
 // FromEnv builds Config from environment with sane defaults.
 func FromEnv() (Config, error) {
 	cfg := Config{
-		Addr:                getenv("ADDR", ":8080"),
-		DBPath:              getenv("DB_PATH", "./korus.db"),
-		MediaRoot:           getenv("MEDIA_ROOT", "./media"),
-		JWTSecret:           getenv("JWT_SECRET", ""),
-		TokenTTL:            durationEnv("TOKEN_TTL", 24*time.Hour),
-		RefreshTTL:          durationEnv("REFRESH_TTL", 30*24*time.Hour),
-		FFmpegPath:          getenv("FFMPEG_PATH", "ffmpeg"),
-		FFprobePath:         getenv("FFPROBE_PATH", "ffprobe"),
-		ListenBrainzToken:   getenv("LISTENBRAINZ_TOKEN", ""),
-		ListenBrainzUser:    getenv("LISTENBRAINZ_USER", ""),
-		MusicBrainzAgent:    getenv("MUSICBRAINZ_AGENT", "Korus/0.1 (https://github.com/Aunali321/korus)"),
-		EnableListenBrainz:  boolEnv("ENABLE_LISTENBRAINZ", false),
-		EnableMusicBrainz:   boolEnv("ENABLE_MUSICBRAINZ", false),
-		RateLimitAuthCount:  intEnv("RATE_LIMIT_AUTH_COUNT", 10),
-		RateLimitAuthWindow: durationEnv("RATE_LIMIT_AUTH_WINDOW", time.Minute),
-		ScanWatch:           boolEnv("SCAN_WATCH", false),
-		ScanExcludePattern:  getenv("SCAN_EXCLUDE_PATTERN", ""),
-		ScanEmbeddedCover:   boolEnv("SCAN_EMBEDDED_COVER", true),
-		ScanWorkers:         intEnv("SCAN_WORKERS", 8),
-		ScanAutoPlaylists:   boolEnv("SCAN_AUTO_PLAYLISTS", true),
-		CoverCachePath:      getenv("COVER_CACHE_PATH", "./cache/covers"),
-		RadioLLMEnabled:     boolEnv("RADIO_LLM_ENABLED", false),
-		RadioLLMAPIKey:      getenv("OPENROUTER_API_KEY", ""),
-		RadioLLMModel:       getenv("RADIO_LLM_MODEL", "google/gemini-3-flash-preview"),
-		RadioDefaultLimit:   intEnv("RADIO_DEFAULT_LIMIT", 20),
+		Addr:                  getenv("ADDR", ":8080"),
+		DBPath:                getenv("DB_PATH", "./korus.db"),
+		MediaRoot:             getenv("MEDIA_ROOT", "./media"),
+		JWTSecret:             getenv("JWT_SECRET", ""),
+		TokenTTL:              durationEnv("TOKEN_TTL", 24*time.Hour),
+		RefreshTTL:            durationEnv("REFRESH_TTL", 30*24*time.Hour),
+		FFmpegPath:            getenv("FFMPEG_PATH", "ffmpeg"),
+		FFprobePath:           getenv("FFPROBE_PATH", "ffprobe"),
+		ListenBrainzToken:     getenv("LISTENBRAINZ_TOKEN", ""),
+		ListenBrainzUser:      getenv("LISTENBRAINZ_USER", ""),
+		MusicBrainzAgent:      getenv("MUSICBRAINZ_AGENT", "Korus/0.1 (https://github.com/Aunali321/korus)"),
+		EnableListenBrainz:    boolEnv("ENABLE_LISTENBRAINZ", false),
+		EnableMusicBrainz:     boolEnv("ENABLE_MUSICBRAINZ", false),
+		RateLimitAuthCount:    intEnv("RATE_LIMIT_AUTH_COUNT", 10),
+		RateLimitAuthWindow:   durationEnv("RATE_LIMIT_AUTH_WINDOW", time.Minute),
+		ScanWatch:             boolEnv("SCAN_WATCH", false),
+		ScanExcludePattern:    getenv("SCAN_EXCLUDE_PATTERN", ""),
+		ScanEmbeddedCover:     boolEnv("SCAN_EMBEDDED_COVER", true),
+		ScanWorkers:           intEnv("SCAN_WORKERS", 8),
+		ScanAutoPlaylists:     boolEnv("SCAN_AUTO_PLAYLISTS", true),
+		CoverCachePath:        getenv("COVER_CACHE_PATH", "./cache/covers"),
+		RadioLLMEnabled:       boolEnv("RADIO_LLM_ENABLED", false),
+		RadioLLMAPIKey:        getenv("OPENROUTER_API_KEY", ""),
+		RadioLLMModel:         getenv("RADIO_LLM_MODEL", "google/gemini-3-flash-preview"),
+		RadioDefaultLimit:     intEnv("RADIO_DEFAULT_LIMIT", 20),
+		MetadataEnrichEnabled: boolEnv("METADATA_ENRICH_ENABLED", true),
+		MetadataEnrichURL:     getenv("METADATA_ENRICH_URL", "https://metadata.aun.rest"),
 	}
 	if cfg.JWTSecret == "" {
 		return cfg, errors.New("JWT_SECRET is required")

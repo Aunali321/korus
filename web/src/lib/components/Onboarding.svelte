@@ -9,6 +9,7 @@
     let step = $state(0);
     let scanning = $state(false);
     let scanStatus = $state<string | null>(null);
+    let scanPhase = $state<string | null>(null);
 
     const presets: { value: StreamingPreset; label: string; desc: string }[] = [
         { value: "original", label: "Original", desc: "No transcoding, highest quality" },
@@ -19,9 +20,19 @@
         { value: "low", label: "Low", desc: "Opus 64kbps, saves data" },
     ];
 
+    const phaseLabels: Record<string, string> = {
+        scanning: "Scanning files",
+        enriching: "Enriching metadata",
+        processing: "Processing artists",
+        cleanup: "Cleaning up",
+        playlists: "Importing playlists",
+        completed: "Complete",
+    };
+
     async function startScan() {
         scanning = true;
         scanStatus = "Starting scan...";
+        scanPhase = null;
         try {
             await api.startScan();
             pollScanStatus();
@@ -34,11 +45,18 @@
     async function pollScanStatus() {
         try {
             const status = await api.getScanStatus();
+            scanPhase = status.phase;
             if (status.status === "running") {
-                scanStatus = `Scanning: ${status.progress}/${status.total} files`;
+                const phaseLabel = phaseLabels[status.phase] || status.phase;
+                if (status.phase === "scanning" || status.phase === "enriching" || status.phase === "processing") {
+                    scanStatus = `${phaseLabel}: ${status.progress}/${status.total}`;
+                } else {
+                    scanStatus = phaseLabel;
+                }
                 setTimeout(pollScanStatus, 1000);
             } else if (status.status === "completed") {
                 scanStatus = `Scan complete: ${status.total} files processed`;
+                scanPhase = "completed";
                 scanning = false;
             } else {
                 scanStatus = status.status;

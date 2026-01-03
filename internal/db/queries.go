@@ -39,9 +39,6 @@ func ScanSong(row interface{ Scan(...any) error }) (models.Song, error) {
 		d := int(duration.Int64)
 		song.Duration = &d
 	}
-	if artistID.Valid {
-		song.Artist = &models.Artist{ID: artistID.Int64, Name: artistName.String}
-	}
 	if albumID.Valid {
 		song.Album = &models.Album{ID: albumID.Int64, Title: albumTitle.String}
 	}
@@ -82,15 +79,17 @@ func GetSongsByAlbum(ctx context.Context, db *sql.DB, albumID int64) ([]models.S
 	return scanSongs(rows)
 }
 
-// GetSongsByArtist returns all songs by an artist with album info
+// GetSongsByArtist returns all songs by an artist (via album or song_artists)
 func GetSongsByArtist(ctx context.Context, db *sql.DB, artistID int64) ([]models.Song, error) {
+	// Get songs where artist is either album artist or in song_artists
 	rows, err := db.QueryContext(ctx, `
-		SELECT `+SongColumns+`
+		SELECT DISTINCT `+SongColumns+`
 		FROM songs s
 		`+SongJoins+`
-		WHERE al.artist_id = ?
+		LEFT JOIN song_artists sa ON sa.song_id = s.id
+		WHERE al.artist_id = ? OR sa.artist_id = ?
 		ORDER BY s.id
-	`, artistID)
+	`, artistID, artistID)
 	if err != nil {
 		return nil, err
 	}
@@ -179,4 +178,53 @@ func GetSongsByTopPlayed(ctx context.Context, db *sql.DB, userID int64, limit in
 	}
 	defer rows.Close()
 	return scanSongs(rows)
+}
+
+// GetArtistsForSong returns all artists for a song from the song_artists table
+func GetArtistsForSong(ctx context.Context, db *sql.DB, songID int64) ([]models.Artist, error) {
+	rows, err := db.QueryContext(ctx, `
+		SELECT a.id, a.name, a.bio, a.image_path, a.external_id
+		FROM song_artists sa
+		JOIN artists a ON a.id = sa.artist_id
+		WHERE sa.song_id = ?
+		ORDER BY sa.position
+	`, songID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var artists []models.Artist
+	for rows.Next() {
+		var a models.Artist
+		var bio, imagePath, externalID sql.NullString
+		if err := rows.Scan(&a.ID, &a.Name, &bio, &imagePath, &externalID); err != nil {
+			continue
+		}
+		if bio.Valid {
+			a.Bio = bio.String
+		}
+		if imagePath.Valid {
+			a.ImagePath = imagePath.String
+		}
+		if externalID.Valid {
+			a.ExternalID = &externalID.String
+		}
+		artists = append(artists, a)
+	}
+	return artists, rows.Err()
+}
+
+// PopulateSongArtists fills the Artists slice for each song
+func PopulateSongArtists(ctx context.Context, db *sql.DB, songs []models.Song) error {
+	for i := range songs {
+		artists, err := GetArtistsForSong(ctx, db, songs[i].ID)
+		if err != nil {
+			continue
+		}
+		if len(artists) > 0 {
+			songs[i].Artists = artists
+		}
+	}
+	return nil
 }

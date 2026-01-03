@@ -217,7 +217,9 @@ func (h *Handler) Home(c echo.Context) error {
 	user, _ := currentUser(c)
 	ctx := c.Request().Context()
 	recent, _ := db.GetSongsByRecentPlays(ctx, h.db, user.ID, 10)
+	_ = db.PopulateSongArtists(ctx, h.db, recent)
 	recommended, _ := db.GetSongsByTopPlayed(ctx, h.db, user.ID, 5)
+	_ = db.PopulateSongArtists(ctx, h.db, recommended)
 	newAdditions, _ := h.fetchAlbums(ctx, 10)
 	return c.JSON(http.StatusOK, map[string]interface{}{
 		"recent_plays":    recent,
