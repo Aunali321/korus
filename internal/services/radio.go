@@ -9,8 +9,16 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
 
 	"github.com/go-pdf/fpdf"
+)
+
+type RadioMode string
+
+const (
+	RadioModeCurator    RadioMode = "curator"
+	RadioModeMainstream RadioMode = "mainstream"
 )
 
 type RadioService struct {
@@ -23,7 +31,15 @@ func NewRadioService(db *sql.DB, apiKey, model string) *RadioService {
 	if model == "" {
 		model = "google/gemini-3-flash-preview"
 	}
-	return &RadioService{db: db, apiKey: apiKey, model: model}
+	return &RadioService{
+		db:     db,
+		apiKey: apiKey,
+		model:  model,
+	}
+}
+
+func (r *RadioService) SetModel(model string) {
+	r.model = model
 }
 
 type songEntry struct {
@@ -147,7 +163,7 @@ type recommendationResponse struct {
 	SongIDs []int64 `json:"song_ids"`
 }
 
-func (r *RadioService) GetRecommendations(ctx context.Context, songID int64, limit int) ([]int64, error) {
+func (r *RadioService) GetRecommendations(ctx context.Context, songID int64, limit int, mode RadioMode) ([]int64, error) {
 	if r.apiKey == "" {
 		return nil, fmt.Errorf("OPENROUTER_API_KEY not configured")
 	}
@@ -157,7 +173,12 @@ func (r *RadioService) GetRecommendations(ctx context.Context, songID int64, lim
 		return nil, fmt.Errorf("song not found: %w", err)
 	}
 
-	pdfBytes, err := r.GeneratePDF()
+	var pdfBytes []byte
+	if mode == RadioModeCurator {
+		pdfBytes, err = r.GenerateCompactPDF()
+	} else {
+		pdfBytes, err = r.GeneratePDF()
+	}
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate PDF: %w", err)
 	}
@@ -169,6 +190,8 @@ func (r *RadioService) GetRecommendations(ctx context.Context, songID int64, lim
 - Genre and subgenre
 - Musical style and mood
 - Language (prefer same language)
+
+Avoid recommending different versions of the same song (remixes, covers, live versions, acoustic versions, etc.).
 
 Search the ENTIRE library across all pages.`
 
@@ -374,6 +397,45 @@ func (r *RadioService) GeneratePDF() ([]byte, error) {
 			pdf.Text(x, y, entry)
 		}
 	}
+
+	var buf bytes.Buffer
+	if err := pdf.Output(&buf); err != nil {
+		return nil, fmt.Errorf("failed to generate PDF: %w", err)
+	}
+
+	return buf.Bytes(), nil
+}
+
+// GenerateCompactPDF creates a minimal PDF with all songs comma-separated
+func (r *RadioService) GenerateCompactPDF() ([]byte, error) {
+	songs, err := r.getSongs()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get songs: %w", err)
+	}
+
+	// Build comma-separated string: "1 - Song - Artist, 2 - Song - Artist, ..."
+	entries := make([]string, 0, len(songs))
+	for _, s := range songs {
+		entry := fmt.Sprintf("%d - %s - %s", s.ID, s.Title, s.Artist)
+		entries = append(entries, entry)
+	}
+	content := strings.Join(entries, ", ")
+
+	pdf := fpdf.New("P", "mm", "A4", "")
+	pdf.SetAutoPageBreak(true, 5)
+	pdf.AddPage()
+
+	const (
+		fontSize = 1.5 // Minimum readable size
+		margin   = 3.0
+	)
+
+	pdf.SetFont("Courier", "", fontSize)
+	pdf.SetXY(margin, margin)
+
+	// Use MultiCell for automatic text wrapping
+	pageWidth := 210.0 - 2*margin
+	pdf.MultiCell(pageWidth, 0.8, content, "", "", false)
 
 	var buf bytes.Buffer
 	if err := pdf.Output(&buf); err != nil {

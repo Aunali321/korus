@@ -1,8 +1,9 @@
-import type { StreamingQuality, StreamingPreset, RepeatMode } from '$lib/types';
+import type { StreamingQuality, StreamingPreset, RepeatMode, RadioMode } from '$lib/types';
 import { api } from '$lib/api';
 
 const STREAMING_KEY = 'korus_streaming_quality';
 const PLAYBACK_KEY = 'korus_playback_settings';
+const RADIO_MODE_KEY = 'korus_radio_mode';
 
 const PRESETS: Record<Exclude<StreamingPreset, 'custom'>, { format: string; bitrate: number } | null> = {
     original: null,
@@ -18,6 +19,7 @@ function createSettingsStore() {
     let shuffle = $state(false);
     let repeat = $state<RepeatMode>('off');
     let radioEnabled = $state(false);
+    let radioMode = $state<RadioMode>('curator');
     let loaded = $state(false);
     let syncing = $state(false);
 
@@ -33,6 +35,10 @@ function createSettingsStore() {
                 const parsed = JSON.parse(playback);
                 shuffle = parsed.shuffle ?? false;
                 repeat = parsed.repeat ?? 'off';
+            }
+            const mode = localStorage.getItem(RADIO_MODE_KEY);
+            if (mode === 'curator' || mode === 'mainstream') {
+                radioMode = mode;
             }
         } catch {
             // ignore
@@ -119,14 +125,23 @@ function createSettingsStore() {
         await setRepeat(modes[(idx + 1) % modes.length]);
     }
 
+    function setRadioMode(mode: RadioMode) {
+        radioMode = mode;
+        if (typeof localStorage !== 'undefined') {
+            localStorage.setItem(RADIO_MODE_KEY, mode);
+        }
+    }
+
     function reset() {
         streamingQuality = { preset: 'original' };
         shuffle = false;
         repeat = 'off';
+        radioMode = 'curator';
         loaded = false;
         if (typeof localStorage !== 'undefined') {
             localStorage.removeItem(STREAMING_KEY);
             localStorage.removeItem(PLAYBACK_KEY);
+            localStorage.removeItem(RADIO_MODE_KEY);
         }
     }
 
@@ -140,6 +155,7 @@ function createSettingsStore() {
         get shuffle() { return shuffle; },
         get repeat() { return repeat; },
         get radioEnabled() { return radioEnabled; },
+        get radioMode() { return radioMode; },
         get loaded() { return loaded; },
         setPreset,
         setCustom,
@@ -148,6 +164,7 @@ function createSettingsStore() {
         setRepeat,
         toggleShuffle,
         toggleRepeat,
+        setRadioMode,
         load,
         reset,
     };

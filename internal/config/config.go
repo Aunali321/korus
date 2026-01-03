@@ -33,6 +33,7 @@ type Config struct {
 	RadioLLMEnabled     bool
 	RadioLLMAPIKey      string
 	RadioLLMModel       string
+	RadioDefaultLimit   int
 }
 
 // FromEnv builds Config from environment with sane defaults.
@@ -62,6 +63,7 @@ func FromEnv() (Config, error) {
 		RadioLLMEnabled:     boolEnv("RADIO_LLM_ENABLED", false),
 		RadioLLMAPIKey:      getenv("OPENROUTER_API_KEY", ""),
 		RadioLLMModel:       getenv("RADIO_LLM_MODEL", "google/gemini-3-flash-preview"),
+		RadioDefaultLimit:   intEnv("RADIO_DEFAULT_LIMIT", 20),
 	}
 	if cfg.JWTSecret == "" {
 		return cfg, errors.New("JWT_SECRET is required")

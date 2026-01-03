@@ -5,6 +5,7 @@ import (
 	"net/http"
 
 	"github.com/Aunali321/korus/internal/models"
+	"github.com/Aunali321/korus/internal/services"
 	"github.com/labstack/echo/v4"
 )
 
@@ -14,6 +15,7 @@ import (
 // @Produce json
 // @Param id path int true "Song ID to seed radio from"
 // @Param limit query int false "Number of songs to return" default(20)
+// @Param mode query string false "Radio mode: curator or mainstream" default(curator)
 // @Success 200 {object} map[string][]models.Song
 // @Failure 404 {object} map[string]string
 // @Router /radio/{id} [get]
@@ -23,20 +25,26 @@ func (h *Handler) Radio(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusBadRequest, map[string]string{"error": "invalid id", "code": "BAD_REQUEST"})
 	}
 
-	limit := 20
+	limit := h.radioDefaultLimit
 	if l := c.QueryParam("limit"); l != "" {
 		if err := echo.QueryParamsBinder(c).Int("limit", &limit).BindError(); err == nil && limit > 0 && limit <= 100 {
 			// valid
 		} else {
-			limit = 20
+			limit = h.radioDefaultLimit
 		}
 	}
+
+	mode := c.QueryParam("mode")
 
 	ctx := c.Request().Context()
 
 	// Try LLM-based recommendations if available
 	if h.radio != nil {
-		ids, err := h.radio.GetRecommendations(ctx, songID, limit)
+		radioMode := services.RadioModeCurator
+		if mode == "mainstream" {
+			radioMode = services.RadioModeMainstream
+		}
+		ids, err := h.radio.GetRecommendations(ctx, songID, limit, radioMode)
 		if err == nil && len(ids) > 0 {
 			return h.getSongsByIDs(c, ids)
 		}

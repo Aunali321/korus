@@ -353,8 +353,8 @@ export const api = {
 
   health: () => request<{ status: string }>("/health"),
 
-  getRadio: (songId: number, limit = 20) =>
-    request<{ songs: Song[] }>(`/radio/${songId}?limit=${limit}`),
+  getRadio: (songId: number, limit = 20, mode: 'curator' | 'mainstream' = 'curator') =>
+    request<{ songs: Song[] }>(`/radio/${songId}?limit=${limit}&mode=${mode}`),
 
   getAppSettings: () =>
     request<{ radio_enabled: boolean }>("/admin/settings"),

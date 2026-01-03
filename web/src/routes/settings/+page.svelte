@@ -1,5 +1,5 @@
 <script lang="ts">
-    import { Settings, LogOut, Server, Volume2, RefreshCw } from "lucide-svelte";
+    import { Settings, LogOut, Server, Volume2, RefreshCw, Radio } from "lucide-svelte";
     import { auth } from "$lib/stores/auth.svelte";
     import { settings } from "$lib/stores/settings.svelte";
     import { toast } from "$lib/stores/toast.svelte";
@@ -243,6 +243,55 @@
             </div>
         </div>
     </section>
+
+    {#if settings.radioEnabled}
+    <section>
+        <h3 class="text-xl font-bold mb-4 flex items-center gap-2">
+            <Radio size={20} class="text-zinc-400" />
+            Radio Mode
+        </h3>
+        <div
+            class="bg-zinc-900 border border-zinc-800 rounded-xl p-6 space-y-4"
+        >
+            <div class="space-y-2">
+                <label
+                    class="flex items-start gap-3 p-3 rounded-lg cursor-pointer transition-colors {settings.radioMode === 'curator' ? 'bg-zinc-800' : 'hover:bg-zinc-800/50'}"
+                >
+                    <input
+                        type="radio"
+                        name="radioMode"
+                        value="curator"
+                        checked={settings.radioMode === 'curator'}
+                        onchange={() => settings.setRadioMode('curator')}
+                        class="w-4 h-4 mt-1 accent-emerald-500"
+                    />
+                    <div>
+                        <div class="font-medium">Curator</div>
+                        <div class="text-sm text-zinc-400">Better quality recommendations</div>
+                        <div class="text-xs text-zinc-500 mt-1">Best for: Most queries, indie, discovery</div>
+                    </div>
+                </label>
+                <label
+                    class="flex items-start gap-3 p-3 rounded-lg cursor-pointer transition-colors {settings.radioMode === 'mainstream' ? 'bg-zinc-800' : 'hover:bg-zinc-800/50'}"
+                >
+                    <input
+                        type="radio"
+                        name="radioMode"
+                        value="mainstream"
+                        checked={settings.radioMode === 'mainstream'}
+                        onchange={() => settings.setRadioMode('mainstream')}
+                        class="w-4 h-4 mt-1 accent-emerald-500"
+                    />
+                    <div>
+                        <div class="font-medium">Mainstream</div>
+                        <div class="text-sm text-zinc-400">More predictable recommendations</div>
+                        <div class="text-xs text-zinc-500 mt-1">Best for: Mainstream music only</div>
+                    </div>
+                </label>
+            </div>
+        </div>
+    </section>
+    {/if}
 
     <section>
         <h3 class="text-xl font-bold mb-4 flex items-center gap-2">

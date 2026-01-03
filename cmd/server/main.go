@@ -95,18 +95,19 @@ func main() {
 	}
 
 	e := api.New(api.Deps{
-		DB:           database,
-		Auth:         authSvc,
-		Scanner:      scanner,
-		Search:       search,
-		Transcoder:   transcoder,
-		MusicBrainz:  mb,
-		ListenBrainz: lb,
-		Radio:        radio,
-		MediaRoot:    cfg.MediaRoot,
-		AuthRate:     cfg.RateLimitAuthCount,
-		AuthWindow:   cfg.RateLimitAuthWindow,
-		WebDistPath:  "web/dist",
+		DB:                database,
+		Auth:              authSvc,
+		Scanner:           scanner,
+		Search:            search,
+		Transcoder:        transcoder,
+		MusicBrainz:       mb,
+		ListenBrainz:      lb,
+		Radio:             radio,
+		MediaRoot:         cfg.MediaRoot,
+		AuthRate:          cfg.RateLimitAuthCount,
+		AuthWindow:        cfg.RateLimitAuthWindow,
+		WebDistPath:       "web/dist",
+		RadioDefaultLimit: cfg.RadioDefaultLimit,
 	})
 	e.GET("/swagger/*", echoSwagger.WrapHandler)
 

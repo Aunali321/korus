@@ -149,6 +149,8 @@ export interface SystemInfo {
 
 export type RepeatMode = 'off' | 'one' | 'all';
 
+export type RadioMode = 'curator' | 'mainstream';
+
 export interface StreamingFormat {
     format: string;
     bitrates: number[];

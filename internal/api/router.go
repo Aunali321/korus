@@ -18,18 +18,19 @@ import (
 )
 
 type Deps struct {
-	DB           *sql.DB
-	Auth         *services.AuthService
-	Scanner      *services.ScannerService
-	Search       *services.SearchService
-	Transcoder   *services.Transcoder
-	MusicBrainz  *services.MusicBrainzService
-	ListenBrainz *services.ListenBrainzService
-	Radio        *services.RadioService
-	MediaRoot    string
-	AuthRate     int
-	AuthWindow   time.Duration
-	WebDistPath  string
+	DB                *sql.DB
+	Auth              *services.AuthService
+	Scanner           *services.ScannerService
+	Search            *services.SearchService
+	Transcoder        *services.Transcoder
+	MusicBrainz       *services.MusicBrainzService
+	ListenBrainz      *services.ListenBrainzService
+	Radio             *services.RadioService
+	MediaRoot         string
+	AuthRate          int
+	AuthWindow        time.Duration
+	WebDistPath       string
+	RadioDefaultLimit int
 }
 
 func New(deps Deps) *echo.Echo {
@@ -48,7 +49,7 @@ func New(deps Deps) *echo.Echo {
 	e.Use(echomw.Recover())
 	e.Use(echomw.CORS())
 
-	h := handlers.New(deps.DB, deps.Auth, deps.Scanner, deps.Search, deps.Transcoder, deps.MusicBrainz, deps.ListenBrainz, deps.Radio, deps.MediaRoot)
+	h := handlers.New(deps.DB, deps.Auth, deps.Scanner, deps.Search, deps.Transcoder, deps.MusicBrainz, deps.ListenBrainz, deps.Radio, deps.MediaRoot, deps.RadioDefaultLimit)
 
 	api := e.Group("/api")
 	api.GET("/health", h.Health)

@@ -129,8 +129,17 @@ Environment variables:
 | `RADIO_LLM_ENABLED` | `false` | Enable LLM-powered radio recommendations |
 | `OPENROUTER_API_KEY` | - | OpenRouter API key (required if radio enabled) |
 | `RADIO_LLM_MODEL` | `google/gemini-3-flash-preview` | LLM model to use |
+| `RADIO_DEFAULT_LIMIT` | `20` | Default number of recommendations to return |
 
 When enabled, the radio feature uses an LLM to find similar songs from your library based on genre, style, mood, and language. The entire library is rendered as a PDF and sent to the model for context.
+
+**Radio Modes:**
+- **Curator** (default): Better quality recommendations. Best for most queries, indie music, and discovery. Uses a compact PDF format.
+- **Mainstream**: More predictable recommendations. Best for mainstream music only. Uses a detailed PDF format.
+
+**Estimated costs (using OpenRouter with Gemini Flash):**
+- Curator mode: ~1500 requests per $1
+- Mainstream mode: ~400 requests per $1
 
 If disabled or if the LLM fails, radio falls back to metadata-based recommendations (same artist/album/year).
 

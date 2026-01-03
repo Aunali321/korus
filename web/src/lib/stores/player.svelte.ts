@@ -524,7 +524,7 @@ function createPlayerStore() {
         audio?.play().catch(console.error);
 
         try {
-            const { songs: radioSongs } = await api.getRadio(song.id, 20);
+            const { songs: radioSongs } = await api.getRadio(song.id, 20, settings.radioMode);
             if (radioSongs && radioSongs.length > 0) {
                 const newSongs = radioSongs.filter(s => s.id !== song.id);
                 queue = [song, ...newSongs];
