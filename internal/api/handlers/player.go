@@ -256,6 +256,7 @@ func (h *Handler) Artwork(c echo.Context) error {
 	artworkType := c.QueryParam("type") // "album" or default to song
 
 	var cover string
+	var filePath string
 	var err error
 
 	if artworkType == "album" {
@@ -264,22 +265,56 @@ func (h *Handler) Artwork(c echo.Context) error {
 	} else {
 		// Song -> album lookup (default)
 		err = h.db.QueryRowContext(ctx, `
-			SELECT cover_path FROM albums WHERE id = (SELECT album_id FROM songs WHERE id = ?)
-		`, id).Scan(&cover)
+			SELECT a.cover_path, s.file_path FROM albums a 
+			JOIN songs s ON s.album_id = a.id 
+			WHERE s.id = ?
+		`, id).Scan(&cover, &filePath)
 	}
 
-	if err != nil || cover == "" {
-		return echo.NewHTTPError(http.StatusNotFound, map[string]string{"error": "artwork not found", "code": "NOT_FOUND"})
+	// Try album cover first
+	if err == nil && cover != "" {
+		if info, statErr := os.Stat(cover); statErr == nil {
+			c.Response().Header().Set("Cache-Control", "public, max-age=31536000, immutable")
+			c.Response().Header().Set("Last-Modified", info.ModTime().UTC().Format(http.TimeFormat))
+			return c.File(cover)
+		}
 	}
-	info, err := os.Stat(cover)
+
+	// Fall back to extracting from song file directly
+	if filePath != "" {
+		tempFile, extractErr := extractArtworkFromFile(filePath)
+		if extractErr == nil && tempFile != "" {
+			defer os.Remove(tempFile)
+			c.Response().Header().Set("Cache-Control", "public, max-age=3600")
+			return c.File(tempFile)
+		}
+	}
+
+	return echo.NewHTTPError(http.StatusNotFound, map[string]string{"error": "artwork not found", "code": "NOT_FOUND"})
+}
+
+// extractArtworkFromFile extracts embedded artwork from audio file using ffmpeg
+func extractArtworkFromFile(audioPath string) (string, error) {
+	tempFile, err := os.CreateTemp("", "artwork-*.jpg")
 	if err != nil {
-		return echo.NewHTTPError(http.StatusNotFound, map[string]string{"error": "artwork not found", "code": "NOT_FOUND"})
+		return "", err
+	}
+	tempFile.Close()
+
+	cmd := exec.Command("ffmpeg", "-y", "-i", audioPath, "-an", "-vcodec", "mjpeg", "-frames:v", "1", tempFile.Name())
+	if err := cmd.Run(); err != nil {
+		os.Remove(tempFile.Name())
+		return "", err
 	}
 
-	c.Response().Header().Set("Cache-Control", "public, max-age=31536000, immutable")
-	c.Response().Header().Set("Last-Modified", info.ModTime().UTC().Format(http.TimeFormat))
+	// Check if file was actually created and has content
+	info, err := os.Stat(tempFile.Name())
+	if err != nil || info.Size() == 0 {
+		os.Remove(tempFile.Name())
+		return "", fmt.Errorf("no artwork extracted")
+	}
 
-	return c.File(cover)
+	return tempFile.Name(), nil
 }
 
 // ArtistImage godoc

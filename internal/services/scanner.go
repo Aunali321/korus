@@ -277,7 +277,41 @@ func (s *ScannerService) ingestFile(ctx context.Context, path string, seenSongs 
 	artistName := meta.Artist()
 	albumTitle := meta.Album()
 	title := meta.Title()
-	if artistName == "" || albumTitle == "" || title == "" {
+
+	// Check for invalid/placeholder metadata and try fallbacks
+	if isInvalidMetadata(artistName) || isInvalidMetadata(albumTitle) || isInvalidMetadata(title) {
+		// Try stream-level tags (opus/ogg files)
+		streamMeta := s.probeStreamTags(path)
+
+		if isInvalidMetadata(artistName) && !isInvalidMetadata(streamMeta.Artist) {
+			artistName = streamMeta.Artist
+		}
+		if isInvalidMetadata(albumTitle) && !isInvalidMetadata(streamMeta.Album) {
+			albumTitle = streamMeta.Album
+		}
+		if isInvalidMetadata(title) && !isInvalidMetadata(streamMeta.Title) {
+			title = streamMeta.Title
+		}
+
+		// Use filename as album fallback
+		if isInvalidMetadata(albumTitle) {
+			albumTitle = "Unknown Album"
+		}
+
+		// Use filename as title fallback
+		if isInvalidMetadata(title) {
+			base := filepath.Base(path)
+			title = strings.TrimSuffix(base, filepath.Ext(base))
+		}
+
+		// If artist still unknown, use "Unknown Artist"
+		if isInvalidMetadata(artistName) {
+			artistName = "Unknown Artist"
+		}
+	}
+
+	// Final validation - need at least title
+	if title == "" {
 		return nil, errors.New("missing metadata")
 	}
 
@@ -557,6 +591,59 @@ func (s *ScannerService) probe(path string) audioMetadata {
 func parseStringToInt(v string) int {
 	i, _ := strconv.Atoi(v)
 	return i
+}
+
+// streamTags holds metadata extracted from stream-level tags (for opus/ogg files)
+type streamTags struct {
+	Artist string
+	Album  string
+	Title  string
+}
+
+// probeStreamTags extracts tags from audio stream (useful for opus files where tags are stream-level)
+func (s *ScannerService) probeStreamTags(path string) streamTags {
+	cmd := exec.Command(s.ffprobePath, "-v", "quiet", "-print_format", "json", "-show_streams", path)
+	var out bytes.Buffer
+	cmd.Stdout = &out
+	_ = cmd.Run()
+
+	var data struct {
+		Streams []struct {
+			CodecType string            `json:"codec_type"`
+			Tags      map[string]string `json:"tags"`
+		} `json:"streams"`
+	}
+
+	var tags streamTags
+	if err := json.Unmarshal(out.Bytes(), &data); err == nil {
+		for _, stream := range data.Streams {
+			if stream.CodecType == "audio" && stream.Tags != nil {
+				tags.Artist = stream.Tags["artist"]
+				if tags.Artist == "" {
+					tags.Artist = stream.Tags["ARTIST"]
+				}
+				tags.Album = stream.Tags["album"]
+				if tags.Album == "" {
+					tags.Album = stream.Tags["ALBUM"]
+				}
+				tags.Title = stream.Tags["title"]
+				if tags.Title == "" {
+					tags.Title = stream.Tags["TITLE"]
+				}
+				break
+			}
+		}
+	}
+	return tags
+}
+
+// isInvalidMetadata checks if a metadata value is missing or placeholder
+func isInvalidMetadata(s string) bool {
+	if s == "" {
+		return true
+	}
+	lower := strings.ToLower(strings.TrimSpace(s))
+	return lower == "na" || lower == "n/a" || lower == "unknown" || lower == "various artists"
 }
 
 func (s *ScannerService) extractCover(ctx context.Context, src string, albumID int64) (string, error) {
