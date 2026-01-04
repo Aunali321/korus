@@ -13,6 +13,7 @@
 	import Toast from "$lib/components/Toast.svelte";
 	import Onboarding from "$lib/components/Onboarding.svelte";
 	import ContextMenu from "$lib/components/ContextMenu.svelte";
+	import CommandPalette from "$lib/components/CommandPalette.svelte";
 
 	let { children } = $props();
 	let showQueue = $state(false);
@@ -86,6 +87,7 @@
 		<Player onToggleQueue={() => (showQueue = !showQueue)} onToggleLyrics={() => (showLyrics = !showLyrics)} />
 		<Toast />
 		<ContextMenu />
+		<CommandPalette onToggleQueue={() => (showQueue = !showQueue)} onToggleLyrics={() => (showLyrics = !showLyrics)} />
 		{#if showOnboarding}
 			<Onboarding onComplete={handleOnboardingComplete} />
 		{/if}

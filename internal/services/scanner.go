@@ -865,16 +865,22 @@ func (s *ScannerService) enrichSongs(ctx context.Context, scanID int64, songs []
 		return
 	}
 
-	// Collect ISRCs
+	// Collect ISRCs, skipping songs that already have artist relationships
 	isrcToSongs := make(map[string][]songEnrichInfo)
 	for _, song := range songs {
-		if song.isrc != "" {
-			isrcToSongs[song.isrc] = append(isrcToSongs[song.isrc], song)
+		if song.isrc == "" {
+			continue
 		}
+		// Skip songs already enriched
+		var count int
+		if err := s.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM song_artists WHERE song_id = ?`, song.songID).Scan(&count); err == nil && count > 0 {
+			continue
+		}
+		isrcToSongs[song.isrc] = append(isrcToSongs[song.isrc], song)
 	}
 
 	if len(isrcToSongs) == 0 {
-		log.Printf("enrichment: no songs with ISRCs found, using fallback parsing")
+		log.Printf("enrichment: no new songs need enrichment, using fallback parsing")
 		s.fallbackArtistParsing(ctx, scanID, songs, nil)
 		return
 	}

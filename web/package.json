@@ -30,6 +30,7 @@
 		"vite": "^7.2.2"
 	},
 	"dependencies": {
+		"svelte-command-palette": "^2.0.2",
 		"virtua": "^0.48.2"
 	}
 }

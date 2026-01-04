@@ -17,6 +17,7 @@ Self-hosted music streaming server with a web interface.
 - **Metadata enrichment** - Automatic artist images and multi-artist support via ISRC lookup
 - **Lyrics** - Display lyrics when available
 - **Queue management** - Reorder, add, remove tracks
+- **Command palette** - Quick navigation and actions with keyboard shortcuts
 - **MusicBrainz integration** - Enrich metadata from MusicBrainz
 - **ListenBrainz scrobbling** - Submit listens to ListenBrainz
 - **Multi-user** - User accounts with JWT authentication
@@ -213,3 +214,40 @@ go test ./...
 # Frontend
 cd web && bun run check
 ```
+
+## Keyboard Shortcuts
+
+Press `Ctrl+K` (or `Cmd+K` on Mac) to open the command palette.
+
+### Navigation
+
+| Shortcut | Action |
+|----------|--------|
+| `Ctrl+0` | Go to Home |
+| `Ctrl+1` | Go to Search |
+| `Ctrl+2` | Go to Library |
+| `Ctrl+3` | Go to Playlists |
+| `Ctrl+4` | Go to Albums |
+| `Ctrl+5` | Go to Artists |
+| `Ctrl+6` | Go to Favorites |
+| `Ctrl+7` | Go to Stats |
+| `Ctrl+8` | Go to Settings |
+| `Ctrl+9` | Go to Admin |
+
+### Playback
+
+| Shortcut | Action |
+|----------|--------|
+| `Space` | Play / Pause |
+| `Shift+Right` | Next Track |
+| `Shift+Left` | Previous Track |
+| `Shift+S` | Toggle Shuffle |
+| `Shift+R` | Toggle Repeat |
+| `Shift+F` | Favorite Current Song |
+
+### View
+
+| Shortcut | Action |
+|----------|--------|
+| `Shift+Q` | Toggle Queue |
+| `Shift+L` | Toggle Lyrics |
