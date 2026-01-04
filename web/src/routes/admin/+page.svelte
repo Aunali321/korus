@@ -140,9 +140,9 @@
                 <Radio size={20} class="text-emerald-400" />
                 Radio Settings
             </h3>
-            <div class="bg-zinc-900 border border-zinc-800 rounded-xl p-6">
-                <div class="flex items-center justify-between">
-                    <div>
+            <div class="bg-zinc-900 border border-zinc-800 rounded-xl p-4 md:p-6">
+                <div class="flex items-center justify-between gap-4">
+                    <div class="min-w-0">
                         <p class="font-medium">Enable Radio</p>
                         <p class="text-sm text-zinc-400">Allow users to start radio stations from songs</p>
                     </div>
@@ -150,7 +150,7 @@
                         onclick={toggleRadio}
                         disabled={savingRadio}
                         aria-label="Toggle radio"
-                        class="relative w-12 h-6 rounded-full transition-colors {radioEnabled ? 'bg-emerald-500' : 'bg-zinc-700'}"
+                        class="relative w-12 h-6 rounded-full transition-colors shrink-0 {radioEnabled ? 'bg-emerald-500' : 'bg-zinc-700'}"
                     >
                         <span
                             class="absolute top-1 left-1 w-4 h-4 bg-white rounded-full transition-transform {radioEnabled ? 'translate-x-6' : ''}"
@@ -165,8 +165,8 @@
                 <Trash2 size={20} class="text-red-400" />
                 Session Cleanup
             </h3>
-            <div class="bg-zinc-900 border border-zinc-800 rounded-xl p-6">
-                <div class="flex items-center gap-4">
+            <div class="bg-zinc-900 border border-zinc-800 rounded-xl p-4 md:p-6">
+                <div class="flex flex-wrap items-center gap-3 md:gap-4">
                     <label for="cleanup-days" class="text-sm text-zinc-400"
                         >Delete sessions older than</label
                     >

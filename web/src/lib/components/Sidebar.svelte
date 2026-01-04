@@ -12,8 +12,11 @@
 		BarChart3,
 		Sparkles,
 		Shield,
+		X,
 	} from "lucide-svelte";
 	import { auth } from "$lib/stores/auth.svelte";
+
+	let { isOpen = false, onClose = () => {} }: { isOpen?: boolean; onClose?: () => void } = $props();
 
 	const navItems = [
 		{ icon: Home, label: "Home", href: "/" },
@@ -43,16 +46,44 @@
 		if (href === "/") return $page.url.pathname === "/";
 		return $page.url.pathname.startsWith(href);
 	}
+
+	function handleNavClick() {
+		onClose();
+	}
 </script>
 
-<div class="w-64 bg-zinc-950 border-r border-zinc-800 flex flex-col h-full">
-	<div class="p-6 border-b border-zinc-800">
-		<h1
-			class="text-2xl font-bold bg-gradient-to-r from-emerald-400 to-cyan-400 bg-clip-text text-transparent"
+<!-- Mobile overlay -->
+{#if isOpen}
+	<button
+		class="fixed inset-0 bg-black/50 z-40 md:hidden"
+		onclick={onClose}
+		aria-label="Close menu"
+	></button>
+{/if}
+
+<!-- Sidebar -->
+<div class="
+	fixed inset-y-0 left-0 z-50 w-64 bg-zinc-950 border-r border-zinc-800 flex flex-col h-full
+	transform transition-transform duration-300 ease-in-out
+	md:relative md:translate-x-0
+	{isOpen ? 'translate-x-0' : '-translate-x-full'}
+">
+	<div class="p-6 border-b border-zinc-800 flex items-center justify-between">
+		<div>
+			<h1
+				class="text-2xl font-bold bg-gradient-to-r from-emerald-400 to-cyan-400 bg-clip-text text-transparent"
+			>
+				Korus
+			</h1>
+			<p class="text-xs text-zinc-500 mt-1">Self-hosted Music</p>
+		</div>
+		<button
+			onclick={onClose}
+			class="p-2 hover:bg-zinc-800 rounded-lg transition-colors md:hidden"
+			aria-label="Close menu"
 		>
-			Korus
-		</h1>
-		<p class="text-xs text-zinc-500 mt-1">Self-hosted Music</p>
+			<X size={20} />
+		</button>
 	</div>
 
 	<nav class="flex-1 overflow-y-auto scrollbar-thin">
@@ -60,6 +91,7 @@
 			{#each navItems as item}
 				<a
 					href={item.href}
+					onclick={handleNavClick}
 					class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all {isActive(
 						item.href,
 					)
@@ -82,6 +114,7 @@
 				{#each libraryItems as item}
 					<a
 						href={item.href}
+						onclick={handleNavClick}
 						class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all {isActive(
 							item.href,
 						)
@@ -104,6 +137,7 @@
 			<div class="space-y-1 mt-1">
 				<a
 					href="/stats"
+					onclick={handleNavClick}
 					class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all {isActive(
 						'/stats',
 					)
@@ -116,6 +150,7 @@
 				{#if isWrappedSeason()}
 					<a
 						href="/wrapped"
+						onclick={handleNavClick}
 						class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all {isActive(
 							'/wrapped',
 						)
@@ -134,6 +169,7 @@
 		{#if auth.isAdmin}
 			<a
 				href="/admin"
+				onclick={handleNavClick}
 				class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all {isActive(
 					'/admin',
 				)
@@ -146,6 +182,7 @@
 		{/if}
 		<a
 			href="/settings"
+			onclick={handleNavClick}
 			class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all {isActive(
 				'/settings',
 			)

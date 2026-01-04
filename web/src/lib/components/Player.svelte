@@ -72,90 +72,17 @@
 </script>
 
 <div
-    class="h-24 bg-zinc-950 border-t border-zinc-800 flex items-center px-4 gap-4 relative z-40"
+    class="bg-zinc-950 border-t border-zinc-800 z-40 shrink-0 fixed bottom-0 left-0 right-0 md:relative"
 >
     {#if player.currentSong}
-        <div class="flex items-center gap-3 w-80">
-            <img
-                src={api.getArtworkUrl(player.currentSong.id)}
-                alt={player.currentSong.title}
-                class="w-14 h-14 rounded-lg object-cover bg-zinc-800"
-            />
-            <div class="flex-1 min-w-0">
-                <h4 class="font-semibold text-sm truncate">
-                    {player.currentSong.title}
-                </h4>
-                <p class="text-xs text-zinc-400 truncate">
-                    {#if player.currentSong.artists && player.currentSong.artists.length > 0}
-                        {#each player.currentSong.artists as artist, i}
-                            <a
-                                href="/artists/{artist.id}"
-                                class="hover:text-zinc-100 hover:underline"
-                            >{artist.name}</a>{#if i < player.currentSong.artists.length - 1}, {/if}
-                        {/each}
-                    {:else}
-                        Unknown
-                    {/if}
-                </p>
-            </div>
-            <button
-                onclick={handleFavorite}
-                class="p-2 hover:bg-zinc-800 rounded-full transition-colors"
-            >
-                <Heart size={18} class={isFavorited ? 'fill-red-500 text-red-500' : 'text-zinc-400 hover:text-red-400'} />
-            </button>
-        </div>
-
-        <div class="flex-1 flex flex-col items-center gap-2">
-            <div class="flex items-center gap-4">
-                <button
-                    onclick={() => player.toggleShuffle()}
-                    class="p-2 transition-colors {player.shuffle
-                        ? 'text-emerald-400'
-                        : 'text-zinc-400 hover:text-zinc-100'}"
-                >
-                    <Shuffle size={18} />
-                </button>
-                <button
-                    onclick={() => player.prev()}
-                    class="p-2 text-zinc-400 hover:text-zinc-100 transition-colors"
-                >
-                    <SkipBack size={20} />
-                </button>
-                <button
-                    onclick={() => player.toggle()}
-                    class="w-10 h-10 bg-white hover:bg-zinc-200 text-black rounded-full flex items-center justify-center transition-all hover:scale-105"
-                >
-                    {#if player.isPlaying}
-                        <Pause size={20} fill="currentColor" />
-                    {:else}
-                        <Play size={20} fill="currentColor" class="ml-0.5" />
-                    {/if}
-                </button>
-                <button
-                    onclick={() => player.next()}
-                    class="p-2 text-zinc-400 hover:text-zinc-100 transition-colors"
-                >
-                    <SkipForward size={20} />
-                </button>
-                <button
-                    onclick={() => player.toggleRepeat()}
-                    class="p-2 transition-colors {player.repeat !== 'off'
-                        ? 'text-emerald-400'
-                        : 'text-zinc-400 hover:text-zinc-100'}"
-                >
-                    {#if player.repeat === "one"}
-                        <Repeat1 size={18} />
-                    {:else}
-                        <Repeat size={18} />
-                    {/if}
-                </button>
-            </div>
-
-            <div class="flex items-center gap-2 w-full max-w-2xl">
-                <span class="text-xs text-zinc-400 w-10 text-right"
-                    >{formatTime(displayProgress)}</span
-                >
+        <!-- Mobile Layout (two rows) -->
+        <div class="md:hidden min-h-[100px]">
+            <!-- Progress bar at top (thin, full width) -->
+            <div class="h-1 bg-zinc-800 relative">
+                <div 
+                    class="absolute inset-y-0 left-0 bg-emerald-500"
+                    style="width: {progressPercent}%"
+                ></div>
                 <input
                     type="range"
                     min="0"
@@ -165,54 +92,237 @@
                     ontouchstart={handleSeekStart}
                     oninput={handleSeekInput}
                     onchange={handleSeekEnd}
-                    class="flex-1 range-progress"
-                    style="--progress: {progressPercent}%"
+                    class="absolute inset-0 w-full opacity-0 cursor-pointer"
                 />
-                <span class="text-xs text-zinc-400 w-10"
-                    >{formatTime(player.duration)}</span
+            </div>
+            
+            <!-- Row 1: Cover, title, artist -->
+            <div class="flex items-center gap-3 px-3 pt-2 pb-1">
+                <img
+                    src={api.getArtworkUrl(player.currentSong.id)}
+                    alt={player.currentSong.title}
+                    class="w-10 h-10 rounded object-cover bg-zinc-800 shrink-0"
+                />
+                <div class="flex-1 min-w-0">
+                    <h4 class="font-medium text-sm truncate">
+                        {player.currentSong.title}
+                    </h4>
+                    <p class="text-xs text-zinc-400 truncate">
+                        {player.currentSong.artists?.map(a => a.name).join(', ') || "Unknown"}
+                    </p>
+                </div>
+                <button
+                    onclick={handleFavorite}
+                    class="p-1.5 shrink-0"
                 >
+                    <Heart size={18} class={isFavorited ? 'fill-red-500 text-red-500' : 'text-zinc-400'} />
+                </button>
+            </div>
+
+            <!-- Row 2: Controls -->
+            <div class="flex items-center justify-between px-3 pb-2">
+                <div class="flex items-center gap-1">
+                    <button
+                        onclick={() => player.toggleShuffle()}
+                        class="p-2 {player.shuffle ? 'text-emerald-400' : 'text-zinc-400'}"
+                    >
+                        <Shuffle size={18} />
+                    </button>
+                    <button
+                        onclick={() => player.toggleRepeat()}
+                        class="p-2 {player.repeat !== 'off' ? 'text-emerald-400' : 'text-zinc-400'}"
+                    >
+                        {#if player.repeat === "one"}
+                            <Repeat1 size={18} />
+                        {:else}
+                            <Repeat size={18} />
+                        {/if}
+                    </button>
+                </div>
+
+                <div class="flex items-center gap-2">
+                    <button
+                        onclick={() => player.prev()}
+                        class="p-2 text-zinc-400"
+                    >
+                        <SkipBack size={20} />
+                    </button>
+                    <button
+                        onclick={() => player.toggle()}
+                        class="w-10 h-10 bg-white text-black rounded-full flex items-center justify-center"
+                    >
+                        {#if player.isPlaying}
+                            <Pause size={20} fill="currentColor" />
+                        {:else}
+                            <Play size={20} fill="currentColor" class="ml-0.5" />
+                        {/if}
+                    </button>
+                    <button
+                        onclick={() => player.next()}
+                        class="p-2 text-zinc-400"
+                    >
+                        <SkipForward size={20} />
+                    </button>
+                </div>
+
+                <div class="flex items-center gap-1">
+                    <button
+                        onclick={onToggleQueue}
+                        class="p-2 text-zinc-400"
+                    >
+                        <ListMusic size={18} />
+                    </button>
+                    <button
+                        onclick={onToggleLyrics}
+                        class="p-2 text-zinc-400"
+                    >
+                        <Mic size={18} />
+                    </button>
+                </div>
             </div>
         </div>
 
-        <div class="flex items-center gap-3 w-80 justify-end">
-            <button
-                onclick={onToggleLyrics}
-                class="p-2 text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800 rounded-lg transition-all"
-            >
-                <Mic size={20} />
-            </button>
-            <button
-                onclick={onToggleQueue}
-                class="p-2 text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800 rounded-lg transition-all"
-            >
-                <ListMusic size={20} />
-            </button>
-            <div class="flex items-center gap-2">
-                <button
-                    onclick={() =>
-                        player.setVolume(player.volume > 0 ? 0 : 0.7)}
-                >
-                    {#if player.volume === 0}
-                        <VolumeX size={20} class="text-zinc-400" />
-                    {:else}
-                        <Volume2 size={20} class="text-zinc-400" />
-                    {/if}
-                </button>
-                <input
-                    type="range"
-                    min="0"
-                    max="1"
-                    step="0.01"
-                    value={player.volume}
-                    oninput={handleVolume}
-                    class="w-24 range-progress"
-                    style="--progress: {volumePercent}%"
+        <!-- Desktop Layout -->
+        <div class="hidden md:flex h-24 items-center px-4 gap-4">
+            <div class="flex items-center gap-3 w-80">
+                <img
+                    src={api.getArtworkUrl(player.currentSong.id)}
+                    alt={player.currentSong.title}
+                    class="w-14 h-14 rounded-lg object-cover bg-zinc-800"
                 />
+                <div class="flex-1 min-w-0">
+                    <h4 class="font-semibold text-sm truncate">
+                        {player.currentSong.title}
+                    </h4>
+                    <p class="text-xs text-zinc-400 truncate">
+                        {#if player.currentSong.artists && player.currentSong.artists.length > 0}
+                            {#each player.currentSong.artists as artist, i}
+                                <a
+                                    href="/artists/{artist.id}"
+                                    class="hover:text-zinc-100 hover:underline"
+                                >{artist.name}</a>{#if i < player.currentSong.artists.length - 1}, {/if}
+                            {/each}
+                        {:else}
+                            Unknown
+                        {/if}
+                    </p>
+                </div>
+                <button
+                    onclick={handleFavorite}
+                    class="p-2 hover:bg-zinc-800 rounded-full transition-colors"
+                >
+                    <Heart size={18} class={isFavorited ? 'fill-red-500 text-red-500' : 'text-zinc-400 hover:text-red-400'} />
+                </button>
+            </div>
+
+            <div class="flex-1 flex flex-col items-center gap-2">
+                <div class="flex items-center gap-4">
+                    <button
+                        onclick={() => player.toggleShuffle()}
+                        class="p-2 transition-colors {player.shuffle
+                            ? 'text-emerald-400'
+                            : 'text-zinc-400 hover:text-zinc-100'}"
+                    >
+                        <Shuffle size={18} />
+                    </button>
+                    <button
+                        onclick={() => player.prev()}
+                        class="p-2 text-zinc-400 hover:text-zinc-100 transition-colors"
+                    >
+                        <SkipBack size={20} />
+                    </button>
+                    <button
+                        onclick={() => player.toggle()}
+                        class="w-10 h-10 bg-white hover:bg-zinc-200 text-black rounded-full flex items-center justify-center transition-all hover:scale-105"
+                    >
+                        {#if player.isPlaying}
+                            <Pause size={20} fill="currentColor" />
+                        {:else}
+                            <Play size={20} fill="currentColor" class="ml-0.5" />
+                        {/if}
+                    </button>
+                    <button
+                        onclick={() => player.next()}
+                        class="p-2 text-zinc-400 hover:text-zinc-100 transition-colors"
+                    >
+                        <SkipForward size={20} />
+                    </button>
+                    <button
+                        onclick={() => player.toggleRepeat()}
+                        class="p-2 transition-colors {player.repeat !== 'off'
+                            ? 'text-emerald-400'
+                            : 'text-zinc-400 hover:text-zinc-100'}"
+                    >
+                        {#if player.repeat === "one"}
+                            <Repeat1 size={18} />
+                        {:else}
+                            <Repeat size={18} />
+                        {/if}
+                    </button>
+                </div>
+
+                <div class="flex items-center gap-2 w-full max-w-2xl">
+                    <span class="text-xs text-zinc-400 w-10 text-right"
+                        >{formatTime(displayProgress)}</span
+                    >
+                    <input
+                        type="range"
+                        min="0"
+                        max={player.duration || 100}
+                        value={displayProgress}
+                        onmousedown={handleSeekStart}
+                        ontouchstart={handleSeekStart}
+                        oninput={handleSeekInput}
+                        onchange={handleSeekEnd}
+                        class="flex-1 range-progress"
+                        style="--progress: {progressPercent}%"
+                    />
+                    <span class="text-xs text-zinc-400 w-10"
+                        >{formatTime(player.duration)}</span
+                    >
+                </div>
+            </div>
+
+            <div class="flex items-center gap-3 w-80 justify-end">
+                <button
+                    onclick={onToggleLyrics}
+                    class="p-2 text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800 rounded-lg transition-all"
+                >
+                    <Mic size={20} />
+                </button>
+                <button
+                    onclick={onToggleQueue}
+                    class="p-2 text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800 rounded-lg transition-all"
+                >
+                    <ListMusic size={20} />
+                </button>
+                <div class="flex items-center gap-2">
+                    <button
+                        onclick={() =>
+                            player.setVolume(player.volume > 0 ? 0 : 0.7)}
+                    >
+                        {#if player.volume === 0}
+                            <VolumeX size={20} class="text-zinc-400" />
+                        {:else}
+                            <Volume2 size={20} class="text-zinc-400" />
+                        {/if}
+                    </button>
+                    <input
+                        type="range"
+                        min="0"
+                        max="1"
+                        step="0.01"
+                        value={player.volume}
+                        oninput={handleVolume}
+                        class="w-24 range-progress"
+                        style="--progress: {volumePercent}%"
+                    />
+                </div>
             </div>
         </div>
     {:else}
         <div
-            class="flex-1 flex items-center justify-center text-zinc-500 text-sm"
+            class="h-24 hidden md:flex items-center justify-center text-zinc-500 text-sm"
         >
             Select a song to play
         </div>

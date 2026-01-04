@@ -102,7 +102,7 @@
 </script>
 
 <div
-    class="fixed top-0 right-0 bottom-0 w-96 bg-zinc-900 border-l border-zinc-800 transform transition-transform duration-300 z-30 flex flex-col {isOpen
+    class="fixed top-0 right-0 bottom-0 w-full md:w-96 bg-zinc-900 border-l border-zinc-800 transform transition-transform duration-300 z-30 flex flex-col {isOpen
         ? 'translate-x-0'
         : 'translate-x-full'}"
 >

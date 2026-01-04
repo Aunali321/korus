@@ -67,11 +67,11 @@
             <div class="text-zinc-500">Searching...</div>
         </div>
     {:else if search.results}
-        <div class="flex gap-2 border-b border-zinc-800 pb-2">
+        <div class="flex flex-wrap gap-2 border-b border-zinc-800 pb-2">
             {#each ["all", "songs", "albums", "artists", "playlists"] as tab}
                 <button
                     onclick={() => search.setActiveTab(tab as "all" | "songs" | "albums" | "artists" | "playlists")}
-                    class="px-4 py-2 rounded-full text-sm transition-colors {search.activeTab ===
+                    class="px-3 py-1.5 md:px-4 md:py-2 rounded-full text-sm transition-colors {search.activeTab ===
                     tab
                         ? 'bg-emerald-500 text-black'
                         : 'text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800'}"

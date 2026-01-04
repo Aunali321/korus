@@ -22,12 +22,12 @@
     }
 </script>
 
-<div class="p-6 space-y-6">
+<div class="p-4 md:p-6 space-y-4 md:space-y-6">
     <div class="flex items-center justify-between">
         <div>
-            <h2 class="text-3xl font-bold mb-2">Your Library</h2>
+            <h2 class="text-2xl md:text-3xl font-bold mb-1 md:mb-2">Your Library</h2>
             {#if library.songs.length > 0}
-                <p class="text-zinc-400">
+                <p class="text-zinc-400 text-sm md:text-base">
                     {library.songs.length} songs
                 </p>
             {/if}
@@ -35,20 +35,22 @@
         {#if library.songs.length > 0}
             <button
                 onclick={shuffleLibrary}
-                class="px-4 py-2 bg-emerald-500 hover:bg-emerald-600 text-black font-semibold rounded-full flex items-center gap-2 transition-all hover:scale-105"
+                class="px-3 md:px-4 py-2 bg-emerald-500 hover:bg-emerald-600 text-black font-semibold rounded-full flex items-center gap-2 transition-all hover:scale-105"
             >
                 <Shuffle size={18} />
-                Shuffle
+                <span class="hidden md:inline">Shuffle</span>
             </button>
         {/if}
     </div>
 
     {#if library.songs.length > 0}
-        <VList data={library.songs} style="height: calc(100vh - 220px);" getKey={(song) => song.id}>
-            {#snippet children(song, index)}
-                <TrackRow {song} {index} songs={library.songs} />
-            {/snippet}
-        </VList>
+        <div class="-mx-2 md:mx-0">
+            <VList data={library.songs} style="height: calc(100vh - 220px);" getKey={(song) => song.id}>
+                {#snippet children(song, index)}
+                    <TrackRow {song} {index} songs={library.songs} />
+                {/snippet}
+            </VList>
+        </div>
     {:else if loading}
         <div class="flex justify-center py-12">
             <div class="text-zinc-500">Loading...</div>

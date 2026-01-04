@@ -122,7 +122,7 @@
     }
 </script>
 
-<div class="p-6 space-y-8">
+<div class="p-4 md:p-6 space-y-8">
     <div class="flex items-center gap-3">
         <Settings class="text-zinc-400" size={32} />
         <h2 class="text-3xl font-bold">Settings</h2>
@@ -131,7 +131,7 @@
     <section>
         <h3 class="text-xl font-bold mb-4">Account</h3>
         <div
-            class="bg-zinc-900 border border-zinc-800 rounded-xl p-6 space-y-4"
+            class="bg-zinc-900 border border-zinc-800 rounded-xl p-4 md:p-6 space-y-4"
         >
             {#if auth.user}
                 <div class="flex items-center gap-4">
@@ -175,7 +175,7 @@
             Streaming Quality
         </h3>
         <div
-            class="bg-zinc-900 border border-zinc-800 rounded-xl p-6 space-y-4"
+            class="bg-zinc-900 border border-zinc-800 rounded-xl p-4 md:p-6 space-y-4"
         >
             {#if streamingOptions && !streamingOptions.ffmpeg_available}
                 <div class="text-sm text-amber-400 bg-amber-400/10 px-3 py-2 rounded-lg">
@@ -260,7 +260,7 @@
             Radio Mode
         </h3>
         <div
-            class="bg-zinc-900 border border-zinc-800 rounded-xl p-6 space-y-4"
+            class="bg-zinc-900 border border-zinc-800 rounded-xl p-4 md:p-6 space-y-4"
         >
             <div class="space-y-2">
                 <label
@@ -308,7 +308,7 @@
             Library
         </h3>
         <div
-            class="bg-zinc-900 border border-zinc-800 rounded-xl p-6 space-y-4"
+            class="bg-zinc-900 border border-zinc-800 rounded-xl p-4 md:p-6 space-y-4"
         >
             <button
                 onclick={startScan}
@@ -378,7 +378,7 @@
             API Configuration
         </h3>
         <div
-            class="bg-zinc-900 border border-zinc-800 rounded-xl p-6 space-y-4"
+            class="bg-zinc-900 border border-zinc-800 rounded-xl p-4 md:p-6 space-y-4"
         >
             <div>
                 <label
@@ -386,7 +386,7 @@
                     class="block text-sm font-medium text-zinc-400 mb-2"
                     >API Base URL</label
                 >
-                <div class="flex gap-2">
+                <div class="flex flex-col md:flex-row gap-2">
                     <input
                         id="apiUrl"
                         type="text"

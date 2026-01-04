@@ -70,7 +70,7 @@
 </script>
 
 <div
-    class="flex items-center gap-4 p-3 rounded-lg hover:bg-zinc-900 group cursor-pointer {isPlaying
+    class="flex items-center gap-2 md:gap-4 p-2 md:p-3 rounded-lg hover:bg-zinc-900 group cursor-pointer {isPlaying
         ? 'bg-zinc-900'
         : ''}"
     oncontextmenu={handleContextMenu}
@@ -78,16 +78,16 @@
     tabindex="-1"
 >
     {#if index !== undefined}
-        <div class="w-6 text-center group-hover:hidden">
+        <div class="w-5 md:w-6 text-center group-hover:hidden shrink-0">
             <span
-                class="text-sm text-zinc-500 {isPlaying
+                class="text-xs md:text-sm text-zinc-500 {isPlaying
                     ? 'text-emerald-400'
                     : ''}">{index + 1}</span
             >
         </div>
         <button
             onclick={handlePlay}
-            class="hidden group-hover:flex w-6 h-6 items-center justify-center"
+            class="hidden group-hover:flex w-5 md:w-6 h-5 md:h-6 items-center justify-center shrink-0"
         >
             <Play size={14} class="text-emerald-400" />
         </button>
@@ -97,15 +97,15 @@
         <img
             src={api.getArtworkUrl(song.id)}
             alt={song.title}
-            class="w-12 h-12 rounded object-cover bg-zinc-800"
+            class="w-10 h-10 md:w-12 md:h-12 rounded object-cover bg-zinc-800 shrink-0"
         />
     {/if}
 
     <button onclick={handlePlay} class="flex-1 min-w-0 text-left">
-        <h4 class="font-medium truncate {isPlaying ? 'text-emerald-400' : ''}">
+        <h4 class="font-medium truncate text-sm md:text-base {isPlaying ? 'text-emerald-400' : ''}">
             {song.title}
         </h4>
-        <p class="text-sm text-zinc-400 truncate">
+        <p class="text-xs md:text-sm text-zinc-400 truncate">
             {#if song.artists && song.artists.length > 0}
                 {#each song.artists as artist, i}
                     <a
@@ -118,33 +118,33 @@
                 Unknown Artist
             {/if}
             {#if showAlbum && song.album}
-                <span class="text-zinc-500"> - {song.album.title}</span>
+                <span class="hidden md:inline text-zinc-500"> - {song.album.title}</span>
             {/if}
         </p>
     </button>
 
-    <div class="text-sm text-zinc-400">{formatDuration(song.duration)}</div>
+    <div class="text-xs md:text-sm text-zinc-500 shrink-0">{formatDuration(song.duration)}</div>
 
     <button
         onclick={handleFavorite}
-        class="opacity-0 group-hover:opacity-100 p-2 hover:bg-zinc-800 rounded-full transition-all {isFavorited ? 'opacity-100' : ''}"
+        class="hidden md:block p-1.5 md:p-2 hover:bg-zinc-800 rounded-full transition-all {isFavorited ? '!block' : 'md:opacity-0 md:group-hover:opacity-100'}"
     >
-        <Heart size={18} class={isFavorited ? 'fill-red-500 text-red-500' : ''} />
+        <Heart size={16} class="md:w-[18px] md:h-[18px] {isFavorited ? 'fill-red-500 text-red-500' : ''}" />
     </button>
 
     <button
         onclick={handleMenuClick}
-        class="opacity-0 group-hover:opacity-100 p-2 hover:bg-zinc-800 rounded-full transition-all"
+        class="hidden md:block p-1.5 md:p-2 hover:bg-zinc-800 rounded-full transition-all md:opacity-0 md:group-hover:opacity-100"
     >
-        <MoreHorizontal size={18} />
+        <MoreHorizontal size={16} class="md:w-[18px] md:h-[18px]" />
     </button>
 
     {#if index === undefined}
         <button
             onclick={handlePlay}
-            class="opacity-0 group-hover:opacity-100 w-10 h-10 bg-emerald-500 rounded-full flex items-center justify-center transition-all hover:scale-110"
+            class="hidden md:flex opacity-0 group-hover:opacity-100 w-8 h-8 md:w-10 md:h-10 bg-emerald-500 rounded-full items-center justify-center transition-all hover:scale-110"
         >
-            <Play size={16} fill="currentColor" class="text-black ml-0.5" />
+            <Play size={14} fill="currentColor" class="text-black ml-0.5 md:w-4 md:h-4" />
         </button>
     {/if}
 </div>

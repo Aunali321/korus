@@ -81,63 +81,65 @@
     }
 </script>
 
-<div class="p-6 space-y-6">
+<div class="p-4 md:p-6 space-y-6">
     <!-- Header with tabs -->
-    <div class="flex items-center justify-between">
-        <div class="flex items-center gap-6">
-            <h2 class="text-3xl font-bold">Stats</h2>
-            <div class="flex gap-1 bg-zinc-900 rounded-lg p-1">
-                <button
-                    onclick={() => (activeTab = "overview")}
-                    class="flex items-center gap-2 px-4 py-2 rounded-md text-sm transition-colors {activeTab ===
-                    'overview'
-                        ? 'bg-zinc-800 text-white'
-                        : 'text-zinc-400 hover:text-white'}"
-                >
-                    <BarChart3 size={16} />
-                    Overview
-                </button>
-                <button
-                    onclick={() => (activeTab = "history")}
-                    class="flex items-center gap-2 px-4 py-2 rounded-md text-sm transition-colors {activeTab ===
-                    'history'
-                        ? 'bg-zinc-800 text-white'
-                        : 'text-zinc-400 hover:text-white'}"
-                >
-                    <Clock size={16} />
-                    History
-                </button>
-                <button
-                    onclick={() => (activeTab = "streaks")}
-                    class="flex items-center gap-2 px-4 py-2 rounded-md text-sm transition-colors {activeTab ===
-                    'streaks'
-                        ? 'bg-zinc-800 text-white'
-                        : 'text-zinc-400 hover:text-white'}"
-                >
-                    <Flame size={16} />
-                    Streaks
-                </button>
-            </div>
-        </div>
-
-        {#if activeTab === "overview"}
-            <div class="flex gap-2">
-                {#each periods as p}
+    <div class="space-y-4">
+        <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+            <div class="flex flex-col md:flex-row md:items-center gap-4 md:gap-6">
+                <h2 class="text-2xl md:text-3xl font-bold">Stats</h2>
+                <div class="flex gap-1 bg-zinc-900 rounded-lg p-1 overflow-x-auto">
                     <button
-                        onclick={() => {
-                            period = p.value;
-                            loadStats();
-                        }}
-                        class="px-3 py-1.5 rounded-full text-sm transition-colors {period ===
-                        p.value
-                            ? 'bg-emerald-500 text-black'
-                            : 'text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800'}"
+                        onclick={() => (activeTab = "overview")}
+                        class="flex items-center gap-2 px-3 md:px-4 py-2 rounded-md text-sm transition-colors whitespace-nowrap {activeTab ===
+                        'overview'
+                            ? 'bg-zinc-800 text-white'
+                            : 'text-zinc-400 hover:text-white'}"
                     >
-                        {p.label}
+                        <BarChart3 size={16} />
+                        Overview
                     </button>
-                {/each}
+                    <button
+                        onclick={() => (activeTab = "history")}
+                        class="flex items-center gap-2 px-3 md:px-4 py-2 rounded-md text-sm transition-colors whitespace-nowrap {activeTab ===
+                        'history'
+                            ? 'bg-zinc-800 text-white'
+                            : 'text-zinc-400 hover:text-white'}"
+                    >
+                        <Clock size={16} />
+                        History
+                    </button>
+                    <button
+                        onclick={() => (activeTab = "streaks")}
+                        class="flex items-center gap-2 px-3 md:px-4 py-2 rounded-md text-sm transition-colors whitespace-nowrap {activeTab ===
+                        'streaks'
+                            ? 'bg-zinc-800 text-white'
+                            : 'text-zinc-400 hover:text-white'}"
+                    >
+                        <Flame size={16} />
+                        Streaks
+                    </button>
+                </div>
             </div>
-        {/if}
+
+            {#if activeTab === "overview"}
+                <div class="flex flex-wrap gap-2">
+                    {#each periods as p}
+                        <button
+                            onclick={() => {
+                                period = p.value;
+                                loadStats();
+                            }}
+                            class="px-3 py-1.5 rounded-full text-sm transition-colors {period ===
+                            p.value
+                                ? 'bg-emerald-500 text-black'
+                                : 'text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800'}"
+                        >
+                            {p.label}
+                        </button>
+                    {/each}
+                </div>
+            {/if}
+        </div>
     </div>
 
     {#if loading}

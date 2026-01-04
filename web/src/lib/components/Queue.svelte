@@ -26,7 +26,7 @@
 {/if}
 
 <div
-    class="fixed right-0 top-0 h-full w-96 bg-zinc-950 border-l border-zinc-800 z-50 transform transition-transform duration-300 {isOpen
+    class="fixed right-0 top-0 h-full w-full md:w-96 bg-zinc-950 border-l border-zinc-800 z-50 transform transition-transform duration-300 {isOpen
         ? 'translate-x-0'
         : 'translate-x-full'}"
 >
