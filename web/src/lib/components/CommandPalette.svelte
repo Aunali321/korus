@@ -5,6 +5,7 @@
 	import { settings } from '$lib/stores/settings.svelte';
 	import { auth } from '$lib/stores/auth.svelte';
 	import { favorites } from '$lib/stores/favorites.svelte';
+	import { onMount } from 'svelte';
 
 	interface Props {
 		onToggleQueue: () => void;
@@ -17,6 +18,41 @@
 		if (player.currentSong) {
 			favorites.toggle(player.currentSong.id);
 		}
+	}
+
+	function isEditableElement(el: EventTarget | null): boolean {
+		if (!el || !(el instanceof HTMLElement)) return false;
+		const tag = el.tagName;
+		if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return true;
+		if (el.isContentEditable) return true;
+		return false;
+	}
+
+	onMount(() => {
+		function handleKeydown(e: KeyboardEvent) {
+			if (isEditableElement(e.target)) return;
+
+			if (e.code === 'Space') {
+				e.preventDefault();
+				player.toggle();
+			} else if (e.code === 'ArrowLeft' && !e.shiftKey) {
+				e.preventDefault();
+				player.seek(Math.max(0, player.progress - 10));
+			} else if (e.code === 'ArrowRight' && !e.shiftKey) {
+				e.preventDefault();
+				player.seek(player.progress + 10);
+			}
+		}
+		window.addEventListener('keydown', handleKeydown);
+		return () => window.removeEventListener('keydown', handleKeydown);
+	});
+
+	function volumeUp() {
+		player.setVolume(Math.min(1, player.volume + 0.1));
+	}
+
+	function volumeDown() {
+		player.setVolume(Math.max(0, player.volume - 0.1));
 	}
 
 	const actions = defineActions([
@@ -115,9 +151,8 @@
 		// Playback
 		{
 			title: 'Play / Pause',
-			subTitle: 'Toggle playback',
+			subTitle: 'Toggle playback (Space)',
 			onRun: () => player.toggle(),
-			shortcut: 'Space',
 			icon: '>',
 			group: 'Playback',
 			keywords: ['play', 'pause', 'toggle'],
@@ -141,6 +176,22 @@
 			keywords: ['previous', 'back'],
 		},
 		{
+			title: 'Seek Forward',
+			subTitle: 'Skip forward 10 seconds (Right)',
+			onRun: () => player.seek(player.progress + 10),
+			icon: '>>',
+			group: 'Playback',
+			keywords: ['seek', 'forward', 'skip'],
+		},
+		{
+			title: 'Seek Backward',
+			subTitle: 'Skip backward 10 seconds (Left)',
+			onRun: () => player.seek(Math.max(0, player.progress - 10)),
+			icon: '<<',
+			group: 'Playback',
+			keywords: ['seek', 'backward', 'rewind'],
+		},
+		{
 			title: 'Toggle Shuffle',
 			subTitle: 'Turn shuffle on/off',
 			onRun: () => player.toggleShuffle(),
@@ -157,6 +208,24 @@
 			icon: 'O',
 			group: 'Playback',
 			keywords: ['repeat', 'loop'],
+		},
+		{
+			title: 'Volume Up',
+			subTitle: 'Increase volume by 10%',
+			onRun: () => volumeUp(),
+			shortcut: 'Shift+Equal',
+			icon: '+',
+			group: 'Playback',
+			keywords: ['volume', 'up', 'louder'],
+		},
+		{
+			title: 'Volume Down',
+			subTitle: 'Decrease volume by 10%',
+			onRun: () => volumeDown(),
+			shortcut: 'Shift+Minus',
+			icon: '-',
+			group: 'Playback',
+			keywords: ['volume', 'down', 'quieter'],
 		},
 		// View
 		{

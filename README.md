@@ -239,11 +239,15 @@ Press `Ctrl+K` (or `Cmd+K` on Mac) to open the command palette.
 | Shortcut | Action |
 |----------|--------|
 | `Space` | Play / Pause |
-| `Shift+Right` | Next Track |
+| `Left` | Seek Backward 10s |
+| `Right` | Seek Forward 10s |
 | `Shift+Left` | Previous Track |
+| `Shift+Right` | Next Track |
 | `Shift+S` | Toggle Shuffle |
 | `Shift+R` | Toggle Repeat |
 | `Shift+F` | Favorite Current Song |
+| `Shift++` | Volume Up |
+| `Shift+-` | Volume Down |
 
 ### View
 

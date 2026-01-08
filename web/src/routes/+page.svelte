@@ -101,7 +101,7 @@
                     {#each recentPlays.slice(0, 6) as song (song.id)}
                         <Card
                             title={song.title}
-                            subtitle={song.artist?.name || "Unknown"}
+                            subtitle={song.artists?.map(a => a.name).join(', ') || "Unknown"}
                             image={api.getArtworkUrl(song.id)}
                             onPlay={() => playTrack(song, recentPlays)}
                         />

@@ -303,7 +303,7 @@ function createPlayerStore() {
         const artwork = api.getArtworkUrl(song.id);
         navigator.mediaSession.metadata = new MediaMetadata({
             title: song.title,
-            artist: song.artist?.name || 'Unknown Artist',
+            artist: song.artists?.map(a => a.name).join(', ') || 'Unknown Artist',
             album: song.album?.title || 'Unknown Album',
             artwork: [
                 { src: artwork, sizes: '512x512', type: 'image/jpeg' },

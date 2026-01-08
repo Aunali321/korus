@@ -330,13 +330,13 @@ func (h *Handler) recentPlays(ctx context.Context, userID int64, limit int) ([]m
 
 func (h *Handler) rankArtists(ctx context.Context, userID int64, start, end time.Time, limit int) []map[string]interface{} {
 	rows, err := h.db.QueryContext(ctx, `
-		SELECT a.id, a.name, COUNT(*) as plays, COALESCE(SUM(ph.duration_listened),0) as total_time, COUNT(DISTINCT s.id) as songs
+		SELECT a.id, a.name, a.image_path, COUNT(*) as plays, COALESCE(SUM(ph.duration_listened),0) as total_time, COUNT(DISTINCT s.id) as songs
 		FROM play_history ph
 		JOIN songs s ON s.id = ph.song_id
 		JOIN albums al ON al.id = s.album_id
 		JOIN artists a ON a.id = al.artist_id
 		WHERE ph.user_id = ? AND ph.played_at BETWEEN ? AND ?
-		GROUP BY a.id, a.name
+		GROUP BY a.id, a.name, a.image_path
 		ORDER BY plays DESC
 		LIMIT ?
 	`, userID, start.Format(time.RFC3339), end.Format(time.RFC3339), limit)
@@ -348,10 +348,15 @@ func (h *Handler) rankArtists(ctx context.Context, userID int64, start, end time
 	for rows.Next() {
 		var id int64
 		var name string
+		var imagePath *string
 		var plays, totalTime, songs int64
-		if err := rows.Scan(&id, &name, &plays, &totalTime, &songs); err == nil {
+		if err := rows.Scan(&id, &name, &imagePath, &plays, &totalTime, &songs); err == nil {
+			artist := map[string]interface{}{"id": id, "name": name}
+			if imagePath != nil && *imagePath != "" {
+				artist["image_path"] = *imagePath
+			}
 			res = append(res, map[string]interface{}{
-				"artist":       map[string]interface{}{"id": id, "name": name},
+				"artist":       artist,
 				"play_count":   plays,
 				"total_time":   totalTime,
 				"unique_songs": songs,
