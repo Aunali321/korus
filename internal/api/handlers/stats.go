@@ -216,7 +216,7 @@ func (h *Handler) Insights(c echo.Context) error {
 func (h *Handler) Home(c echo.Context) error {
 	user, _ := currentUser(c)
 	ctx := c.Request().Context()
-	recent, _ := db.GetSongsByRecentPlays(ctx, h.db, user.ID, 10)
+	recent, _ := db.GetSongsByRecentPlays(ctx, h.db, user.ID, 27)
 	_ = db.PopulateSongArtists(ctx, h.db, recent)
 	recommended, _ := db.GetSongsByTopPlayed(ctx, h.db, user.ID, 5)
 	_ = db.PopulateSongArtists(ctx, h.db, recommended)
