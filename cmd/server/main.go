@@ -20,12 +20,46 @@ import (
 	"github.com/Aunali321/korus/internal/config"
 	"github.com/Aunali321/korus/internal/db"
 	"github.com/Aunali321/korus/internal/services"
+	"github.com/Aunali321/korus/internal/services/hls"
 )
 
 // @title Korus API
 // @version 0.1
 // @description Self-hosted music streaming server API.
+// @license.name AGPL-3.0
+// @license.url https://www.gnu.org/licenses/agpl-3.0.html
+// @host localhost:8080
 // @BasePath /api
+// @accept json
+// @produce json
+// @securityDefinitions.apikey BearerAuth
+// @in header
+// @name Authorization
+// @description JWT Bearer token. Format: "Bearer {token}"
+// @tag.name Auth
+// @tag.description Authentication endpoints
+// @tag.name Library
+// @tag.description Music library endpoints
+// @tag.name Playlists
+// @tag.description Playlist management
+// @tag.name Favorites
+// @tag.description User favorites
+// @tag.name Search
+// @tag.description Search functionality
+// @tag.name Streaming
+// @tag.description Audio streaming and HLS
+// @tag.name Admin
+// @tag.description Admin operations
+// @tag.name Health
+// @tag.description Health check endpoints
+// @tag.name History
+// @tag.description Listening history
+// @tag.name Settings
+// @tag.description User settings
+// @tag.name Stats
+// @tag.description Statistics and analytics
+// @tag.name Radio
+// @tag.description AI-powered radio
 func main() {
 	cfg, err := config.FromEnv()
 	if err != nil {
@@ -94,6 +128,23 @@ func main() {
 		log.Printf("Radio LLM enabled with model: %s", cfg.RadioLLMModel)
 	}
 
+	// Initialize HLS service
+	hlsService, err := hls.NewService(hls.ServiceConfig{
+		CacheDir:        cfg.HLSCacheDir,
+		CacheSizeMB:     cfg.HLSCacheSizeMB,
+		CacheTTLHours:   cfg.HLSCacheTTLHours,
+		CacheMinTTL:     time.Duration(cfg.HLSCacheMinTTLHours) * time.Hour,
+		SegmentDuration: cfg.HLSSegmentDuration,
+		FFmpegPath:      cfg.FFmpegPath,
+		CleanupInterval: 5 * time.Minute,
+	})
+	if err != nil {
+		log.Fatalf("hls service: %v", err)
+	}
+	hlsService.Start(ctx)
+	defer hlsService.Stop()
+	log.Printf("HLS streaming enabled with %dMB cache at %s", cfg.HLSCacheSizeMB, cfg.HLSCacheDir)
+
 	e := api.New(api.Deps{
 		DB:                database,
 		Auth:              authSvc,
@@ -103,6 +154,7 @@ func main() {
 		MusicBrainz:       mb,
 		ListenBrainz:      lb,
 		Radio:             radio,
+		HLS:               hlsService,
 		MediaRoot:         cfg.MediaRoot,
 		AuthRate:          cfg.RateLimitAuthCount,
 		AuthWindow:        cfg.RateLimitAuthWindow,

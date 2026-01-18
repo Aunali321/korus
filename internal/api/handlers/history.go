@@ -23,6 +23,7 @@ type historyRequest struct {
 // @Param body body historyRequest true "history"
 // @Success 200 {object} map[string]bool
 // @Router /history [post]
+// @Security BearerAuth
 func (h *Handler) RecordHistory(c echo.Context) error {
 	user, _ := currentUser(c)
 	var req historyRequest
@@ -56,6 +57,7 @@ func (h *Handler) RecordHistory(c echo.Context) error {
 // @Param offset query int false "offset"
 // @Success 200 {array} map[string]interface{}
 // @Router /history [get]
+// @Security BearerAuth
 func (h *Handler) ListHistory(c echo.Context) error {
 	user, _ := currentUser(c)
 	limit, offset := parseLimitOffset(c, 50, 200)

@@ -1,3 +1,4 @@
+import Hls from 'hls.js';
 import type { Song } from '$lib/types';
 import { api, getAccessToken } from '$lib/api';
 import { settings } from './settings.svelte';
@@ -20,11 +21,13 @@ function createPlayerStore() {
     let originalQueue: Song[] = [];
     let queueIndex = $state(0);
     let isPlaying = $state(false);
+    let isBuffering = $state(false);
     let volume = $state(0.7);
     let progress = $state(0);
     let duration = $state(0);
     let radioLoading = $state(false);
     let audio: HTMLAudioElement | null = null;
+    let hls: Hls | null = null;
     let playStartTime = 0;
     let initialized = $state(false);
     
@@ -128,7 +131,6 @@ function createPlayerStore() {
     }
 
     async function restoreState(state: PlayerStateData) {
-        // Don't restore if no current song was saved
         if (!state.currentSongId) return;
         
         try {
@@ -148,7 +150,6 @@ function createPlayerStore() {
 
         if (restoredQueue.length === 0) return;
 
-        // Verify the current song exists in the queue
         const currentSongInLibrary = songMap.get(state.currentSongId);
         if (!currentSongInLibrary) return;
 
@@ -164,10 +165,7 @@ function createPlayerStore() {
         initAudio();
         duration = currentSong.duration || 0;
         progress = state.progress || 0;
-        loadSong(currentSong);
-        if (audio && state.progress > 0) {
-            audio.currentTime = state.progress;
-        }
+        loadSong(currentSong, state.progress);
     }
 
     function recordHistory() {
@@ -185,6 +183,13 @@ function createPlayerStore() {
         playStartTime = 0;
     }
 
+    function destroyHls() {
+        if (hls) {
+            hls.destroy();
+            hls = null;
+        }
+    }
+
     function initAudio() {
         if (typeof window === 'undefined') return;
         if (audio) return;
@@ -192,7 +197,6 @@ function createPlayerStore() {
         audio = new Audio();
         audio.volume = volume;
 
-        // Only add global listeners once
         if (!globalListenersAdded) {
             globalListenersAdded = true;
 
@@ -223,14 +227,23 @@ function createPlayerStore() {
             progress = audio!.currentTime;
         });
 
-        audio.addEventListener('loadedmetadata', () => {
+        audio.addEventListener('durationchange', () => {
             if (audio!.duration && isFinite(audio!.duration)) {
                 duration = audio!.duration;
             }
         });
 
-        audio.addEventListener('error', () => {
+        audio.addEventListener('waiting', () => {
+            isBuffering = true;
+        });
+
+        audio.addEventListener('canplay', () => {
+            isBuffering = false;
+        });
+
+        audio.addEventListener('error', (e) => {
             console.error('Audio error:', audio?.error);
+            isBuffering = false;
         });
 
         audio.addEventListener('ended', () => {
@@ -246,6 +259,7 @@ function createPlayerStore() {
 
         audio.addEventListener('play', () => {
             isPlaying = true;
+            isBuffering = false;
             if (playStartTime === 0) {
                 playStartTime = Date.now();
             }
@@ -257,6 +271,76 @@ function createPlayerStore() {
         });
 
         setupMediaSession();
+    }
+
+    function initHls(manifestUrl: string, startPosition?: number) {
+        if (!audio) return;
+
+        destroyHls();
+
+        if (Hls.isSupported()) {
+            hls = new Hls({
+                maxBufferLength: 60,
+                maxMaxBufferLength: 120,
+                startLevel: 0,
+                autoStartLoad: true,
+                fragLoadingMaxRetry: 5,
+                manifestLoadingMaxRetry: 5,
+                levelLoadingMaxRetry: 5,
+                xhrSetup: (xhr) => {
+                    const token = getAccessToken();
+                    if (token) {
+                        xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+                    }
+                },
+            });
+
+            hls.loadSource(manifestUrl);
+            hls.attachMedia(audio);
+
+            hls.on(Hls.Events.MANIFEST_PARSED, () => {
+                if (startPosition && startPosition > 0) {
+                    audio!.currentTime = startPosition;
+                }
+            });
+
+            hls.on(Hls.Events.ERROR, (event, data) => {
+                console.error('HLS error:', data);
+                
+                if (data.fatal) {
+                    switch (data.type) {
+                        case Hls.ErrorTypes.NETWORK_ERROR:
+                            console.error('Fatal network error, trying to recover');
+                            hls?.startLoad();
+                            break;
+                        case Hls.ErrorTypes.MEDIA_ERROR:
+                            console.error('Fatal media error, trying to recover');
+                            hls?.recoverMediaError();
+                            break;
+                        default:
+                            console.error('Unrecoverable error, skipping to next track');
+                            destroyHls();
+                            next();
+                            break;
+                    }
+                }
+            });
+
+            hls.on(Hls.Events.FRAG_BUFFERED, () => {
+                isBuffering = false;
+            });
+
+        } else if (audio.canPlayType('application/vnd.apple.mpegurl')) {
+            // Native HLS support (Safari)
+            audio.src = manifestUrl;
+            if (startPosition && startPosition > 0) {
+                audio.addEventListener('loadedmetadata', () => {
+                    audio!.currentTime = startPosition;
+                }, { once: true });
+            }
+        } else {
+            console.error('HLS is not supported in this browser');
+        }
     }
 
     function setupMediaSession() {
@@ -311,18 +395,31 @@ function createPlayerStore() {
         });
     }
 
-    function loadSong(song: Song) {
+    function loadSong(song: Song, startPosition?: number) {
         initAudio();
         if (!audio) return;
 
         duration = song.duration || 0;
-        progress = 0;
+        progress = startPosition || 0;
+        isBuffering = true;
 
         const { format, bitrate } = settings.getStreamParams();
-        const streamUrl = api.getStreamUrl(song.id, format, bitrate);
-
-        audio.src = streamUrl;
-        audio.load();
+        
+        // For original quality (no format), use direct stream URL instead of HLS
+        if (!format) {
+            destroyHls();
+            const directUrl = api.getOriginalStreamUrl(song.id);
+            audio.src = directUrl;
+            if (startPosition && startPosition > 0) {
+                audio.addEventListener('loadedmetadata', () => {
+                    audio!.currentTime = startPosition;
+                }, { once: true });
+            }
+        } else {
+            const manifestUrl = api.getStreamUrl(song.id, format, bitrate);
+            initHls(manifestUrl, startPosition);
+        }
+        
         updateMediaSessionMetadata(song);
     }
 
@@ -461,7 +558,6 @@ function createPlayerStore() {
         if (queue.length === 0) {
             queue = [song];
         } else {
-            // Insert after current song
             const before = queue.slice(0, queueIndex + 1);
             const after = queue.slice(queueIndex + 1);
             queue = [...before, song, ...after];
@@ -539,6 +635,7 @@ function createPlayerStore() {
     }
 
     function reset() {
+        destroyHls();
         if (audio) {
             audio.pause();
             audio.src = '';
@@ -548,6 +645,7 @@ function createPlayerStore() {
         originalQueue = [];
         queueIndex = 0;
         isPlaying = false;
+        isBuffering = false;
         progress = 0;
         duration = 0;
         playStartTime = 0;
@@ -568,6 +666,7 @@ function createPlayerStore() {
         get queue() { return queue; },
         get queueIndex() { return queueIndex; },
         get isPlaying() { return isPlaying; },
+        get isBuffering() { return isBuffering; },
         get volume() { return volume; },
         get progress() { return progress; },
         get duration() { return duration; },

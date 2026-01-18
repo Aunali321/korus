@@ -15,6 +15,7 @@ import (
 // @Param offset query int false "offset"
 // @Success 200 {object} map[string]interface{}
 // @Router /search [get]
+// @Security BearerAuth
 func (h *Handler) Search(c echo.Context) error {
 	q := c.QueryParam("q")
 	limit, offset := parseLimitOffset(c, 25, 200)

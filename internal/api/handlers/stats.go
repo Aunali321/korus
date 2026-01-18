@@ -17,6 +17,7 @@ import (
 // @Param period query string false "hour|today|week|month|year|all_time"
 // @Success 200 {object} map[string]interface{}
 // @Router /stats [get]
+// @Security BearerAuth
 func (h *Handler) Stats(c echo.Context) error {
 	user, _ := currentUser(c)
 	period := c.QueryParam("period")
@@ -55,6 +56,7 @@ func (h *Handler) Stats(c echo.Context) error {
 // @Param period query string false "year|all_time"
 // @Success 200 {object} map[string]interface{}
 // @Router /stats/wrapped [get]
+// @Security BearerAuth
 func (h *Handler) Wrapped(c echo.Context) error {
 	user, _ := currentUser(c)
 	start, end := resolvePeriod(c.QueryParam("period"))
@@ -195,6 +197,7 @@ func (h *Handler) Wrapped(c echo.Context) error {
 // @Produce json
 // @Success 200 {object} map[string]interface{}
 // @Router /stats/insights [get]
+// @Security BearerAuth
 func (h *Handler) Insights(c echo.Context) error {
 	user, _ := currentUser(c)
 	ctx := c.Request().Context()
@@ -213,6 +216,7 @@ func (h *Handler) Insights(c echo.Context) error {
 // @Produce json
 // @Success 200 {object} map[string]interface{}
 // @Router /home [get]
+// @Security BearerAuth
 func (h *Handler) Home(c echo.Context) error {
 	user, _ := currentUser(c)
 	ctx := c.Request().Context()

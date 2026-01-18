@@ -36,6 +36,11 @@ type Config struct {
 	RadioDefaultLimit     int
 	MetadataEnrichEnabled bool
 	MetadataEnrichURL     string
+	HLSCacheDir         string
+	HLSCacheSizeMB      int64
+	HLSCacheTTLHours    int
+	HLSCacheMinTTLHours int
+	HLSSegmentDuration  int
 }
 
 // FromEnv builds Config from environment with sane defaults.
@@ -68,6 +73,11 @@ func FromEnv() (Config, error) {
 		RadioDefaultLimit:     intEnv("RADIO_DEFAULT_LIMIT", 20),
 		MetadataEnrichEnabled: boolEnv("METADATA_ENRICH_ENABLED", true),
 		MetadataEnrichURL:     getenv("METADATA_ENRICH_URL", "https://metadata.aun.rest"),
+		HLSCacheDir:         getenv("CACHE_HLS_DIR", "./cache/hls"),
+		HLSCacheSizeMB:      int64Env("CACHE_HLS_SIZE_MB", 5000),
+		HLSCacheTTLHours:    intEnv("CACHE_HLS_TTL_HOURS", 24),
+		HLSCacheMinTTLHours: intEnv("CACHE_HLS_MIN_TTL_HOURS", 1),
+		HLSSegmentDuration:  intEnv("CACHE_HLS_SEGMENT_DURATION", 4),
 	}
 	if cfg.JWTSecret == "" {
 		return cfg, errors.New("JWT_SECRET is required")
@@ -104,6 +114,15 @@ func boolEnv(key string, def bool) bool {
 func intEnv(key string, def int) int {
 	if v := os.Getenv(key); v != "" {
 		if i, err := strconv.Atoi(v); err == nil {
+			return i
+		}
+	}
+	return def
+}
+
+func int64Env(key string, def int64) int64 {
+	if v := os.Getenv(key); v != "" {
+		if i, err := strconv.ParseInt(v, 10, 64); err == nil {
 			return i
 		}
 	}

@@ -15,6 +15,7 @@ import (
 	"github.com/Aunali321/korus/internal/api/middleware"
 	"github.com/Aunali321/korus/internal/api/validators"
 	"github.com/Aunali321/korus/internal/services"
+	"github.com/Aunali321/korus/internal/services/hls"
 )
 
 type Deps struct {
@@ -26,6 +27,7 @@ type Deps struct {
 	MusicBrainz       *services.MusicBrainzService
 	ListenBrainz      *services.ListenBrainzService
 	Radio             *services.RadioService
+	HLS               *hls.Service
 	MediaRoot         string
 	AuthRate          int
 	AuthWindow        time.Duration
@@ -50,6 +52,7 @@ func New(deps Deps) *echo.Echo {
 	e.Use(echomw.CORS())
 
 	h := handlers.New(deps.DB, deps.Auth, deps.Scanner, deps.Search, deps.Transcoder, deps.MusicBrainz, deps.ListenBrainz, deps.Radio, deps.MediaRoot, deps.RadioDefaultLimit)
+	hlsHandler := handlers.NewHLSHandler(deps.DB, deps.HLS)
 
 	api := e.Group("/api")
 	api.GET("/health", h.Health)
@@ -78,11 +81,17 @@ func New(deps Deps) *echo.Echo {
 	api.GET("/songs/:id", h.Song, middleware.Auth(deps.Auth))
 	api.GET("/search", h.Search, middleware.Auth(deps.Auth))
 
-	api.GET("/stream/:id", h.Stream, middleware.Auth(deps.Auth))
-	api.GET("/streaming/options", h.StreamingOptions, middleware.Auth(deps.Auth))
-	api.GET("/artwork/:id", h.Artwork)
-	api.GET("/artist-image/:id", h.ArtistImage)
-	api.GET("/lyrics/:id", h.Lyrics, middleware.Auth(deps.Auth))
+	// HLS streaming endpoints
+	api.GET("/stream/:id", hlsHandler.Stream, middleware.Auth(deps.Auth))
+	api.GET("/stream/:id/manifest.m3u8", hlsHandler.Manifest, middleware.Auth(deps.Auth))
+	api.GET("/stream/:id/init.mp4", hlsHandler.InitSegment, middleware.Auth(deps.Auth))
+	api.GET("/stream/:id/:segment", hlsHandler.Segment, middleware.Auth(deps.Auth))
+	api.GET("/streaming/options", hlsHandler.StreamingOptions, middleware.Auth(deps.Auth))
+	api.GET("/download/:id", hlsHandler.Download, middleware.Auth(deps.Auth))
+
+	api.GET("/artwork/:id", hlsHandler.Artwork)
+	api.GET("/artist-image/:id", hlsHandler.ArtistImage)
+	api.GET("/lyrics/:id", hlsHandler.Lyrics, middleware.Auth(deps.Auth))
 
 	api.GET("/playlists", h.ListPlaylists, middleware.Auth(deps.Auth))
 	api.POST("/playlists", h.CreatePlaylist, middleware.Auth(deps.Auth))

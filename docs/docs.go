@@ -5,11 +5,21 @@ import "github.com/swaggo/swag"
 
 const docTemplate = `{
     "schemes": {{ marshal .Schemes }},
+    "consumes": [
+        "application/json"
+    ],
+    "produces": [
+        "application/json"
+    ],
     "swagger": "2.0",
     "info": {
         "description": "{{escape .Description}}",
         "title": "{{.Title}}",
         "contact": {},
+        "license": {
+            "name": "AGPL-3.0",
+            "url": "https://www.gnu.org/licenses/agpl-3.0.html"
+        },
         "version": "{{.Version}}"
     },
     "host": "{{.Host}}",
@@ -17,6 +27,11 @@ const docTemplate = `{
     "paths": {
         "/admin/musicbrainz/enrich": {
             "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
                 "consumes": [
                     "application/json"
                 ],
@@ -65,6 +80,11 @@ const docTemplate = `{
         },
         "/admin/sessions/cleanup": {
             "delete": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
                 "consumes": [
                     "application/json"
                 ],
@@ -105,6 +125,11 @@ const docTemplate = `{
         },
         "/admin/settings": {
             "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
                 "produces": [
                     "application/json"
                 ],
@@ -123,6 +148,11 @@ const docTemplate = `{
                 }
             },
             "put": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
                 "consumes": [
                     "application/json"
                 ],
@@ -158,6 +188,11 @@ const docTemplate = `{
         },
         "/admin/system": {
             "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
                 "produces": [
                     "application/json"
                 ],
@@ -178,6 +213,11 @@ const docTemplate = `{
         },
         "/albums/{id}": {
             "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
                 "produces": [
                     "application/json"
                 ],
@@ -216,6 +256,11 @@ const docTemplate = `{
         },
         "/artists/{id}": {
             "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
                 "produces": [
                     "application/json"
                 ],
@@ -252,34 +297,77 @@ const docTemplate = `{
                 }
             }
         },
-        "/artwork/{id}": {
+        "/artists/{id}/image": {
             "get": {
+                "description": "Returns artist image",
                 "produces": [
-                    "image/png",
-                    "image/jpeg"
+                    "image/*"
                 ],
                 "tags": [
-                    "Player"
+                    "Library"
                 ],
-                "summary": "Get artwork for song or album",
+                "summary": "Get artist image",
                 "parameters": [
                     {
                         "type": "integer",
-                        "description": "Song or Album ID",
+                        "description": "Artist ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Artist image",
+                        "schema": {
+                            "type": "file"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/artwork/{id}": {
+            "get": {
+                "description": "Returns cover artwork image",
+                "produces": [
+                    "image/*"
+                ],
+                "tags": [
+                    "Streaming"
+                ],
+                "summary": "Get artwork for a track or album",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Track or Album ID",
                         "name": "id",
                         "in": "path",
                         "required": true
                     },
                     {
+                        "enum": [
+                            "track",
+                            "album"
+                        ],
                         "type": "string",
-                        "description": "album to get album artwork directly, otherwise song lookup",
+                        "default": "track",
+                        "description": "Type of artwork",
                         "name": "type",
                         "in": "query"
                     }
                 ],
                 "responses": {
                     "200": {
-                        "description": "OK",
+                        "description": "Artwork image",
                         "schema": {
                             "type": "file"
                         }
@@ -341,6 +429,11 @@ const docTemplate = `{
         },
         "/auth/logout": {
             "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
                 "produces": [
                     "application/json"
                 ],
@@ -372,6 +465,11 @@ const docTemplate = `{
         },
         "/auth/me": {
             "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
                 "produces": [
                     "application/json"
                 ],
@@ -401,6 +499,11 @@ const docTemplate = `{
         },
         "/auth/onboarded": {
             "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
                 "produces": [
                     "application/json"
                 ],
@@ -519,8 +622,93 @@ const docTemplate = `{
                 }
             }
         },
+        "/download/{id}": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Download a track in original or transcoded format",
+                "produces": [
+                    "application/octet-stream"
+                ],
+                "tags": [
+                    "Streaming"
+                ],
+                "summary": "Download track",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Track ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "enum": [
+                            "mp3",
+                            "aac",
+                            "opus",
+                            "flac",
+                            "alac"
+                        ],
+                        "type": "string",
+                        "description": "Target format",
+                        "name": "format",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Bitrate in kbps",
+                        "name": "bitrate",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Audio file",
+                        "schema": {
+                            "type": "file"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        },
         "/favorites": {
             "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
                 "produces": [
                     "application/json"
                 ],
@@ -541,6 +729,11 @@ const docTemplate = `{
         },
         "/favorites/albums/{id}": {
             "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
                 "produces": [
                     "application/json"
                 ],
@@ -579,6 +772,11 @@ const docTemplate = `{
                 }
             },
             "delete": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
                 "produces": [
                     "application/json"
                 ],
@@ -610,6 +808,11 @@ const docTemplate = `{
         },
         "/favorites/songs/{id}": {
             "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
                 "produces": [
                     "application/json"
                 ],
@@ -648,6 +851,11 @@ const docTemplate = `{
                 }
             },
             "delete": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
                 "produces": [
                     "application/json"
                 ],
@@ -679,6 +887,11 @@ const docTemplate = `{
         },
         "/follows/artists/{id}": {
             "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
                 "produces": [
                     "application/json"
                 ],
@@ -717,6 +930,11 @@ const docTemplate = `{
                 }
             },
             "delete": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
                 "produces": [
                     "application/json"
                 ],
@@ -768,6 +986,11 @@ const docTemplate = `{
         },
         "/history": {
             "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
                 "produces": [
                     "application/json"
                 ],
@@ -803,6 +1026,11 @@ const docTemplate = `{
                 }
             },
             "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
                 "consumes": [
                     "application/json"
                 ],
@@ -839,6 +1067,11 @@ const docTemplate = `{
         },
         "/home": {
             "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
                 "produces": [
                     "application/json"
                 ],
@@ -859,6 +1092,11 @@ const docTemplate = `{
         },
         "/library": {
             "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
                 "produces": [
                     "application/json"
                 ],
@@ -887,17 +1125,23 @@ const docTemplate = `{
         },
         "/lyrics/{id}": {
             "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Returns lyrics and synced lyrics if available",
                 "produces": [
                     "application/json"
                 ],
                 "tags": [
-                    "Player"
+                    "Library"
                 ],
-                "summary": "Get lyrics for song",
+                "summary": "Get lyrics for a track",
                 "parameters": [
                     {
                         "type": "integer",
-                        "description": "Song ID",
+                        "description": "Track ID",
                         "name": "id",
                         "in": "path",
                         "required": true
@@ -1090,6 +1334,11 @@ const docTemplate = `{
         },
         "/playlists": {
             "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
                 "produces": [
                     "application/json"
                 ],
@@ -1125,6 +1374,11 @@ const docTemplate = `{
                 }
             },
             "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
                 "consumes": [
                     "application/json"
                 ],
@@ -1159,6 +1413,11 @@ const docTemplate = `{
         },
         "/playlists/{id}": {
             "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
                 "produces": [
                     "application/json"
                 ],
@@ -1204,6 +1463,11 @@ const docTemplate = `{
                 }
             },
             "put": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
                 "consumes": [
                     "application/json"
                 ],
@@ -1261,6 +1525,11 @@ const docTemplate = `{
                 }
             },
             "delete": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
                 "produces": [
                     "application/json"
                 ],
@@ -1345,6 +1614,11 @@ const docTemplate = `{
                 }
             },
             "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
                 "consumes": [
                     "multipart/form-data"
                 ],
@@ -1413,6 +1687,11 @@ const docTemplate = `{
         },
         "/playlists/{id}/reorder": {
             "put": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
                 "consumes": [
                     "application/json"
                 ],
@@ -1481,6 +1760,11 @@ const docTemplate = `{
         },
         "/playlists/{id}/songs": {
             "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
                 "consumes": [
                     "application/json"
                 ],
@@ -1545,6 +1829,11 @@ const docTemplate = `{
         },
         "/playlists/{id}/songs/{song_id}": {
             "delete": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
                 "produces": [
                     "application/json"
                 ],
@@ -1601,6 +1890,11 @@ const docTemplate = `{
         },
         "/radio/{id}": {
             "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
                 "produces": [
                     "application/json"
                 ],
@@ -1658,6 +1952,11 @@ const docTemplate = `{
         },
         "/scan": {
             "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
                 "produces": [
                     "application/json"
                 ],
@@ -1687,6 +1986,11 @@ const docTemplate = `{
         },
         "/scan/status": {
             "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
                 "produces": [
                     "application/json"
                 ],
@@ -1707,6 +2011,11 @@ const docTemplate = `{
         },
         "/search": {
             "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
                 "produces": [
                     "application/json"
                 ],
@@ -1748,6 +2057,11 @@ const docTemplate = `{
         },
         "/settings": {
             "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
                 "produces": [
                     "application/json"
                 ],
@@ -1765,6 +2079,11 @@ const docTemplate = `{
                 }
             },
             "put": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
                 "consumes": [
                     "application/json"
                 ],
@@ -1798,6 +2117,11 @@ const docTemplate = `{
         },
         "/songs/{id}": {
             "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
                 "produces": [
                     "application/json"
                 ],
@@ -1835,6 +2159,11 @@ const docTemplate = `{
         },
         "/stats": {
             "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
                 "produces": [
                     "application/json"
                 ],
@@ -1863,6 +2192,11 @@ const docTemplate = `{
         },
         "/stats/insights": {
             "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
                 "produces": [
                     "application/json"
                 ],
@@ -1883,6 +2217,11 @@ const docTemplate = `{
         },
         "/stats/wrapped": {
             "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
                 "produces": [
                     "application/json"
                 ],
@@ -1911,43 +2250,143 @@ const docTemplate = `{
         },
         "/stream/{id}": {
             "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Stream audio - serves original file or redirects to HLS manifest",
                 "produces": [
-                    "application/octet-stream"
+                    "audio/*"
                 ],
                 "tags": [
-                    "Player"
+                    "Streaming"
                 ],
-                "summary": "Stream or transcode song",
+                "summary": "Stream a track",
                 "parameters": [
                     {
                         "type": "integer",
-                        "description": "Song ID",
+                        "description": "Track ID",
                         "name": "id",
                         "in": "path",
                         "required": true
                     },
                     {
+                        "enum": [
+                            "aac",
+                            "mp3",
+                            "opus",
+                            "flac",
+                            "alac"
+                        ],
                         "type": "string",
-                        "description": "mp3|aac|opus|wav",
+                        "description": "Target format",
                         "name": "format",
                         "in": "query"
                     },
                     {
-                        "type": "integer",
-                        "description": "bitrate kbps",
+                        "type": "string",
+                        "description": "Bitrate in kbps",
                         "name": "bitrate",
                         "in": "query"
                     },
                     {
-                        "type": "number",
-                        "description": "seek position in seconds",
-                        "name": "seek",
+                        "type": "string",
+                        "description": "Auth token for player",
+                        "name": "token",
                         "in": "query"
                     }
                 ],
                 "responses": {
                     "200": {
-                        "description": "OK",
+                        "description": "Audio stream",
+                        "schema": {
+                            "type": "file"
+                        }
+                    },
+                    "307": {
+                        "description": "Redirect to HLS manifest",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/stream/{id}/init.mp4": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Serves the fMP4 initialization segment for HLS",
+                "produces": [
+                    "video/mp4"
+                ],
+                "tags": [
+                    "Streaming"
+                ],
+                "summary": "Get fMP4 init segment",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Track ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "enum": [
+                            "aac",
+                            "mp3",
+                            "opus",
+                            "flac",
+                            "alac"
+                        ],
+                        "type": "string",
+                        "default": "aac",
+                        "description": "Audio format",
+                        "name": "format",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Bitrate in kbps",
+                        "name": "bitrate",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Init segment",
                         "schema": {
                             "type": "file"
                         }
@@ -1970,8 +2409,183 @@ const docTemplate = `{
                             }
                         }
                     },
-                    "503": {
-                        "description": "Service Unavailable",
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/stream/{id}/manifest.m3u8": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Serves the m3u8 manifest for HLS streaming",
+                "produces": [
+                    "application/vnd.apple.mpegurl"
+                ],
+                "tags": [
+                    "Streaming"
+                ],
+                "summary": "Get HLS manifest for a track",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Track ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "enum": [
+                            "aac",
+                            "mp3",
+                            "opus",
+                            "flac",
+                            "alac"
+                        ],
+                        "type": "string",
+                        "default": "aac",
+                        "description": "Audio format",
+                        "name": "format",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Bitrate in kbps",
+                        "name": "bitrate",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Auth token for player",
+                        "name": "token",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "HLS manifest",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/stream/{id}/{segment}.m4s": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Serves an audio segment for HLS streaming",
+                "produces": [
+                    "video/mp4"
+                ],
+                "tags": [
+                    "Streaming"
+                ],
+                "summary": "Get HLS audio segment",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Track ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Segment number (e.g., 0.m4s)",
+                        "name": "segment",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "enum": [
+                            "aac",
+                            "mp3",
+                            "opus",
+                            "flac",
+                            "alac"
+                        ],
+                        "type": "string",
+                        "default": "aac",
+                        "description": "Audio format",
+                        "name": "format",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Bitrate in kbps",
+                        "name": "bitrate",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Audio segment",
+                        "schema": {
+                            "type": "file"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
                         "schema": {
                             "type": "object",
                             "additionalProperties": {
@@ -1984,13 +2598,14 @@ const docTemplate = `{
         },
         "/streaming/options": {
             "get": {
+                "description": "Returns available formats, bitrates, and streaming capabilities",
                 "produces": [
                     "application/json"
                 ],
                 "tags": [
-                    "Player"
+                    "Streaming"
                 ],
-                "summary": "Get available streaming formats and bitrates",
+                "summary": "Get available streaming formats",
                 "responses": {
                     "200": {
                         "description": "OK",
@@ -2149,6 +2764,9 @@ const docTemplate = `{
                 "created_at": {
                     "type": "string"
                 },
+                "external_id": {
+                    "type": "string"
+                },
                 "id": {
                     "type": "integer"
                 },
@@ -2172,8 +2790,11 @@ const docTemplate = `{
                 "album_id": {
                     "type": "integer"
                 },
-                "artist": {
-                    "$ref": "#/definitions/models.Artist"
+                "artists": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/models.Artist"
+                    }
                 },
                 "duration": {
                     "type": "integer"
@@ -2201,13 +2822,21 @@ const docTemplate = `{
                 }
             }
         }
+    },
+    "securityDefinitions": {
+        "BearerAuth": {
+            "description": "JWT Bearer token. Format: \"Bearer {token}\"",
+            "type": "apiKey",
+            "name": "Authorization",
+            "in": "header"
+        }
     }
 }`
 
 // SwaggerInfo holds exported Swagger Info so clients can modify it
 var SwaggerInfo = &swag.Spec{
 	Version:          "0.1",
-	Host:             "",
+	Host:             "localhost:8080",
 	BasePath:         "/api",
 	Schemes:          []string{},
 	Title:            "Korus API",

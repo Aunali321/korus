@@ -19,6 +19,7 @@ import (
 // @Param limit query int false "max items (default: all)"
 // @Success 200 {object} map[string]interface{}
 // @Router /library [get]
+// @Security BearerAuth
 func (h *Handler) Library(c echo.Context) error {
 	ctx := c.Request().Context()
 	limit := parseOptionalLimit(c)
@@ -41,6 +42,7 @@ func (h *Handler) Library(c echo.Context) error {
 // @Success 200 {object} map[string]interface{}
 // @Failure 404 {object} map[string]string
 // @Router /artists/{id} [get]
+// @Security BearerAuth
 func (h *Handler) Artist(c echo.Context) error {
 	ctx := c.Request().Context()
 	id, _ := strconv.ParseInt(c.Param("id"), 10, 64)
@@ -82,6 +84,7 @@ func (h *Handler) Artist(c echo.Context) error {
 // @Success 200 {object} map[string]interface{}
 // @Failure 404 {object} map[string]string
 // @Router /albums/{id} [get]
+// @Security BearerAuth
 func (h *Handler) Album(c echo.Context) error {
 	ctx := c.Request().Context()
 	id, _ := strconv.ParseInt(c.Param("id"), 10, 64)
@@ -124,6 +127,7 @@ func (h *Handler) Album(c echo.Context) error {
 // @Success 200 {object} models.Song
 // @Failure 404 {object} map[string]string
 // @Router /songs/{id} [get]
+// @Security BearerAuth
 func (h *Handler) Song(c echo.Context) error {
 	ctx := c.Request().Context()
 	id, _ := strconv.ParseInt(c.Param("id"), 10, 64)

@@ -19,6 +19,7 @@ import (
 // @Success 200 {object} map[string]bool
 // @Failure 404 {object} map[string]string
 // @Router /favorites/songs/{id} [post]
+// @Security BearerAuth
 func (h *Handler) FavSong(c echo.Context) error {
 	user, _ := currentUser(c)
 	id, _ := strconv.ParseInt(c.Param("id"), 10, 64)
@@ -38,6 +39,7 @@ func (h *Handler) FavSong(c echo.Context) error {
 // @Param id path int true "Song ID"
 // @Success 200 {object} map[string]bool
 // @Router /favorites/songs/{id} [delete]
+// @Security BearerAuth
 func (h *Handler) UnfavSong(c echo.Context) error {
 	user, _ := currentUser(c)
 	id, _ := strconv.ParseInt(c.Param("id"), 10, 64)
@@ -55,6 +57,7 @@ func (h *Handler) UnfavSong(c echo.Context) error {
 // @Success 200 {object} map[string]bool
 // @Failure 404 {object} map[string]string
 // @Router /favorites/albums/{id} [post]
+// @Security BearerAuth
 func (h *Handler) FavAlbum(c echo.Context) error {
 	user, _ := currentUser(c)
 	id, _ := strconv.ParseInt(c.Param("id"), 10, 64)
@@ -74,6 +77,7 @@ func (h *Handler) FavAlbum(c echo.Context) error {
 // @Param id path int true "Album ID"
 // @Success 200 {object} map[string]bool
 // @Router /favorites/albums/{id} [delete]
+// @Security BearerAuth
 func (h *Handler) UnfavAlbum(c echo.Context) error {
 	user, _ := currentUser(c)
 	id, _ := strconv.ParseInt(c.Param("id"), 10, 64)
@@ -91,6 +95,7 @@ func (h *Handler) UnfavAlbum(c echo.Context) error {
 // @Success 200 {object} map[string]bool
 // @Failure 404 {object} map[string]string
 // @Router /follows/artists/{id} [post]
+// @Security BearerAuth
 func (h *Handler) FollowArtist(c echo.Context) error {
 	user, _ := currentUser(c)
 	id, _ := strconv.ParseInt(c.Param("id"), 10, 64)
@@ -110,6 +115,7 @@ func (h *Handler) FollowArtist(c echo.Context) error {
 // @Param id path int true "Artist ID"
 // @Success 200 {object} map[string]bool
 // @Router /follows/artists/{id} [delete]
+// @Security BearerAuth
 func (h *Handler) UnfollowArtist(c echo.Context) error {
 	user, _ := currentUser(c)
 	id, _ := strconv.ParseInt(c.Param("id"), 10, 64)
@@ -125,6 +131,7 @@ func (h *Handler) UnfollowArtist(c echo.Context) error {
 // @Produce json
 // @Success 200 {object} map[string]interface{}
 // @Router /favorites [get]
+// @Security BearerAuth
 func (h *Handler) ListFavorites(c echo.Context) error {
 	user, _ := currentUser(c)
 	ctx := c.Request().Context()

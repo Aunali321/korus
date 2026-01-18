@@ -6,6 +6,7 @@
     import { settings } from "$lib/stores/settings.svelte";
     import { contextMenu } from "$lib/stores/contextMenu.svelte";
     import { api } from "$lib/api";
+    import { goto } from "$app/navigation";
 
     let {
         song,
@@ -101,7 +102,7 @@
         />
     {/if}
 
-    <button onclick={handlePlay} class="flex-1 min-w-0 text-left">
+    <div onclick={handlePlay} class="flex-1 min-w-0 text-left cursor-pointer" role="button" tabindex="0" onkeydown={(e) => e.key === 'Enter' && handlePlay()}>
         <h4 class="font-medium truncate text-sm md:text-base {isPlaying ? 'text-emerald-400' : ''}">
             {song.title}
         </h4>
@@ -110,7 +111,7 @@
                 {#each song.artists as artist, i}
                     <a
                         href="/artists/{artist.id}"
-                        onclick={(e) => e.stopPropagation()}
+                        onclick={(e) => { e.stopPropagation(); e.preventDefault(); goto(`/artists/${artist.id}`); }}
                         class="hover:underline hover:text-zinc-300"
                     >{artist.name}</a>{#if i < song.artists.length - 1}, {/if}
                 {/each}
@@ -121,7 +122,7 @@
                 <span class="hidden md:inline text-zinc-500"> - {song.album.title}</span>
             {/if}
         </p>
-    </button>
+    </div>
 
     <div class="text-xs md:text-sm text-zinc-500 shrink-0">{formatDuration(song.duration)}</div>
 

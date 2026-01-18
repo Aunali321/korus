@@ -28,6 +28,7 @@ type playlistRequest struct {
 // @Param offset query int false "offset"
 // @Success 200 {array} map[string]interface{}
 // @Router /playlists [get]
+// @Security BearerAuth
 func (h *Handler) ListPlaylists(c echo.Context) error {
 	user, _ := currentUser(c)
 	limit, offset := parseLimitOffset(c, 50, 200)
@@ -85,6 +86,7 @@ func (h *Handler) ListPlaylists(c echo.Context) error {
 // @Param body body playlistRequest true "playlist"
 // @Success 200 {object} map[string]interface{}
 // @Router /playlists [post]
+// @Security BearerAuth
 func (h *Handler) CreatePlaylist(c echo.Context) error {
 	user, _ := currentUser(c)
 	var req playlistRequest
@@ -119,6 +121,7 @@ func (h *Handler) CreatePlaylist(c echo.Context) error {
 // @Failure 404 {object} map[string]string
 // @Failure 403 {object} map[string]string
 // @Router /playlists/{id} [get]
+// @Security BearerAuth
 func (h *Handler) GetPlaylist(c echo.Context) error {
 	user, _ := currentUser(c)
 	id, _ := strconv.ParseInt(c.Param("id"), 10, 64)
@@ -171,6 +174,7 @@ func (h *Handler) GetPlaylist(c echo.Context) error {
 // @Failure 404 {object} map[string]string
 // @Failure 403 {object} map[string]string
 // @Router /playlists/{id} [put]
+// @Security BearerAuth
 func (h *Handler) UpdatePlaylist(c echo.Context) error {
 	user, _ := currentUser(c)
 	id, _ := strconv.ParseInt(c.Param("id"), 10, 64)
@@ -215,6 +219,7 @@ func (h *Handler) UpdatePlaylist(c echo.Context) error {
 // @Failure 403 {object} map[string]string
 // @Failure 404 {object} map[string]string
 // @Router /playlists/{id}/cover [post]
+// @Security BearerAuth
 func (h *Handler) UploadPlaylistCover(c echo.Context) error {
 	user, _ := currentUser(c)
 	id, _ := strconv.ParseInt(c.Param("id"), 10, 64)
@@ -305,6 +310,7 @@ func (h *Handler) GetPlaylistCover(c echo.Context) error {
 // @Failure 404 {object} map[string]string
 // @Failure 403 {object} map[string]string
 // @Router /playlists/{id} [delete]
+// @Security BearerAuth
 func (h *Handler) DeletePlaylist(c echo.Context) error {
 	user, _ := currentUser(c)
 	id, _ := strconv.ParseInt(c.Param("id"), 10, 64)
@@ -332,6 +338,7 @@ func (h *Handler) DeletePlaylist(c echo.Context) error {
 // @Failure 404 {object} map[string]string
 // @Failure 403 {object} map[string]string
 // @Router /playlists/{id}/songs [post]
+// @Security BearerAuth
 func (h *Handler) AddPlaylistSong(c echo.Context) error {
 	user, _ := currentUser(c)
 	id, _ := strconv.ParseInt(c.Param("id"), 10, 64)
@@ -376,6 +383,7 @@ func (h *Handler) AddPlaylistSong(c echo.Context) error {
 // @Failure 404 {object} map[string]string
 // @Failure 403 {object} map[string]string
 // @Router /playlists/{id}/songs/{song_id} [delete]
+// @Security BearerAuth
 func (h *Handler) DeletePlaylistSong(c echo.Context) error {
 	user, _ := currentUser(c)
 	id, _ := strconv.ParseInt(c.Param("id"), 10, 64)
@@ -404,6 +412,7 @@ func (h *Handler) DeletePlaylistSong(c echo.Context) error {
 // @Failure 404 {object} map[string]string
 // @Failure 403 {object} map[string]string
 // @Router /playlists/{id}/reorder [put]
+// @Security BearerAuth
 func (h *Handler) ReorderPlaylistSongs(c echo.Context) error {
 	user, _ := currentUser(c)
 	id, _ := strconv.ParseInt(c.Param("id"), 10, 64)

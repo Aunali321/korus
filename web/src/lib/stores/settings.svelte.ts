@@ -7,7 +7,7 @@ const RADIO_MODE_KEY = 'korus_radio_mode';
 
 const PRESETS: Record<Exclude<StreamingPreset, 'custom'>, { format: string; bitrate: number } | null> = {
     original: null,
-    lossless: { format: 'wav', bitrate: 0 },
+    lossless: { format: 'flac', bitrate: 0 },
     very_high: { format: 'opus', bitrate: 256 },
     high: { format: 'opus', bitrate: 192 },
     medium: { format: 'opus', bitrate: 128 },
@@ -15,7 +15,7 @@ const PRESETS: Record<Exclude<StreamingPreset, 'custom'>, { format: string; bitr
 };
 
 function createSettingsStore() {
-    let streamingQuality = $state<StreamingQuality>({ preset: 'original' });
+    let streamingQuality = $state<StreamingQuality>({ preset: 'very_high', format: 'opus', bitrate: 256 });
     let shuffle = $state(false);
     let repeat = $state<RepeatMode>('off');
     let radioEnabled = $state(false);
@@ -133,7 +133,7 @@ function createSettingsStore() {
     }
 
     function reset() {
-        streamingQuality = { preset: 'original' };
+        streamingQuality = { preset: 'very_high', format: 'opus', bitrate: 256 };
         shuffle = false;
         repeat = 'off';
         radioMode = 'curator';

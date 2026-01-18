@@ -1,4 +1,6 @@
 basePath: /api
+consumes:
+- application/json
 definitions:
   handlers.PlayerState:
     properties:
@@ -96,6 +98,8 @@ definitions:
         type: string
       created_at:
         type: string
+      external_id:
+        type: string
       id:
         type: integer
       image_path:
@@ -111,8 +115,10 @@ definitions:
         $ref: '#/definitions/models.Album'
       album_id:
         type: integer
-      artist:
-        $ref: '#/definitions/models.Artist'
+      artists:
+        items:
+          $ref: '#/definitions/models.Artist'
+        type: array
       duration:
         type: integer
       file_path:
@@ -130,9 +136,13 @@ definitions:
       track_number:
         type: integer
     type: object
+host: localhost:8080
 info:
   contact: {}
   description: Self-hosted music streaming server API.
+  license:
+    name: AGPL-3.0
+    url: https://www.gnu.org/licenses/agpl-3.0.html
   title: Korus API
   version: "0.1"
 paths:
@@ -164,6 +174,8 @@ paths:
             additionalProperties:
               type: string
             type: object
+      security:
+      - BearerAuth: []
       summary: MusicBrainz enrich
       tags:
       - Admin
@@ -190,6 +202,8 @@ paths:
               format: int64
               type: integer
             type: object
+      security:
+      - BearerAuth: []
       summary: Cleanup sessions
       tags:
       - Admin
@@ -203,6 +217,8 @@ paths:
           schema:
             additionalProperties: true
             type: object
+      security:
+      - BearerAuth: []
       summary: Get app settings
       tags:
       - Admin
@@ -225,6 +241,8 @@ paths:
           schema:
             additionalProperties: true
             type: object
+      security:
+      - BearerAuth: []
       summary: Update app settings
       tags:
       - Admin
@@ -238,6 +256,8 @@ paths:
           schema:
             additionalProperties: true
             type: object
+      security:
+      - BearerAuth: []
       summary: System info
       tags:
       - Admin
@@ -263,6 +283,8 @@ paths:
             additionalProperties:
               type: string
             type: object
+      security:
+      - BearerAuth: []
       summary: Get album by id
       tags:
       - Library
@@ -288,27 +310,25 @@ paths:
             additionalProperties:
               type: string
             type: object
+      security:
+      - BearerAuth: []
       summary: Get artist by id
       tags:
       - Library
-  /artwork/{id}:
+  /artists/{id}/image:
     get:
+      description: Returns artist image
       parameters:
-      - description: Song or Album ID
+      - description: Artist ID
         in: path
         name: id
         required: true
         type: integer
-      - description: album to get album artwork directly, otherwise song lookup
-        in: query
-        name: type
-        type: string
       produces:
-      - image/png
-      - image/jpeg
+      - image/*
       responses:
         "200":
-          description: OK
+          description: Artist image
           schema:
             type: file
         "404":
@@ -317,9 +337,42 @@ paths:
             additionalProperties:
               type: string
             type: object
-      summary: Get artwork for song or album
+      summary: Get artist image
       tags:
-      - Player
+      - Library
+  /artwork/{id}:
+    get:
+      description: Returns cover artwork image
+      parameters:
+      - description: Track or Album ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - default: track
+        description: Type of artwork
+        enum:
+        - track
+        - album
+        in: query
+        name: type
+        type: string
+      produces:
+      - image/*
+      responses:
+        "200":
+          description: Artwork image
+          schema:
+            type: file
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Get artwork for a track or album
+      tags:
+      - Streaming
   /auth/login:
     post:
       consumes:
@@ -365,6 +418,8 @@ paths:
             additionalProperties:
               type: string
             type: object
+      security:
+      - BearerAuth: []
       summary: Logout user
       tags:
       - Auth
@@ -384,6 +439,8 @@ paths:
             additionalProperties:
               type: string
             type: object
+      security:
+      - BearerAuth: []
       summary: Current user
       tags:
       - Auth
@@ -404,6 +461,8 @@ paths:
             additionalProperties:
               type: string
             type: object
+      security:
+      - BearerAuth: []
       summary: Mark user as onboarded
       tags:
       - Auth
@@ -465,6 +524,59 @@ paths:
       summary: Register a new user
       tags:
       - Auth
+  /download/{id}:
+    get:
+      description: Download a track in original or transcoded format
+      parameters:
+      - description: Track ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Target format
+        enum:
+        - mp3
+        - aac
+        - opus
+        - flac
+        - alac
+        in: query
+        name: format
+        type: string
+      - description: Bitrate in kbps
+        in: query
+        name: bitrate
+        type: integer
+      produces:
+      - application/octet-stream
+      responses:
+        "200":
+          description: Audio file
+          schema:
+            type: file
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Download track
+      tags:
+      - Streaming
   /favorites:
     get:
       produces:
@@ -475,6 +587,8 @@ paths:
           schema:
             additionalProperties: true
             type: object
+      security:
+      - BearerAuth: []
       summary: List favorites
       tags:
       - Favorites
@@ -495,6 +609,8 @@ paths:
             additionalProperties:
               type: boolean
             type: object
+      security:
+      - BearerAuth: []
       summary: Unfavorite album
       tags:
       - Favorites
@@ -520,6 +636,8 @@ paths:
             additionalProperties:
               type: string
             type: object
+      security:
+      - BearerAuth: []
       summary: Favorite album
       tags:
       - Favorites
@@ -540,6 +658,8 @@ paths:
             additionalProperties:
               type: boolean
             type: object
+      security:
+      - BearerAuth: []
       summary: Unfavorite song
       tags:
       - Favorites
@@ -565,6 +685,8 @@ paths:
             additionalProperties:
               type: string
             type: object
+      security:
+      - BearerAuth: []
       summary: Favorite song
       tags:
       - Favorites
@@ -585,6 +707,8 @@ paths:
             additionalProperties:
               type: boolean
             type: object
+      security:
+      - BearerAuth: []
       summary: Unfollow artist
       tags:
       - Favorites
@@ -610,6 +734,8 @@ paths:
             additionalProperties:
               type: string
             type: object
+      security:
+      - BearerAuth: []
       summary: Follow artist
       tags:
       - Favorites
@@ -647,6 +773,8 @@ paths:
               additionalProperties: true
               type: object
             type: array
+      security:
+      - BearerAuth: []
       summary: List play history
       tags:
       - History
@@ -669,6 +797,8 @@ paths:
             additionalProperties:
               type: boolean
             type: object
+      security:
+      - BearerAuth: []
       summary: Record play history
       tags:
       - History
@@ -682,6 +812,8 @@ paths:
           schema:
             additionalProperties: true
             type: object
+      security:
+      - BearerAuth: []
       summary: Home summary
       tags:
       - Stats
@@ -700,13 +832,16 @@ paths:
           schema:
             additionalProperties: true
             type: object
+      security:
+      - BearerAuth: []
       summary: Get library overview
       tags:
       - Library
   /lyrics/{id}:
     get:
+      description: Returns lyrics and synced lyrics if available
       parameters:
-      - description: Song ID
+      - description: Track ID
         in: path
         name: id
         required: true
@@ -725,9 +860,11 @@ paths:
             additionalProperties:
               type: string
             type: object
-      summary: Get lyrics for song
+      security:
+      - BearerAuth: []
+      summary: Get lyrics for a track
       tags:
-      - Player
+      - Library
   /musicbrainz/recommendations:
     get:
       produces:
@@ -856,6 +993,8 @@ paths:
               additionalProperties: true
               type: object
             type: array
+      security:
+      - BearerAuth: []
       summary: List playlists
       tags:
       - Playlists
@@ -877,6 +1016,8 @@ paths:
           schema:
             additionalProperties: true
             type: object
+      security:
+      - BearerAuth: []
       summary: Create playlist
       tags:
       - Playlists
@@ -909,6 +1050,8 @@ paths:
             additionalProperties:
               type: string
             type: object
+      security:
+      - BearerAuth: []
       summary: Delete playlist
       tags:
       - Playlists
@@ -939,6 +1082,8 @@ paths:
             additionalProperties:
               type: string
             type: object
+      security:
+      - BearerAuth: []
       summary: Get playlist
       tags:
       - Playlists
@@ -977,6 +1122,8 @@ paths:
             additionalProperties:
               type: string
             type: object
+      security:
+      - BearerAuth: []
       summary: Update playlist
       tags:
       - Playlists
@@ -1045,6 +1192,8 @@ paths:
             additionalProperties:
               type: string
             type: object
+      security:
+      - BearerAuth: []
       summary: Upload playlist cover
       tags:
       - Playlists
@@ -1090,6 +1239,8 @@ paths:
             additionalProperties:
               type: string
             type: object
+      security:
+      - BearerAuth: []
       summary: Reorder playlist songs
       tags:
       - Playlists
@@ -1132,6 +1283,8 @@ paths:
             additionalProperties:
               type: string
             type: object
+      security:
+      - BearerAuth: []
       summary: Add song to playlist
       tags:
       - Playlists
@@ -1169,6 +1322,8 @@ paths:
             additionalProperties:
               type: string
             type: object
+      security:
+      - BearerAuth: []
       summary: Remove song from playlist
       tags:
       - Playlists
@@ -1207,6 +1362,8 @@ paths:
             additionalProperties:
               type: string
             type: object
+      security:
+      - BearerAuth: []
       summary: Get similar songs for radio playback
       tags:
       - Radio
@@ -1226,6 +1383,8 @@ paths:
             additionalProperties:
               type: string
             type: object
+      security:
+      - BearerAuth: []
       summary: Start library scan
       tags:
       - Library
@@ -1239,6 +1398,8 @@ paths:
           schema:
             additionalProperties: true
             type: object
+      security:
+      - BearerAuth: []
       summary: Get scan status
       tags:
       - Library
@@ -1266,6 +1427,8 @@ paths:
           schema:
             additionalProperties: true
             type: object
+      security:
+      - BearerAuth: []
       summary: Search library
       tags:
       - Search
@@ -1278,6 +1441,8 @@ paths:
           description: OK
           schema:
             $ref: '#/definitions/handlers.UserSettings'
+      security:
+      - BearerAuth: []
       summary: Get user settings
       tags:
       - Settings
@@ -1298,6 +1463,8 @@ paths:
           description: OK
           schema:
             $ref: '#/definitions/handlers.UserSettings'
+      security:
+      - BearerAuth: []
       summary: Update user settings
       tags:
       - Settings
@@ -1322,6 +1489,8 @@ paths:
             additionalProperties:
               type: string
             type: object
+      security:
+      - BearerAuth: []
       summary: Get song by id
       tags:
       - Library
@@ -1340,6 +1509,8 @@ paths:
           schema:
             additionalProperties: true
             type: object
+      security:
+      - BearerAuth: []
       summary: Stats overview
       tags:
       - Stats
@@ -1353,6 +1524,8 @@ paths:
           schema:
             additionalProperties: true
             type: object
+      security:
+      - BearerAuth: []
       summary: Insights
       tags:
       - Stats
@@ -1371,34 +1544,106 @@ paths:
           schema:
             additionalProperties: true
             type: object
+      security:
+      - BearerAuth: []
       summary: Wrapped stats
       tags:
       - Stats
   /stream/{id}:
     get:
+      description: Stream audio - serves original file or redirects to HLS manifest
       parameters:
-      - description: Song ID
+      - description: Track ID
         in: path
         name: id
         required: true
         type: integer
-      - description: mp3|aac|opus|wav
+      - description: Target format
+        enum:
+        - aac
+        - mp3
+        - opus
+        - flac
+        - alac
         in: query
         name: format
         type: string
-      - description: bitrate kbps
+      - description: Bitrate in kbps
+        in: query
+        name: bitrate
+        type: string
+      - description: Auth token for player
+        in: query
+        name: token
+        type: string
+      produces:
+      - audio/*
+      responses:
+        "200":
+          description: Audio stream
+          schema:
+            type: file
+        "307":
+          description: Redirect to HLS manifest
+          schema:
+            type: string
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Stream a track
+      tags:
+      - Streaming
+  /stream/{id}/{segment}.m4s:
+    get:
+      description: Serves an audio segment for HLS streaming
+      parameters:
+      - description: Track ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Segment number (e.g., 0.m4s)
+        in: path
+        name: segment
+        required: true
+        type: string
+      - default: aac
+        description: Audio format
+        enum:
+        - aac
+        - mp3
+        - opus
+        - flac
+        - alac
+        in: query
+        name: format
+        type: string
+      - description: Bitrate in kbps
         in: query
         name: bitrate
         type: integer
-      - description: seek position in seconds
-        in: query
-        name: seek
-        type: number
       produces:
-      - application/octet-stream
+      - video/mp4
       responses:
         "200":
-          description: OK
+          description: Audio segment
           schema:
             type: file
         "400":
@@ -1413,17 +1658,132 @@ paths:
             additionalProperties:
               type: string
             type: object
-        "503":
-          description: Service Unavailable
+        "500":
+          description: Internal Server Error
           schema:
             additionalProperties:
               type: string
             type: object
-      summary: Stream or transcode song
+      security:
+      - BearerAuth: []
+      summary: Get HLS audio segment
       tags:
-      - Player
+      - Streaming
+  /stream/{id}/init.mp4:
+    get:
+      description: Serves the fMP4 initialization segment for HLS
+      parameters:
+      - description: Track ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - default: aac
+        description: Audio format
+        enum:
+        - aac
+        - mp3
+        - opus
+        - flac
+        - alac
+        in: query
+        name: format
+        type: string
+      - description: Bitrate in kbps
+        in: query
+        name: bitrate
+        type: integer
+      produces:
+      - video/mp4
+      responses:
+        "200":
+          description: Init segment
+          schema:
+            type: file
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Get fMP4 init segment
+      tags:
+      - Streaming
+  /stream/{id}/manifest.m3u8:
+    get:
+      description: Serves the m3u8 manifest for HLS streaming
+      parameters:
+      - description: Track ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - default: aac
+        description: Audio format
+        enum:
+        - aac
+        - mp3
+        - opus
+        - flac
+        - alac
+        in: query
+        name: format
+        type: string
+      - description: Bitrate in kbps
+        in: query
+        name: bitrate
+        type: integer
+      - description: Auth token for player
+        in: query
+        name: token
+        type: string
+      produces:
+      - application/vnd.apple.mpegurl
+      responses:
+        "200":
+          description: HLS manifest
+          schema:
+            type: string
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Get HLS manifest for a track
+      tags:
+      - Streaming
   /streaming/options:
     get:
+      description: Returns available formats, bitrates, and streaming capabilities
       produces:
       - application/json
       responses:
@@ -1432,7 +1792,15 @@ paths:
           schema:
             additionalProperties: true
             type: object
-      summary: Get available streaming formats and bitrates
+      summary: Get available streaming formats
       tags:
-      - Player
+      - Streaming
+produces:
+- application/json
+securityDefinitions:
+  BearerAuth:
+    description: 'JWT Bearer token. Format: "Bearer {token}"'
+    in: header
+    name: Authorization
+    type: apiKey
 swagger: "2.0"

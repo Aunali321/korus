@@ -75,6 +75,7 @@ func (h *Handler) Login(c echo.Context) error {
 // @Success 200 {object} map[string]bool
 // @Failure 401 {object} map[string]string
 // @Router /auth/logout [post]
+// @Security BearerAuth
 func (h *Handler) Logout(c echo.Context) error {
 	token := bearerToken(c.Request().Header.Get("Authorization"))
 	if token == "" {
@@ -119,6 +120,7 @@ func (h *Handler) Refresh(c echo.Context) error {
 // @Success 200 {object} map[string]interface{}
 // @Failure 401 {object} map[string]string
 // @Router /auth/me [get]
+// @Security BearerAuth
 func (h *Handler) Me(c echo.Context) error {
 	user, err := currentUser(c)
 	if err != nil {
@@ -134,6 +136,7 @@ func (h *Handler) Me(c echo.Context) error {
 // @Success 200 {object} map[string]bool
 // @Failure 401 {object} map[string]string
 // @Router /auth/onboarded [post]
+// @Security BearerAuth
 func (h *Handler) CompleteOnboarding(c echo.Context) error {
 	user, err := currentUser(c)
 	if err != nil {

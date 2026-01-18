@@ -19,6 +19,7 @@ import (
 // @Success 200 {object} map[string][]models.Song
 // @Failure 404 {object} map[string]string
 // @Router /radio/{id} [get]
+// @Security BearerAuth
 func (h *Handler) Radio(c echo.Context) error {
 	var songID int64
 	if err := echo.PathParamsBinder(c).Int64("id", &songID).BindError(); err != nil {

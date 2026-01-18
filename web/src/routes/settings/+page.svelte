@@ -26,12 +26,12 @@
     };
 
     const presets: { value: StreamingPreset; label: string; description: string }[] = [
-        { value: "original", label: "Original", description: "No transcoding (~600 MB/hr for lossless)" },
-        { value: "lossless", label: "Lossless", description: "WAV transcoding (~635-950 MB/hr)" },
         { value: "very_high", label: "Very High", description: "Opus 256 kbps (~115 MB/hr)" },
         { value: "high", label: "High", description: "Opus 192 kbps (~86 MB/hr)" },
         { value: "medium", label: "Medium", description: "Opus 128 kbps (~58 MB/hr)" },
         { value: "low", label: "Low", description: "Opus 64 kbps (~29 MB/hr)" },
+        { value: "lossless", label: "Lossless", description: "FLAC transcoding (~600-900 MB/hr)" },
+        { value: "original", label: "Original", description: "No transcoding (may not work with all formats)" },
     ];
 
     $effect(() => {

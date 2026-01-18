@@ -17,6 +17,7 @@ import (
 // @Success 200 {object} map[string]interface{}
 // @Failure 409 {object} map[string]string
 // @Router /scan [post]
+// @Security BearerAuth
 func (h *Handler) StartScan(c echo.Context) error {
 	scanID, err := h.scanner.StartScan(c.Request().Context())
 	if err != nil {
@@ -31,6 +32,7 @@ func (h *Handler) StartScan(c echo.Context) error {
 // @Produce json
 // @Success 200 {object} map[string]interface{}
 // @Router /scan/status [get]
+// @Security BearerAuth
 func (h *Handler) ScanStatus(c echo.Context) error {
 	status, err := h.scanner.Status(c.Request().Context())
 	if err != nil {
@@ -45,6 +47,7 @@ func (h *Handler) ScanStatus(c echo.Context) error {
 // @Produce json
 // @Success 200 {object} map[string]interface{}
 // @Router /admin/system [get]
+// @Security BearerAuth
 func (h *Handler) SystemInfo(c echo.Context) error {
 	var users, songs, artists, albums int
 	_ = h.db.QueryRow(`SELECT COUNT(*) FROM users`).Scan(&users)
@@ -81,6 +84,7 @@ func (h *Handler) SystemInfo(c echo.Context) error {
 // @Param body body map[string]int true "older_than_days"
 // @Success 200 {object} map[string]int64
 // @Router /admin/sessions/cleanup [delete]
+// @Security BearerAuth
 func (h *Handler) CleanupSessions(c echo.Context) error {
 	var payload struct {
 		OlderThanDays int `json:"older_than_days" validate:"required"`
@@ -107,6 +111,7 @@ func (h *Handler) CleanupSessions(c echo.Context) error {
 // @Success 200 {object} map[string]string
 // @Failure 503 {object} map[string]string
 // @Router /admin/musicbrainz/enrich [post]
+// @Security BearerAuth
 func (h *Handler) Enrich(c echo.Context) error {
 	if h.musicBrainz == nil {
 		return echo.NewHTTPError(http.StatusServiceUnavailable, map[string]string{"error": "musicbrainz disabled", "code": "MB_DISABLED"})
@@ -144,6 +149,7 @@ func hostname() string {
 // @Produce json
 // @Success 200 {object} map[string]interface{}
 // @Router /admin/settings [get]
+// @Security BearerAuth
 func (h *Handler) GetAppSettings(c echo.Context) error {
 	ctx := c.Request().Context()
 	radioEnabled := false
@@ -163,6 +169,7 @@ func (h *Handler) GetAppSettings(c echo.Context) error {
 // @Param settings body map[string]interface{} true "Settings"
 // @Success 200 {object} map[string]interface{}
 // @Router /admin/settings [put]
+// @Security BearerAuth
 func (h *Handler) UpdateAppSettings(c echo.Context) error {
 	var payload struct {
 		RadioEnabled *bool `json:"radio_enabled"`

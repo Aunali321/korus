@@ -97,7 +97,6 @@ async function request<T>(
     ...((options.headers as Record<string, string>) || {}),
   };
 
-  // Get token fresh each time (not cached in closure)
   const token = getAccessToken();
   if (token) {
     headers["Authorization"] = `Bearer ${token}`;
@@ -111,7 +110,6 @@ async function request<T>(
   if (res.status === 401 && retry) {
     const refreshed = await refreshTokens();
     if (refreshed) {
-      // Retry with fresh token from localStorage
       return request<T>(path, options, false);
     }
     throw new Error("Unauthorized");
@@ -181,9 +179,30 @@ export const api = {
 
   getArtistImageUrl: (id: number) => `${getApiUrl()}/artist-image/${id}`,
 
+  // HLS streaming URL - returns manifest URL
   getStreamUrl: (id: number, format?: string, bitrate?: number) => {
     const token = getAccessToken();
+    let url = `${getApiUrl()}/stream/${id}/manifest.m3u8`;
+    const params: string[] = [];
+    if (token) params.push(`token=${token}`);
+    if (format) params.push(`format=${format}`);
+    if (bitrate) params.push(`bitrate=${bitrate}`);
+    if (params.length) url += "?" + params.join("&");
+    return url;
+  },
+
+  // Original file streaming URL (no transcoding)
+  getOriginalStreamUrl: (id: number) => {
+    const token = getAccessToken();
     let url = `${getApiUrl()}/stream/${id}`;
+    if (token) url += `?token=${token}`;
+    return url;
+  },
+
+  // Download URL for full file download
+  getDownloadUrl: (id: number, format?: string, bitrate?: number) => {
+    const token = getAccessToken();
+    let url = `${getApiUrl()}/download/${id}`;
     const params: string[] = [];
     if (token) params.push(`token=${token}`);
     if (format) params.push(`format=${format}`);
