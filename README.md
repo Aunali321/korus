@@ -1,5 +1,7 @@
 # Korus
 
+<img src="web/static/logo.svg" alt="Korus Logo" width="64" height="64" />
+
 Self-hosted music streaming server with a web interface.
 
 ## Features

@@ -1,5 +1,7 @@
 <script lang="ts">
-    import { BarChart3, Clock, Flame } from "lucide-svelte";
+    import BarChart3 from "@lucide/svelte/icons/bar-chart-3";
+    import Clock from "@lucide/svelte/icons/clock";
+    import Flame from "@lucide/svelte/icons/flame";
     import { api } from "$lib/api";
     import { auth } from "$lib/stores/auth.svelte";
     import type { Stats, PlayHistory, Insights } from "$lib/types";

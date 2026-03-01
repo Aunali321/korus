@@ -152,28 +152,41 @@ export const api = {
     request<{ success: boolean }>("/auth/onboarded", { method: "POST" }),
 
   getLibrary: () =>
-    request<{ songs: Song[]; albums: Album[]; artists: Artist[] }>(
-      `/library`,
-    ),
+    request<{ songs: Song[]; albums: Album[]; artists: Artist[] }>(`/library`),
 
   getSong: (id: number) => request<Song>(`/songs/${id}`),
 
   getAlbum: (id: number) =>
-    request<{ id: number; title: string; year?: number; cover_path?: string; mbid?: string; artist?: Artist; songs: Song[]; created_at?: string }>(`/albums/${id}`),
+    request<{
+      id: number;
+      title: string;
+      year?: number;
+      cover_path?: string;
+      mbid?: string;
+      artist?: Artist;
+      songs: Song[];
+      created_at?: string;
+    }>(`/albums/${id}`),
 
   getArtist: (id: number) =>
-    request<{ id: number; name: string; bio?: string; image_path?: string; mbid?: string; albums: Album[]; songs: Song[] }>(
-      `/artists/${id}`,
-    ),
+    request<{
+      id: number;
+      name: string;
+      bio?: string;
+      image_path?: string;
+      mbid?: string;
+      albums: Album[];
+      songs: Song[];
+    }>(`/artists/${id}`),
 
   search: (q: string, limit = 25, offset = 0) =>
     request<SearchResults>(
       `/search?q=${encodeURIComponent(q)}&limit=${limit}&offset=${offset}`,
     ),
 
-  getArtworkUrl: (id: number, type?: 'song' | 'album') => {
+  getArtworkUrl: (id: number, type?: "song" | "album") => {
     let url = `${getApiUrl()}/artwork/${id}`;
-    if (type === 'album') url += '?type=album';
+    if (type === "album") url += "?type=album";
     return url;
   },
 
@@ -225,9 +238,19 @@ export const api = {
     }),
 
   getPlayerState: () =>
-    request<{ current_song_id: number | null; queue: number[]; queue_index: number; progress: number }>("/player/state"),
+    request<{
+      current_song_id: number | null;
+      queue: number[];
+      queue_index: number;
+      progress: number;
+    }>("/player/state"),
 
-  savePlayerState: (state: { current_song_id: number | null; queue: number[]; queue_index: number; progress: number }) =>
+  savePlayerState: (state: {
+    current_song_id: number | null;
+    queue: number[];
+    queue_index: number;
+    progress: number;
+  }) =>
     request<{ success: boolean }>("/player/state", {
       method: "PUT",
       body: JSON.stringify(state),
@@ -255,7 +278,10 @@ export const api = {
       body: JSON.stringify({ name, description, public: isPublic }),
     }),
 
-  uploadPlaylistCover: async (id: number, file: File): Promise<{ cover_path: string }> => {
+  uploadPlaylistCover: async (
+    id: number,
+    file: File,
+  ): Promise<{ cover_path: string }> => {
     const formData = new FormData();
     formData.append("cover", file);
     const token = getAccessToken();
@@ -374,15 +400,45 @@ export const api = {
 
   health: () => request<{ status: string }>("/health"),
 
-  getRadio: (songId: number, limit = 20, mode: 'curator' | 'mainstream' = 'curator') =>
+  getRadio: (
+    songId: number,
+    limit = 20,
+    mode: "curator" | "mainstream" = "curator",
+  ) =>
     request<{ songs: Song[] }>(`/radio/${songId}?limit=${limit}&mode=${mode}`),
 
-  getAppSettings: () =>
-    request<{ radio_enabled: boolean }>("/admin/settings"),
+  getAppSettings: () => request<{ radio_enabled: boolean }>("/admin/settings"),
 
   updateAppSettings: (settings: { radio_enabled?: boolean }) =>
     request<{ radio_enabled: boolean }>("/admin/settings", {
       method: "PUT",
       body: JSON.stringify(settings),
     }),
+
+  getBackupUrl: () => {
+    const token = getAccessToken();
+    let url = `${getApiUrl()}/admin/database/backup`;
+    if (token) url += `?token=${token}`;
+    return url;
+  },
+
+  restoreDatabase: async (
+    file: File,
+  ): Promise<{ message: string; safety_backup: string }> => {
+    const formData = new FormData();
+    formData.append("backup", file);
+    const token = getAccessToken();
+    const headers: Record<string, string> = {};
+    if (token) headers["Authorization"] = `Bearer ${token}`;
+    const res = await fetch(`${getApiUrl()}/admin/database/restore`, {
+      method: "POST",
+      headers,
+      body: formData,
+    });
+    if (!res.ok) {
+      const error = await res.json().catch(() => ({ error: res.statusText }));
+      throw new Error(error.error || error.message || res.statusText);
+    }
+    return res.json();
+  },
 };

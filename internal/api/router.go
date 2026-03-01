@@ -20,6 +20,7 @@ import (
 
 type Deps struct {
 	DB                *sql.DB
+	DBPath            string
 	Auth              *services.AuthService
 	Scanner           *services.ScannerService
 	Search            *services.SearchService
@@ -51,7 +52,7 @@ func New(deps Deps) *echo.Echo {
 	e.Use(echomw.Recover())
 	e.Use(echomw.CORS())
 
-	h := handlers.New(deps.DB, deps.Auth, deps.Scanner, deps.Search, deps.Transcoder, deps.MusicBrainz, deps.ListenBrainz, deps.Radio, deps.MediaRoot, deps.RadioDefaultLimit)
+	h := handlers.New(deps.DB, deps.DBPath, deps.Auth, deps.Scanner, deps.Search, deps.Transcoder, deps.MusicBrainz, deps.ListenBrainz, deps.Radio, deps.MediaRoot, deps.RadioDefaultLimit)
 	hlsHandler := handlers.NewHLSHandler(deps.DB, deps.HLS)
 
 	api := e.Group("/api")
@@ -137,6 +138,8 @@ func New(deps Deps) *echo.Echo {
 	admin.POST("/musicbrainz/enrich", h.Enrich)
 	admin.GET("/settings", h.GetAppSettings)
 	admin.PUT("/settings", h.UpdateAppSettings)
+	admin.GET("/database/backup", h.BackupDatabase)
+	admin.POST("/database/restore", h.RestoreDatabase)
 
 	api.POST("/musicbrainz/submit-listen", h.SubmitListen, middleware.Auth(deps.Auth))
 	api.GET("/musicbrainz/recommendations", h.Recommendations, middleware.Auth(deps.Auth))

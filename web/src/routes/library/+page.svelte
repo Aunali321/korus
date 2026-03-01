@@ -1,6 +1,6 @@
 <script lang="ts">
     import { VList } from "virtua/svelte";
-    import { Shuffle } from "lucide-svelte";
+    import Shuffle from "@lucide/svelte/icons/shuffle";
     import { auth } from "$lib/stores/auth.svelte";
     import { library } from "$lib/stores/library.svelte";
     import { player } from "$lib/stores/player.svelte";

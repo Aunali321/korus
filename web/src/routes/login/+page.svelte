@@ -3,7 +3,8 @@
     import { auth } from "$lib/stores/auth.svelte";
     import { toast } from "$lib/stores/toast.svelte";
     import { setApiUrl } from "$lib/api";
-    import { ChevronDown, Server } from "lucide-svelte";
+    import ChevronDown from "@lucide/svelte/icons/chevron-down";
+    import Server from "@lucide/svelte/icons/server";
 
     let username = $state("");
     let password = $state("");

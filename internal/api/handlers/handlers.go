@@ -8,6 +8,7 @@ import (
 
 type Handler struct {
 	db                *sql.DB
+	dbPath            string
 	auth              *services.AuthService
 	scanner           *services.ScannerService
 	search            *services.SearchService
@@ -19,9 +20,10 @@ type Handler struct {
 	radioDefaultLimit int
 }
 
-func New(db *sql.DB, auth *services.AuthService, scanner *services.ScannerService, search *services.SearchService, transcoder *services.Transcoder, mb *services.MusicBrainzService, lb *services.ListenBrainzService, radio *services.RadioService, mediaRoot string, radioDefaultLimit int) *Handler {
+func New(db *sql.DB, dbPath string, auth *services.AuthService, scanner *services.ScannerService, search *services.SearchService, transcoder *services.Transcoder, mb *services.MusicBrainzService, lb *services.ListenBrainzService, radio *services.RadioService, mediaRoot string, radioDefaultLimit int) *Handler {
 	return &Handler{
 		db:                db,
+		dbPath:            dbPath,
 		auth:              auth,
 		scanner:           scanner,
 		search:            search,

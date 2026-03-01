@@ -2,7 +2,11 @@
     import { page } from "$app/stores";
     import { goto } from "$app/navigation";
     import { onMount } from "svelte";
-    import { Play, Trash2, Edit2, Clock, Upload } from "lucide-svelte";
+    import Play from "@lucide/svelte/icons/play";
+    import Trash2 from "@lucide/svelte/icons/trash-2";
+    import Edit2 from "@lucide/svelte/icons/edit-2";
+    import Clock from "@lucide/svelte/icons/clock";
+    import Upload from "@lucide/svelte/icons/upload";
     import { api } from "$lib/api";
     import { auth } from "$lib/stores/auth.svelte";
     import { player } from "$lib/stores/player.svelte";

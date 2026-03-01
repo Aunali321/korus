@@ -1,5 +1,9 @@
 <script lang="ts">
-    import { Play, Shuffle, Radio, ChevronLeft, ChevronRight } from "lucide-svelte";
+    import Play from "@lucide/svelte/icons/play";
+    import Shuffle from "@lucide/svelte/icons/shuffle";
+    import Radio from "@lucide/svelte/icons/radio";
+    import ChevronLeft from "@lucide/svelte/icons/chevron-left";
+    import ChevronRight from "@lucide/svelte/icons/chevron-right";
     import { api } from "$lib/api";
     import { auth } from "$lib/stores/auth.svelte";
     import { player } from "$lib/stores/player.svelte";

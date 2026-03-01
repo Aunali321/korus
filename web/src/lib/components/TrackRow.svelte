@@ -1,5 +1,7 @@
 <script lang="ts">
-    import { Play, Heart, MoreHorizontal } from "lucide-svelte";
+    import Play from "@lucide/svelte/icons/play";
+    import Heart from "@lucide/svelte/icons/heart";
+    import MoreHorizontal from "@lucide/svelte/icons/more-horizontal";
     import type { Song } from "$lib/types";
     import { player } from "$lib/stores/player.svelte";
     import { favorites } from "$lib/stores/favorites.svelte";

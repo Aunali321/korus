@@ -1,5 +1,6 @@
 <script lang="ts">
-    import { X, Mic } from "lucide-svelte";
+    import X from "@lucide/svelte/icons/x";
+    import Mic from "@lucide/svelte/icons/mic";
     import { player } from "$lib/stores/player.svelte";
     import { api } from "$lib/api";
 

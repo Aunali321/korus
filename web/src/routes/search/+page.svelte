@@ -1,5 +1,5 @@
 <script lang="ts">
-    import { Search as SearchIcon } from "lucide-svelte";
+    import SearchIcon from "@lucide/svelte/icons/search";
     import { api } from "$lib/api";
     import { player } from "$lib/stores/player.svelte";
     import { settings } from "$lib/stores/settings.svelte";

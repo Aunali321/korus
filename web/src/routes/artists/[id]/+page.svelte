@@ -1,6 +1,8 @@
 <script lang="ts">
     import { page } from "$app/stores";
-    import { Play, UserPlus, UserCheck } from "lucide-svelte";
+    import Play from "@lucide/svelte/icons/play";
+    import UserPlus from "@lucide/svelte/icons/user-plus";
+    import UserCheck from "@lucide/svelte/icons/user-check";
     import { api } from "$lib/api";
     import { auth } from "$lib/stores/auth.svelte";
     import { player } from "$lib/stores/player.svelte";

@@ -1,5 +1,8 @@
 <script lang="ts">
-    import { X, CheckCircle, AlertCircle, Info } from "lucide-svelte";
+    import X from "@lucide/svelte/icons/x";
+    import CheckCircle from "@lucide/svelte/icons/check-circle";
+    import AlertCircle from "@lucide/svelte/icons/alert-circle";
+    import Info from "@lucide/svelte/icons/info";
     import { toast, type Toast } from "$lib/stores/toast.svelte";
 
     const icons = {

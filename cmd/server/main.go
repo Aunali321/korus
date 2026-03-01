@@ -147,6 +147,7 @@ func main() {
 
 	e := api.New(api.Deps{
 		DB:                database,
+		DBPath:            cfg.DBPath,
 		Auth:              authSvc,
 		Scanner:           scanner,
 		Search:            search,

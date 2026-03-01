@@ -1,13 +1,19 @@
 package handlers
 
 import (
+	"database/sql"
+	"fmt"
+	"io"
+	"log"
 	"net/http"
 	"os"
+	"path/filepath"
 	"runtime"
 	"time"
 
 	"github.com/Aunali321/korus/internal/db"
 	"github.com/labstack/echo/v4"
+	_ "modernc.org/sqlite"
 )
 
 // StartScan godoc
@@ -57,8 +63,7 @@ func (h *Handler) SystemInfo(c echo.Context) error {
 
 	// Get database size
 	var dbSize int64
-	dbFile := "korus.db"
-	if info, err := os.Stat(dbFile); err == nil {
+	if info, err := os.Stat(h.dbPath); err == nil {
 		dbSize = info.Size()
 	}
 
@@ -196,4 +201,172 @@ func (h *Handler) UpdateAppSettings(c echo.Context) error {
 	return c.JSON(http.StatusOK, map[string]interface{}{
 		"radio_enabled": radioEnabled,
 	})
+}
+
+// BackupDatabase godoc
+// @Summary Backup database
+// @Description Creates a backup of the SQLite database and streams it to the client
+// @Tags Admin
+// @Produce application/octet-stream
+// @Success 200 {file} binary "Database backup file"
+// @Failure 500 {object} map[string]string
+// @Router /admin/database/backup [get]
+// @Security BearerAuth
+func (h *Handler) BackupDatabase(c echo.Context) error {
+	tempFile, err := os.CreateTemp("", "korus-backup-*.db")
+	if err != nil {
+		return echo.NewHTTPError(http.StatusInternalServerError, map[string]string{"error": "failed to create temp file", "code": "BACKUP_FAILED"})
+	}
+	tempPath := tempFile.Name()
+	tempFile.Close()
+	defer os.Remove(tempPath)
+
+	backupDB, err := sql.Open("sqlite", tempPath)
+	if err != nil {
+		return echo.NewHTTPError(http.StatusInternalServerError, map[string]string{"error": "failed to open backup db", "code": "BACKUP_FAILED"})
+	}
+	defer backupDB.Close()
+
+	_, err = h.db.Exec(fmt.Sprintf(`VACUUM INTO '%s'`, tempPath))
+	if err != nil {
+		return echo.NewHTTPError(http.StatusInternalServerError, map[string]string{"error": fmt.Sprintf("backup failed: %v", err), "code": "BACKUP_FAILED"})
+	}
+
+	timestamp := time.Now().Format("2006-01-02_15-04-05")
+	filename := fmt.Sprintf("korus-backup-%s.db", timestamp)
+
+	c.Response().Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="%s"`, filename))
+	c.Response().Header().Set("Content-Type", "application/octet-stream")
+
+	return c.File(tempPath)
+}
+
+// RestoreDatabase godoc
+// @Summary Restore database
+// @Description Restores the database from an uploaded backup file. Server will restart after restore.
+// @Tags Admin
+// @Accept multipart/form-data
+// @Produce json
+// @Param backup formData file true "Database backup file"
+// @Success 200 {object} map[string]string
+// @Failure 400 {object} map[string]string
+// @Failure 500 {object} map[string]string
+// @Router /admin/database/restore [post]
+// @Security BearerAuth
+func (h *Handler) RestoreDatabase(c echo.Context) error {
+	file, err := c.FormFile("backup")
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, map[string]string{"error": "backup file required", "code": "MISSING_FILE"})
+	}
+
+	if file.Size > 1<<30 {
+		return echo.NewHTTPError(http.StatusBadRequest, map[string]string{"error": "file too large (max 1GB)", "code": "FILE_TOO_LARGE"})
+	}
+
+	src, err := file.Open()
+	if err != nil {
+		return echo.NewHTTPError(http.StatusInternalServerError, map[string]string{"error": "failed to open uploaded file", "code": "RESTORE_FAILED"})
+	}
+	defer src.Close()
+
+	tempFile, err := os.CreateTemp("", "korus-restore-*.db")
+	if err != nil {
+		return echo.NewHTTPError(http.StatusInternalServerError, map[string]string{"error": "failed to create temp file", "code": "RESTORE_FAILED"})
+	}
+	tempPath := tempFile.Name()
+	defer os.Remove(tempPath)
+
+	_, err = io.Copy(tempFile, src)
+	tempFile.Close()
+	if err != nil {
+		return echo.NewHTTPError(http.StatusInternalServerError, map[string]string{"error": "failed to save uploaded file", "code": "RESTORE_FAILED"})
+	}
+
+	if err := validateSQLiteDatabase(tempPath); err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, map[string]string{"error": fmt.Sprintf("invalid database file: %v", err), "code": "INVALID_DATABASE"})
+	}
+
+	dbDir := filepath.Dir(h.dbPath)
+	timestamp := time.Now().Format("2006-01-02_15-04-05")
+	safetyBackupPath := filepath.Join(dbDir, fmt.Sprintf("korus.db.backup.%s", timestamp))
+
+	_, err = h.db.Exec(fmt.Sprintf(`VACUUM INTO '%s'`, safetyBackupPath))
+	if err != nil {
+		return echo.NewHTTPError(http.StatusInternalServerError, map[string]string{"error": fmt.Sprintf("failed to create safety backup: %v", err), "code": "BACKUP_FAILED"})
+	}
+
+	log.Printf("Created safety backup at: %s", safetyBackupPath)
+
+	h.db.Close()
+
+	if err := copyFile(tempPath, h.dbPath); err != nil {
+		copyFile(safetyBackupPath, h.dbPath)
+		return echo.NewHTTPError(http.StatusInternalServerError, map[string]string{"error": fmt.Sprintf("failed to restore database: %v", err), "code": "RESTORE_FAILED"})
+	}
+
+	os.Remove(h.dbPath + "-wal")
+	os.Remove(h.dbPath + "-shm")
+
+	log.Printf("Database restored from uploaded file. Server will restart...")
+
+	c.JSON(http.StatusOK, map[string]string{
+		"message":       "Database restored successfully. Server will exit and should be restarted by your process manager (Docker, systemd, etc.)",
+		"safety_backup": safetyBackupPath,
+	})
+
+	go func() {
+		time.Sleep(500 * time.Millisecond)
+		os.Exit(0)
+	}()
+
+	return nil
+}
+
+func validateSQLiteDatabase(path string) error {
+	db, err := sql.Open("sqlite", path)
+	if err != nil {
+		return fmt.Errorf("cannot open as sqlite: %w", err)
+	}
+	defer db.Close()
+
+	var result string
+	err = db.QueryRow("PRAGMA integrity_check").Scan(&result)
+	if err != nil {
+		return fmt.Errorf("integrity check failed: %w", err)
+	}
+	if result != "ok" {
+		return fmt.Errorf("integrity check returned: %s", result)
+	}
+
+	var count int
+	err = db.QueryRow("SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='users'").Scan(&count)
+	if err != nil {
+		return fmt.Errorf("failed to check tables: %w", err)
+	}
+	if count == 0 {
+		return fmt.Errorf("not a valid Korus database (missing users table)")
+	}
+
+	return nil
+}
+
+func copyFile(src, dst string) error {
+	srcFile, err := os.Open(src)
+	if err != nil {
+		return err
+	}
+	defer srcFile.Close()
+
+	dstFile, err := os.Create(dst)
+	if err != nil {
+		return err
+	}
+	defer dstFile.Close()
+
+	_, err = io.Copy(dstFile, srcFile)
+	if err != nil {
+		return err
+	}
+
+	return dstFile.Sync()
 }

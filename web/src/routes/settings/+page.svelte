@@ -1,5 +1,10 @@
 <script lang="ts">
-    import { Settings, LogOut, Server, Volume2, RefreshCw, Radio } from "lucide-svelte";
+    import Settings from "@lucide/svelte/icons/settings";
+    import LogOut from "@lucide/svelte/icons/log-out";
+    import Server from "@lucide/svelte/icons/server";
+    import Volume2 from "@lucide/svelte/icons/volume-2";
+    import RefreshCw from "@lucide/svelte/icons/refresh-cw";
+    import Radio from "@lucide/svelte/icons/radio";
     import { auth } from "$lib/stores/auth.svelte";
     import { settings } from "$lib/stores/settings.svelte";
     import { toast } from "$lib/stores/toast.svelte";

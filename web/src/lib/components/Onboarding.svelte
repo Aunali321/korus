@@ -1,5 +1,10 @@
 <script lang="ts">
-    import { X, ChevronRight, ChevronLeft, Music, Settings, FolderSync } from "lucide-svelte";
+    import X from "@lucide/svelte/icons/x";
+    import ChevronRight from "@lucide/svelte/icons/chevron-right";
+    import ChevronLeft from "@lucide/svelte/icons/chevron-left";
+    import Music from "@lucide/svelte/icons/music";
+    import Settings from "@lucide/svelte/icons/settings";
+    import FolderSync from "@lucide/svelte/icons/folder-sync";
     import { api } from "$lib/api";
     import { settings } from "$lib/stores/settings.svelte";
     import type { StreamingPreset } from "$lib/types";

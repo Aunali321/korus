@@ -1,18 +1,16 @@
 <script lang="ts">
-    import {
-        Play,
-        Pause,
-        SkipBack,
-        SkipForward,
-        Shuffle,
-        Repeat,
-        Repeat1,
-        Volume2,
-        VolumeX,
-        Heart,
-        ListMusic,
-        Mic,
-    } from "lucide-svelte";
+    import Play from "@lucide/svelte/icons/play";
+    import Pause from "@lucide/svelte/icons/pause";
+    import SkipBack from "@lucide/svelte/icons/skip-back";
+    import SkipForward from "@lucide/svelte/icons/skip-forward";
+    import Shuffle from "@lucide/svelte/icons/shuffle";
+    import Repeat from "@lucide/svelte/icons/repeat";
+    import Repeat1 from "@lucide/svelte/icons/repeat-1";
+    import Volume2 from "@lucide/svelte/icons/volume-2";
+    import VolumeX from "@lucide/svelte/icons/volume-x";
+    import Heart from "@lucide/svelte/icons/heart";
+    import ListMusic from "@lucide/svelte/icons/list-music";
+    import Mic from "@lucide/svelte/icons/mic";
     import { player } from "$lib/stores/player.svelte";
     import { favorites } from "$lib/stores/favorites.svelte";
     import { api } from "$lib/api";

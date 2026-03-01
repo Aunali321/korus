@@ -1,5 +1,10 @@
 <script lang="ts">
-    import { ListPlus, ListStart, Radio, Plus, Minus, ChevronRight } from "lucide-svelte";
+    import ListPlus from "@lucide/svelte/icons/list-plus";
+    import ListStart from "@lucide/svelte/icons/list-start";
+    import Radio from "@lucide/svelte/icons/radio";
+    import Plus from "@lucide/svelte/icons/plus";
+    import Minus from "@lucide/svelte/icons/minus";
+    import ChevronRight from "@lucide/svelte/icons/chevron-right";
     import type { Playlist } from "$lib/types";
     import { contextMenu } from "$lib/stores/contextMenu.svelte";
     import { settings } from "$lib/stores/settings.svelte";

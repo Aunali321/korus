@@ -14,7 +14,7 @@
 	import Onboarding from "$lib/components/Onboarding.svelte";
 	import ContextMenu from "$lib/components/ContextMenu.svelte";
 	import CommandPalette from "$lib/components/CommandPalette.svelte";
-	import { Menu } from "lucide-svelte";
+	import Menu from "@lucide/svelte/icons/menu";
 
 	let { children } = $props();
 	let showQueue = $state(false);
@@ -91,6 +91,7 @@
 					>
 						<Menu size={24} />
 					</button>
+					<img src="/logo.svg" alt="Korus" class="w-6 h-6" />
 					<h1 class="text-lg font-bold bg-gradient-to-r from-emerald-400 to-cyan-400 bg-clip-text text-transparent">
 						Korus
 					</h1>

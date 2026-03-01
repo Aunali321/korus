@@ -1,5 +1,5 @@
 <script lang="ts">
-    import { Plus } from "lucide-svelte";
+    import Plus from "@lucide/svelte/icons/plus";
     import { api } from "$lib/api";
     import { auth } from "$lib/stores/auth.svelte";
     import { toast } from "$lib/stores/toast.svelte";

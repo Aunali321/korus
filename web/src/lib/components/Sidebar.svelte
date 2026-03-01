@@ -1,19 +1,17 @@
 <script lang="ts">
 	import { page } from "$app/stores";
-	import {
-		Home,
-		Search,
-		Library,
-		ListMusic,
-		Disc3,
-		Mic2,
-		Heart,
-		Settings,
-		BarChart3,
-		Sparkles,
-		Shield,
-		X,
-	} from "lucide-svelte";
+	import Home from "@lucide/svelte/icons/home";
+	import Search from "@lucide/svelte/icons/search";
+	import Library from "@lucide/svelte/icons/library";
+	import ListMusic from "@lucide/svelte/icons/list-music";
+	import Disc3 from "@lucide/svelte/icons/disc-3";
+	import Mic2 from "@lucide/svelte/icons/mic-2";
+	import Heart from "@lucide/svelte/icons/heart";
+	import Settings from "@lucide/svelte/icons/settings";
+	import BarChart3 from "@lucide/svelte/icons/bar-chart-3";
+	import Sparkles from "@lucide/svelte/icons/sparkles";
+	import Shield from "@lucide/svelte/icons/shield";
+	import X from "@lucide/svelte/icons/x";
 	import { auth } from "$lib/stores/auth.svelte";
 
 	let { isOpen = false, onClose = () => {} }: { isOpen?: boolean; onClose?: () => void } = $props();
@@ -69,13 +67,13 @@
 	{isOpen ? 'translate-x-0' : '-translate-x-full'}
 ">
 	<div class="p-6 border-b border-zinc-800 flex items-center justify-between">
-		<div>
+		<div class="flex items-center gap-2">
+			<img src="/logo.svg" alt="Korus" class="w-7 h-7" />
 			<h1
 				class="text-2xl font-bold bg-gradient-to-r from-emerald-400 to-cyan-400 bg-clip-text text-transparent"
 			>
 				Korus
 			</h1>
-			<p class="text-xs text-zinc-500 mt-1">Self-hosted Music</p>
 		</div>
 		<button
 			onclick={onClose}

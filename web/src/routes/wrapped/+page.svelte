@@ -1,5 +1,5 @@
 <script lang="ts">
-    import { Lock } from "lucide-svelte";
+    import Lock from "@lucide/svelte/icons/lock";
     import { api } from "$lib/api";
     import { auth } from "$lib/stores/auth.svelte";
     import type { WrappedData } from "$lib/types";

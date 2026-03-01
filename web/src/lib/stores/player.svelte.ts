@@ -1,4 +1,4 @@
-import Hls from 'hls.js';
+import type Hls from 'hls.js';
 import type { Song } from '$lib/types';
 import { api, getAccessToken } from '$lib/api';
 import { settings } from './settings.svelte';
@@ -273,13 +273,15 @@ function createPlayerStore() {
         setupMediaSession();
     }
 
-    function initHls(manifestUrl: string, startPosition?: number) {
+    async function initHls(manifestUrl: string, startPosition?: number) {
         if (!audio) return;
 
         destroyHls();
 
-        if (Hls.isSupported()) {
-            hls = new Hls({
+        const { default: HlsLib } = await import('hls.js');
+
+        if (HlsLib.isSupported()) {
+            hls = new HlsLib({
                 maxBufferLength: 60,
                 maxMaxBufferLength: 120,
                 startLevel: 0,
@@ -298,22 +300,22 @@ function createPlayerStore() {
             hls.loadSource(manifestUrl);
             hls.attachMedia(audio);
 
-            hls.on(Hls.Events.MANIFEST_PARSED, () => {
+            hls.on(HlsLib.Events.MANIFEST_PARSED, () => {
                 if (startPosition && startPosition > 0) {
                     audio!.currentTime = startPosition;
                 }
             });
 
-            hls.on(Hls.Events.ERROR, (event, data) => {
+            hls.on(HlsLib.Events.ERROR, (event, data) => {
                 console.error('HLS error:', data);
-                
+
                 if (data.fatal) {
                     switch (data.type) {
-                        case Hls.ErrorTypes.NETWORK_ERROR:
+                        case HlsLib.ErrorTypes.NETWORK_ERROR:
                             console.error('Fatal network error, trying to recover');
                             hls?.startLoad();
                             break;
-                        case Hls.ErrorTypes.MEDIA_ERROR:
+                        case HlsLib.ErrorTypes.MEDIA_ERROR:
                             console.error('Fatal media error, trying to recover');
                             hls?.recoverMediaError();
                             break;
@@ -326,7 +328,7 @@ function createPlayerStore() {
                 }
             });
 
-            hls.on(Hls.Events.FRAG_BUFFERED, () => {
+            hls.on(HlsLib.Events.FRAG_BUFFERED, () => {
                 isBuffering = false;
             });
 

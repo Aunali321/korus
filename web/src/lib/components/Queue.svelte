@@ -1,6 +1,8 @@
 <script lang="ts">
     import { VList } from "virtua/svelte";
-    import { X, Play, Loader2 } from "lucide-svelte";
+    import X from "@lucide/svelte/icons/x";
+    import Play from "@lucide/svelte/icons/play";
+    import Loader2 from "@lucide/svelte/icons/loader-2";
     import { player } from "$lib/stores/player.svelte";
     import { api } from "$lib/api";
 

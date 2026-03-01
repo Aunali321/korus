@@ -1,6 +1,8 @@
 <script lang="ts">
     import { page } from "$app/stores";
-    import { Play, Heart, Clock } from "lucide-svelte";
+    import Play from "@lucide/svelte/icons/play";
+    import Heart from "@lucide/svelte/icons/heart";
+    import Clock from "@lucide/svelte/icons/clock";
     import { api } from "$lib/api";
     import { auth } from "$lib/stores/auth.svelte";
     import { player } from "$lib/stores/player.svelte";
