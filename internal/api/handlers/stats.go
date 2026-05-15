@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"context"
+	"database/sql"
 	"net/http"
 	"time"
 
@@ -66,14 +67,21 @@ func (h *Handler) Wrapped(c echo.Context) error {
 	startStr := start.Format(time.RFC3339)
 	endStr := end.Format(time.RFC3339)
 
-	// Get top 5 songs with artist info
+	// Get top 5 songs with artist info. Pull the song's primary performer
+	// from song_artists (the per-song truth), not albums.artist_id. Inner
+	// subselect picks the lowest-position primary so a song with multiple
+	// primary rows (rare) contributes one row per play. LEFT JOIN preserves
+	// plays even if a song lacks a song_artists row.
 	topSongs := []map[string]any{}
 	songRows, err := h.db.QueryContext(ctx, `
 		SELECT s.id, s.title, ar.id, ar.name, COUNT(*) as plays
 		FROM play_history ph
 		JOIN songs s ON s.id = ph.song_id
-		JOIN albums al ON al.id = s.album_id
-		JOIN artists ar ON ar.id = al.artist_id
+		LEFT JOIN artists ar ON ar.id = (
+			SELECT artist_id FROM song_artists
+			WHERE song_id = s.id AND role = 'primary'
+			ORDER BY position LIMIT 1
+		)
 		WHERE ph.user_id = ? AND ph.played_at BETWEEN ? AND ?
 		GROUP BY s.id
 		ORDER BY plays DESC
@@ -82,30 +90,33 @@ func (h *Handler) Wrapped(c echo.Context) error {
 	if err == nil {
 		defer songRows.Close()
 		for songRows.Next() {
-			var songID, artistID, plays int64
-			var songTitle, artistName string
+			var songID, plays int64
+			var songTitle string
+			var artistID sql.NullInt64
+			var artistName sql.NullString
 			if songRows.Scan(&songID, &songTitle, &artistID, &artistName, &plays) == nil {
-				topSongs = append(topSongs, map[string]any{
-					"id":    songID,
-					"title": songTitle,
-					"artist": map[string]any{
-						"id":   artistID,
-						"name": artistName,
-					},
-					"plays": plays,
-				})
+				entry := map[string]any{
+					"id":     songID,
+					"title":  songTitle,
+					"plays":  plays,
+					"artist": nil,
+				}
+				if artistID.Valid {
+					entry["artist"] = map[string]any{"id": artistID.Int64, "name": artistName.String}
+				}
+				topSongs = append(topSongs, entry)
 			}
 		}
 	}
 
-	// Get top 5 artists
+	// Get top 5 artists (group by song's primary artist, not album artist —
+	// otherwise compilation tracks all collapse to "Various Artists")
 	topArtists := []map[string]any{}
 	artistRows, err := h.db.QueryContext(ctx, `
 		SELECT ar.id, ar.name, COUNT(*) as plays
 		FROM play_history ph
-		JOIN songs s ON s.id = ph.song_id
-		JOIN albums al ON al.id = s.album_id
-		JOIN artists ar ON ar.id = al.artist_id
+		JOIN song_artists sa ON sa.song_id = ph.song_id AND sa.role = 'primary'
+		JOIN artists ar ON ar.id = sa.artist_id
 		WHERE ph.user_id = ? AND ph.played_at BETWEEN ? AND ?
 		GROUP BY ar.id
 		ORDER BY plays DESC
@@ -126,14 +137,16 @@ func (h *Handler) Wrapped(c echo.Context) error {
 		}
 	}
 
-	// Get top 5 albums with artist info
+	// Get top 5 albums with artist info. LEFT JOIN so compilation albums
+	// (artist_id IS NULL) still appear; their artist comes back as null and
+	// the frontend renders the compilation label.
 	topAlbums := []map[string]any{}
 	albumRows, err := h.db.QueryContext(ctx, `
 		SELECT al.id, al.title, ar.id, ar.name, COUNT(*) as plays
 		FROM play_history ph
 		JOIN songs s ON s.id = ph.song_id
 		JOIN albums al ON al.id = s.album_id
-		JOIN artists ar ON ar.id = al.artist_id
+		LEFT JOIN artists ar ON ar.id = al.artist_id
 		WHERE ph.user_id = ? AND ph.played_at BETWEEN ? AND ?
 		GROUP BY al.id
 		ORDER BY plays DESC
@@ -142,18 +155,21 @@ func (h *Handler) Wrapped(c echo.Context) error {
 	if err == nil {
 		defer albumRows.Close()
 		for albumRows.Next() {
-			var albumID, artistID, plays int64
-			var albumTitle, artistName string
+			var albumID, plays int64
+			var albumTitle string
+			var artistID sql.NullInt64
+			var artistName sql.NullString
 			if albumRows.Scan(&albumID, &albumTitle, &artistID, &artistName, &plays) == nil {
-				topAlbums = append(topAlbums, map[string]any{
-					"id":    albumID,
-					"title": albumTitle,
-					"artist": map[string]any{
-						"id":   artistID,
-						"name": artistName,
-					},
-					"plays": plays,
-				})
+				entry := map[string]any{
+					"id":     albumID,
+					"title":  albumTitle,
+					"plays":  plays,
+					"artist": nil,
+				}
+				if artistID.Valid {
+					entry["artist"] = map[string]any{"id": artistID.Int64, "name": artistName.String}
+				}
+				topAlbums = append(topAlbums, entry)
 			}
 		}
 	}
@@ -260,15 +276,22 @@ func resolvePeriod(period string) (time.Time, time.Time) {
 }
 
 func (h *Handler) rankSongs(ctx context.Context, userID int64, start, end time.Time, limit int) []map[string]interface{} {
+	// Song's primary artist comes from song_artists (per-song truth), not
+	// albums.artist_id. Inner subselect picks the lowest-position primary so
+	// a song with multiple primary rows (rare) contributes one row per play.
+	// LEFT JOIN preserves plays even if a song lacks a song_artists row.
 	rows, err := h.db.QueryContext(ctx, `
-		SELECT s.id, s.title, s.album_id, s.duration, ar.id, ar.name,
+		SELECT s.id, s.title, s.album_id, s.duration_ms, ar.id, ar.name,
 		       COUNT(*) as plays, COALESCE(SUM(ph.duration_listened),0) as total_time, COALESCE(AVG(ph.completion_rate),0) as avg_comp
 		FROM play_history ph
 		JOIN songs s ON s.id = ph.song_id
-		JOIN albums al ON al.id = s.album_id
-		JOIN artists ar ON ar.id = al.artist_id
+		LEFT JOIN artists ar ON ar.id = (
+			SELECT artist_id FROM song_artists
+			WHERE song_id = s.id AND role = 'primary'
+			ORDER BY position LIMIT 1
+		)
 		WHERE ph.user_id = ? AND ph.played_at BETWEEN ? AND ?
-		GROUP BY s.id, s.title, s.album_id, s.duration, ar.id, ar.name
+		GROUP BY s.id, s.title, s.album_id, s.duration_ms, ar.id, ar.name
 		ORDER BY plays DESC
 		LIMIT ?
 	`, userID, start.Format(time.RFC3339), end.Format(time.RFC3339), limit)
@@ -278,19 +301,25 @@ func (h *Handler) rankSongs(ctx context.Context, userID int64, start, end time.T
 	defer rows.Close()
 	var res []map[string]interface{}
 	for rows.Next() {
-		var id, albumID, duration, artistID int64
-		var title, artistName string
+		var id, albumID, duration int64
+		var title string
+		var artistID sql.NullInt64
+		var artistName sql.NullString
 		var plays, totalTime int64
 		var avg float64
 		if err := rows.Scan(&id, &title, &albumID, &duration, &artistID, &artistName, &plays, &totalTime, &avg); err == nil {
+			song := map[string]interface{}{
+				"id":       id,
+				"title":    title,
+				"album_id": albumID,
+				"duration": duration,
+				"artist":   nil,
+			}
+			if artistID.Valid {
+				song["artist"] = map[string]interface{}{"id": artistID.Int64, "name": artistName.String}
+			}
 			res = append(res, map[string]interface{}{
-				"song": map[string]interface{}{
-					"id":       id,
-					"title":    title,
-					"album_id": albumID,
-					"duration": duration,
-					"artist":   map[string]interface{}{"id": artistID, "name": artistName},
-				},
+				"song":           song,
 				"play_count":     plays,
 				"total_time":     totalTime,
 				"avg_completion": avg,
@@ -301,13 +330,20 @@ func (h *Handler) rankSongs(ctx context.Context, userID int64, start, end time.T
 }
 
 func (h *Handler) recentPlays(ctx context.Context, userID int64, limit int) ([]map[string]interface{}, error) {
+	// Per-play artist comes from song_artists (real performer), not the
+	// album's artist_id. LEFT JOIN preserves every play row. The inner
+	// subselect picks the lowest-position primary so a song with multiple
+	// rows tagged primary (rare but possible) doesn't multiply play rows.
 	rows, err := h.db.QueryContext(ctx, `
 		SELECT ph.song_id, ph.played_at, s.title, s.album_id,
 		       ar.id, ar.name
 		FROM play_history ph
 		JOIN songs s ON s.id = ph.song_id
-		JOIN albums al ON al.id = s.album_id
-		JOIN artists ar ON ar.id = al.artist_id
+		LEFT JOIN artists ar ON ar.id = (
+			SELECT artist_id FROM song_artists
+			WHERE song_id = s.id AND role = 'primary'
+			ORDER BY position LIMIT 1
+		)
 		WHERE ph.user_id = ?
 		ORDER BY ph.played_at DESC
 		LIMIT ?
@@ -318,15 +354,21 @@ func (h *Handler) recentPlays(ctx context.Context, userID int64, limit int) ([]m
 	defer rows.Close()
 	res := []map[string]interface{}{}
 	for rows.Next() {
-		var songID, albumID, artistID int64
-		var playedAt, title, artistName string
+		var songID, albumID int64
+		var playedAt, title string
+		var artistID sql.NullInt64
+		var artistName sql.NullString
 		if err := rows.Scan(&songID, &playedAt, &title, &albumID, &artistID, &artistName); err == nil {
-			res = append(res, map[string]interface{}{
+			entry := map[string]interface{}{
 				"id":       songID,
 				"title":    title,
 				"album_id": albumID,
-				"artist":   map[string]interface{}{"id": artistID, "name": artistName},
-			})
+				"artist":   nil,
+			}
+			if artistID.Valid {
+				entry["artist"] = map[string]interface{}{"id": artistID.Int64, "name": artistName.String}
+			}
+			res = append(res, entry)
 		}
 	}
 	return res, nil
@@ -337,8 +379,8 @@ func (h *Handler) rankArtists(ctx context.Context, userID int64, start, end time
 		SELECT a.id, a.name, a.image_path, COUNT(*) as plays, COALESCE(SUM(ph.duration_listened),0) as total_time, COUNT(DISTINCT s.id) as songs
 		FROM play_history ph
 		JOIN songs s ON s.id = ph.song_id
-		JOIN albums al ON al.id = s.album_id
-		JOIN artists a ON a.id = al.artist_id
+		JOIN song_artists sa ON sa.song_id = s.id AND sa.role = 'primary'
+		JOIN artists a ON a.id = sa.artist_id
 		WHERE ph.user_id = ? AND ph.played_at BETWEEN ? AND ?
 		GROUP BY a.id, a.name, a.image_path
 		ORDER BY plays DESC
@@ -371,13 +413,14 @@ func (h *Handler) rankArtists(ctx context.Context, userID int64, start, end time
 }
 
 func (h *Handler) rankAlbums(ctx context.Context, userID int64, start, end time.Time, limit int) []map[string]interface{} {
+	// LEFT JOIN so compilations (artist_id IS NULL) still appear in top albums.
 	rows, err := h.db.QueryContext(ctx, `
 		SELECT al.id, al.title, al.artist_id, ar.id, ar.name,
 		       COUNT(*) as plays, COALESCE(SUM(ph.duration_listened),0) as total_time, COALESCE(AVG(ph.completion_rate),0) as comp
 		FROM play_history ph
 		JOIN songs s ON s.id = ph.song_id
 		JOIN albums al ON al.id = s.album_id
-		JOIN artists ar ON ar.id = al.artist_id
+		LEFT JOIN artists ar ON ar.id = al.artist_id
 		WHERE ph.user_id = ? AND ph.played_at BETWEEN ? AND ?
 		GROUP BY al.id, al.title, al.artist_id, ar.id, ar.name
 		ORDER BY plays DESC
@@ -389,18 +432,28 @@ func (h *Handler) rankAlbums(ctx context.Context, userID int64, start, end time.
 	defer rows.Close()
 	var res []map[string]interface{}
 	for rows.Next() {
-		var id, artistID, artistIDFromJoin int64
-		var title, artistName string
+		var id int64
+		var title string
+		var albumArtistID sql.NullInt64
+		var joinedArtistID sql.NullInt64
+		var artistName sql.NullString
 		var plays, totalTime int64
 		var comp float64
-		if err := rows.Scan(&id, &title, &artistID, &artistIDFromJoin, &artistName, &plays, &totalTime, &comp); err == nil {
+		if err := rows.Scan(&id, &title, &albumArtistID, &joinedArtistID, &artistName, &plays, &totalTime, &comp); err == nil {
+			album := map[string]interface{}{
+				"id":        id,
+				"title":     title,
+				"artist_id": nil,
+				"artist":    nil,
+			}
+			if albumArtistID.Valid {
+				album["artist_id"] = albumArtistID.Int64
+			}
+			if joinedArtistID.Valid {
+				album["artist"] = map[string]interface{}{"id": joinedArtistID.Int64, "name": artistName.String}
+			}
 			res = append(res, map[string]interface{}{
-				"album": map[string]interface{}{
-					"id":        id,
-					"title":     title,
-					"artist_id": artistID,
-					"artist":    map[string]interface{}{"id": artistIDFromJoin, "name": artistName},
-				},
+				"album":           album,
 				"play_count":      plays,
 				"total_time":      totalTime,
 				"completion_rate": comp,
@@ -460,16 +513,12 @@ func (h *Handler) discoveryStats(ctx context.Context, userID int64, start, end t
 
 	var newArtists int
 	_ = h.db.QueryRowContext(ctx, `
-		SELECT COUNT(DISTINCT a.id) FROM play_history ph
-		JOIN songs s ON s.id = ph.song_id
-		JOIN albums al ON al.id = s.album_id
-		JOIN artists a ON a.id = al.artist_id
+		SELECT COUNT(DISTINCT sa.artist_id) FROM play_history ph
+		JOIN song_artists sa ON sa.song_id = ph.song_id AND sa.role = 'primary'
 		WHERE ph.user_id = ? AND ph.played_at BETWEEN ? AND ?
-		AND a.id NOT IN (
-			SELECT a2.id FROM play_history ph2
-			JOIN songs s2 ON s2.id = ph2.song_id
-			JOIN albums al2 ON al2.id = s2.album_id
-			JOIN artists a2 ON a2.id = al2.artist_id
+		AND sa.artist_id NOT IN (
+			SELECT sa2.artist_id FROM play_history ph2
+			JOIN song_artists sa2 ON sa2.song_id = ph2.song_id AND sa2.role = 'primary'
 			WHERE ph2.user_id = ? AND ph2.played_at < ?
 		)
 	`, userID, startStr, endStr, userID, startStr).Scan(&newArtists)
@@ -493,13 +542,22 @@ func (h *Handler) overview(ctx context.Context, userID int64, start, end time.Ti
 	var uniqueArtists int64
 	var uniqueAlbums int64
 	var avgCompletion float64
+	startStr := start.Format(time.RFC3339)
+	endStr := end.Format(time.RFC3339)
+	// unique_artists is computed via song_artists (song-level) so compilation
+	// tracks count toward their real artist instead of "Various Artists".
 	_ = h.db.QueryRowContext(ctx, `
-		SELECT COUNT(*), COALESCE(SUM(duration_listened),0), COUNT(DISTINCT song_id), COUNT(DISTINCT a.artist_id), COUNT(DISTINCT s.album_id), COALESCE(AVG(completion_rate),0)
+		SELECT COUNT(*), COALESCE(SUM(duration_listened),0), COUNT(DISTINCT song_id),
+		       (SELECT COUNT(DISTINCT sa.artist_id)
+		        FROM play_history ph2
+		        JOIN song_artists sa ON sa.song_id = ph2.song_id AND sa.role = 'primary'
+		        WHERE ph2.user_id = ? AND ph2.played_at BETWEEN ? AND ?),
+		       COUNT(DISTINCT s.album_id), COALESCE(AVG(completion_rate),0)
 		FROM play_history ph
 		JOIN songs s ON s.id = ph.song_id
 		JOIN albums a ON a.id = s.album_id
 		WHERE ph.user_id = ? AND ph.played_at BETWEEN ? AND ?
-	`, userID, start.Format(time.RFC3339), end.Format(time.RFC3339)).Scan(&totalPlays, &totalTime, &uniqueSongs, &uniqueArtists, &uniqueAlbums, &avgCompletion)
+	`, userID, startStr, endStr, userID, startStr, endStr).Scan(&totalPlays, &totalTime, &uniqueSongs, &uniqueArtists, &uniqueAlbums, &avgCompletion)
 	return map[string]interface{}{
 		"total_plays":         totalPlays,
 		"total_time":          totalTime,

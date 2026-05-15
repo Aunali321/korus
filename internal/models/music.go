@@ -14,7 +14,7 @@ type Artist struct {
 
 type Album struct {
 	ID        int64     `json:"id"`
-	ArtistID  int64     `json:"artist_id"`
+	ArtistID  *int64    `json:"artist_id"`
 	Title     string    `json:"title"`
 	Year      *int      `json:"year,omitempty"`
 	CoverPath string    `json:"cover_path,omitempty"`

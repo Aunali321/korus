@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"context"
+	"database/sql"
 	"net/http"
 	"strconv"
 
@@ -147,10 +148,14 @@ func (h *Handler) ListFavorites(c echo.Context) error {
 }
 
 func (h *Handler) fetchAlbumsByFav(ctx context.Context, userID int64) ([]models.Album, error) {
+	// LEFT JOIN artists so compilation albums (artist_id IS NULL) still
+	// appear; their artist comes back null and the frontend renders the
+	// compilation label.
 	rows, err := h.db.QueryContext(ctx, `
-		SELECT a.id, a.title, a.cover_path
+		SELECT a.id, a.title, a.cover_path, a.artist_id, ar.id, ar.name
 		FROM favorites_albums f
 		JOIN albums a ON a.id = f.album_id
+		LEFT JOIN artists ar ON ar.id = a.artist_id
 		WHERE f.user_id = ?
 	`, userID)
 	if err != nil {
@@ -160,7 +165,15 @@ func (h *Handler) fetchAlbumsByFav(ctx context.Context, userID int64) ([]models.
 	var res []models.Album
 	for rows.Next() {
 		var a models.Album
-		if err := rows.Scan(&a.ID, &a.Title, &a.CoverPath); err == nil {
+		var albumArtistID, joinedArtistID sql.NullInt64
+		var artistName sql.NullString
+		if err := rows.Scan(&a.ID, &a.Title, &a.CoverPath, &albumArtistID, &joinedArtistID, &artistName); err == nil {
+			if albumArtistID.Valid {
+				a.ArtistID = &albumArtistID.Int64
+			}
+			if joinedArtistID.Valid {
+				a.Artist = &models.Artist{ID: joinedArtistID.Int64, Name: artistName.String}
+			}
 			res = append(res, a)
 		}
 	}

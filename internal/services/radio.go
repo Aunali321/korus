@@ -49,11 +49,16 @@ type songEntry struct {
 }
 
 func (r *RadioService) getSongs() ([]songEntry, error) {
+	// Prefer the song's primary artist (per-song truth from song_artists);
+	// fall back to album artist for songs that lack a song_artists row.
+	// LEFT JOINs preserve compilation tracks (NULL album artist).
 	rows, err := r.db.Query(`
-		SELECT s.id, s.title, ar.name
+		SELECT s.id, s.title, COALESCE(ar_song.name, ar_alb.name, 'Unknown') AS artist
 		FROM songs s
-		JOIN albums al ON s.album_id = al.id
-		JOIN artists ar ON al.artist_id = ar.id
+		LEFT JOIN song_artists sa ON sa.song_id = s.id AND sa.role = 'primary'
+		LEFT JOIN artists ar_song ON ar_song.id = sa.artist_id
+		LEFT JOIN albums al ON al.id = s.album_id
+		LEFT JOIN artists ar_alb ON ar_alb.id = al.artist_id
 		ORDER BY s.id
 	`)
 	if err != nil {
@@ -75,10 +80,12 @@ func (r *RadioService) getSongs() ([]songEntry, error) {
 func (r *RadioService) getSongByID(id int64) (*songEntry, error) {
 	var s songEntry
 	err := r.db.QueryRow(`
-		SELECT s.id, s.title, ar.name
+		SELECT s.id, s.title, COALESCE(ar_song.name, ar_alb.name, 'Unknown') AS artist
 		FROM songs s
-		JOIN albums al ON s.album_id = al.id
-		JOIN artists ar ON al.artist_id = ar.id
+		LEFT JOIN song_artists sa ON sa.song_id = s.id AND sa.role = 'primary'
+		LEFT JOIN artists ar_song ON ar_song.id = sa.artist_id
+		LEFT JOIN albums al ON al.id = s.album_id
+		LEFT JOIN artists ar_alb ON ar_alb.id = al.artist_id
 		WHERE s.id = ?
 	`, id).Scan(&s.ID, &s.Title, &s.Artist)
 	if err != nil {

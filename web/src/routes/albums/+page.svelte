@@ -3,6 +3,7 @@
     import { api } from "$lib/api";
     import { library } from "$lib/stores/library.svelte";
     import Card from "$lib/components/Card.svelte";
+    import { getAlbumArtistName } from "$lib/types";
 
     let innerWidth = $state(0);
 
@@ -35,7 +36,7 @@
                         {#each row as album (album.id)}
                             <Card
                                 title={album.title}
-                                subtitle="{album.artist?.name || 'Unknown'} • {album.year || ''}"
+                                subtitle="{getAlbumArtistName(album)} • {album.year || ''}"
                                 image={album.cover_path
                                     ? api.getArtworkUrl(album.id, "album")
                                     : undefined}

@@ -91,11 +91,15 @@ func (h *Handler) Album(c echo.Context) error {
 	var al models.Album
 	var mbid sql.NullString
 	var year sql.NullInt64
+	var artistID sql.NullInt64
 	err := h.db.QueryRowContext(ctx, `
 		SELECT id, artist_id, title, year, cover_path, mbid, created_at FROM albums WHERE id = ?
-	`, id).Scan(&al.ID, &al.ArtistID, &al.Title, &year, &al.CoverPath, &mbid, &al.CreatedAt)
+	`, id).Scan(&al.ID, &artistID, &al.Title, &year, &al.CoverPath, &mbid, &al.CreatedAt)
 	if err != nil {
 		return echo.NewHTTPError(http.StatusNotFound, map[string]string{"error": "album not found", "code": "NOT_FOUND"})
+	}
+	if artistID.Valid {
+		al.ArtistID = &artistID.Int64
 	}
 	if year.Valid {
 		y := int(year.Int64)
@@ -106,8 +110,11 @@ func (h *Handler) Album(c echo.Context) error {
 	}
 	songs, _ := db.GetSongsByAlbum(ctx, h.db, id)
 	_ = db.PopulateSongArtists(ctx, h.db, songs)
-	artist, _ := h.fetchArtist(ctx, al.ArtistID)
-	al.Artist = artist
+	var artist *models.Artist
+	if al.ArtistID != nil {
+		artist, _ = h.fetchArtist(ctx, *al.ArtistID)
+		al.Artist = artist
+	}
 	return c.JSON(http.StatusOK, map[string]any{
 		"id":         al.ID,
 		"title":      al.Title,
@@ -206,10 +213,14 @@ func (h *Handler) fetchAlbums(ctx context.Context, limit int) ([]models.Album, e
 		var al models.Album
 		var mbid sql.NullString
 		var year sql.NullInt64
+		var albumArtistID sql.NullInt64
 		var artistID sql.NullInt64
 		var artistName, artistBio, artistImagePath, artistMBID sql.NullString
-		if err := rows.Scan(&al.ID, &al.ArtistID, &al.Title, &year, &al.CoverPath, &mbid, &al.CreatedAt,
+		if err := rows.Scan(&al.ID, &albumArtistID, &al.Title, &year, &al.CoverPath, &mbid, &al.CreatedAt,
 			&artistID, &artistName, &artistBio, &artistImagePath, &artistMBID); err == nil {
+			if albumArtistID.Valid {
+				al.ArtistID = &albumArtistID.Int64
+			}
 			if year.Valid {
 				y := int(year.Int64)
 				al.Year = &y
@@ -237,7 +248,20 @@ func (h *Handler) fetchAlbums(ctx context.Context, limit int) ([]models.Album, e
 }
 
 func (h *Handler) fetchAlbumsByArtist(ctx context.Context, artistID int64) ([]models.Album, error) {
-	rows, err := h.db.QueryContext(ctx, `SELECT id, artist_id, title, year, cover_path, mbid, created_at FROM albums WHERE artist_id = ?`, artistID)
+	// An artist's albums = (a) albums whose album-level artist matches, AND
+	// (b) compilation/multi-artist albums (artist_id IS NULL or different)
+	// where the artist appears as a primary performer on at least one song.
+	// Without (b), the artist's detail page would be missing every
+	// compilation track they performed on.
+	rows, err := h.db.QueryContext(ctx, `
+		SELECT id, artist_id, title, year, cover_path, mbid, created_at FROM albums WHERE artist_id = ?
+		UNION
+		SELECT al.id, al.artist_id, al.title, al.year, al.cover_path, al.mbid, al.created_at
+		FROM albums al
+		JOIN songs s ON s.album_id = al.id
+		JOIN song_artists sa ON sa.song_id = s.id AND sa.role = 'primary'
+		WHERE sa.artist_id = ? AND (al.artist_id IS NULL OR al.artist_id <> ?)
+	`, artistID, artistID, artistID)
 	if err != nil {
 		return []models.Album{}, err
 	}
@@ -247,7 +271,11 @@ func (h *Handler) fetchAlbumsByArtist(ctx context.Context, artistID int64) ([]mo
 		var al models.Album
 		var mbid sql.NullString
 		var year sql.NullInt64
-		if err := rows.Scan(&al.ID, &al.ArtistID, &al.Title, &year, &al.CoverPath, &mbid, &al.CreatedAt); err == nil {
+		var aid sql.NullInt64
+		if err := rows.Scan(&al.ID, &aid, &al.Title, &year, &al.CoverPath, &mbid, &al.CreatedAt); err == nil {
+			if aid.Valid {
+				al.ArtistID = &aid.Int64
+			}
 			if year.Valid {
 				y := int(year.Int64)
 				al.Year = &y
@@ -285,10 +313,14 @@ func (h *Handler) fetchAlbum(ctx context.Context, id int64) (*models.Album, erro
 	var al models.Album
 	var mbid sql.NullString
 	var year sql.NullInt64
+	var aid sql.NullInt64
 	err := h.db.QueryRowContext(ctx, `SELECT id, artist_id, title, year, cover_path, mbid, created_at FROM albums WHERE id = ?`, id).
-		Scan(&al.ID, &al.ArtistID, &al.Title, &year, &al.CoverPath, &mbid, &al.CreatedAt)
+		Scan(&al.ID, &aid, &al.Title, &year, &al.CoverPath, &mbid, &al.CreatedAt)
 	if err != nil {
 		return nil, err
+	}
+	if aid.Valid {
+		al.ArtistID = &aid.Int64
 	}
 	if mbid.Valid {
 		al.MBID = &mbid.String

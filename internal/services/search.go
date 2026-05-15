@@ -34,13 +34,14 @@ func (s *SearchService) Search(ctx context.Context, q string, limit, offset int)
 	if q == "" {
 		return res, nil
 	}
-	// Songs via FTS - join with actual tables since FTS is contentless
+	// Songs via FTS - join with actual tables since FTS is contentless.
+	// No artist join here: each song's artists are populated below via
+	// PopulateSongArtists from song_artists, the per-song truth.
 	rows, err := s.db.QueryContext(ctx, `
-		SELECT s.id, s.album_id, s.title, s.duration_ms / 1000, ar.id, ar.name, al.id, al.title
+		SELECT s.id, s.album_id, s.title, s.duration_ms / 1000, al.id, al.title
 		FROM songs_fts fts
 		JOIN songs s ON s.id = fts.rowid
 		JOIN albums al ON al.id = s.album_id
-		JOIN artists ar ON ar.id = al.artist_id
 		WHERE songs_fts MATCH ?
 		LIMIT ? OFFSET ?
 	`, q, limit, offset)
@@ -51,11 +52,9 @@ func (s *SearchService) Search(ctx context.Context, q string, limit, offset int)
 	for rows.Next() {
 		var song models.Song
 		var duration sql.NullInt64
-		var artistID int64
-		var artistName string
 		var albumID int64
 		var albumTitle string
-		if err := rows.Scan(&song.ID, &song.AlbumID, &song.Title, &duration, &artistID, &artistName, &albumID, &albumTitle); err == nil {
+		if err := rows.Scan(&song.ID, &song.AlbumID, &song.Title, &duration, &albumID, &albumTitle); err == nil {
 			if duration.Valid {
 				d := int(duration.Int64)
 				song.Duration = &d
@@ -64,7 +63,7 @@ func (s *SearchService) Search(ctx context.Context, q string, limit, offset int)
 			res.Songs = append(res.Songs, song)
 		}
 	}
-	// Populate artists for songs
+	// Populate artists for songs from song_artists
 	_ = db.PopulateSongArtists(ctx, s.db, res.Songs)
 
 	// Artists
@@ -104,11 +103,15 @@ func (s *SearchService) Search(ctx context.Context, q string, limit, offset int)
 		for albumRows.Next() {
 			var mbid sql.NullString
 			var year sql.NullInt64
+			var albumArtistID sql.NullInt64
 			var artistID sql.NullInt64
 			var artistName sql.NullString
 			var al models.Album
-			if err := albumRows.Scan(&al.ID, &al.ArtistID, &al.Title, &year, &al.CoverPath, &mbid, &al.CreatedAt,
+			if err := albumRows.Scan(&al.ID, &albumArtistID, &al.Title, &year, &al.CoverPath, &mbid, &al.CreatedAt,
 				&artistID, &artistName); err == nil {
+				if albumArtistID.Valid {
+					al.ArtistID = &albumArtistID.Int64
+				}
 				if year.Valid {
 					y := int(year.Int64)
 					al.Year = &y

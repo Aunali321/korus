@@ -5,6 +5,7 @@
     import { settings } from "$lib/stores/settings.svelte";
     import { search } from "$lib/stores/search.svelte";
     import type { Song } from "$lib/types";
+    import { getAlbumArtistName } from "$lib/types";
     import Card from "$lib/components/Card.svelte";
     import TrackRow from "$lib/components/TrackRow.svelte";
 
@@ -104,7 +105,7 @@
                         {#each search.results.albums.slice(0, search.activeTab === "all" ? 6 : undefined) as album (album.id)}
                             <Card
                                 title={album.title}
-                                subtitle={album.artist?.name || "Unknown"}
+                                subtitle={getAlbumArtistName(album)}
                                 image={album.cover_path
                                     ? api.getArtworkUrl(album.id, "album")
                                     : undefined}

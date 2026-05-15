@@ -259,7 +259,7 @@
                                         >
                                         <span class="card-sub"
                                             >{album.artist?.name ||
-                                                "Unknown Artist"}</span
+                                                "Various Artists"}</span
                                         >
                                     </div>
                                     <span class="card-plays">{album.plays}</span

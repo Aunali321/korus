@@ -2,6 +2,7 @@
     import { api } from "$lib/api";
     import Card from "$lib/components/Card.svelte";
     import TrackRow from "$lib/components/TrackRow.svelte";
+    import { getAlbumArtistName } from "$lib/types";
     import type { PageData } from "./$types";
 
     let { data }: { data: PageData } = $props();
@@ -47,7 +48,7 @@
                 {#each albums as album (album.id)}
                     <Card
                         title={album.title}
-                        subtitle={album.artist?.name || "Unknown"}
+                        subtitle={getAlbumArtistName(album)}
                         image={album.cover_path
                             ? api.getArtworkUrl(album.id, "album")
                             : undefined}

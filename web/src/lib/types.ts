@@ -11,8 +11,8 @@ export interface Artist {
 export interface Album {
     id: number;
     title: string;
-    artist_id: number;
-    artist?: Artist;
+    artist_id: number | null;
+    artist?: Artist | null;
     cover_path?: string;
     year?: number;
     mbid?: string;
@@ -131,7 +131,7 @@ export interface Insights {
 export interface ScanJob {
     id: string;
     status: 'pending' | 'running' | 'completed' | 'failed';
-    phase: 'scanning' | 'enriching' | 'processing' | 'cleanup' | 'playlists' | 'completed';
+    phase: 'scanning' | 'enriching' | 'processing' | 'reconciling' | 'cleanup' | 'playlists' | 'completed';
     progress: number;
     total: number;
     current_file?: string;
@@ -177,5 +177,18 @@ export function getArtistNames(song: Song): string {
     if (song.artists && song.artists.length > 0) {
         return song.artists.map(a => a.name).join(', ');
     }
+    return 'Unknown Artist';
+}
+
+// Album artist label. Returns the artist name when the album has a single
+// owning artist, or "Various Artists" when the album is a compilation
+// (artist_id is explicitly null, signalling multiple distinct primary
+// artists across the album's songs). Note: `=== null` (not `== null`) so
+// that a partial Album payload missing the artist_id field falls through
+// to "Unknown Artist" rather than misleadingly claiming "Various Artists".
+export function getAlbumArtistName(album: { artist?: Artist | null; artist_id?: number | null } | null | undefined): string {
+    if (!album) return 'Unknown Artist';
+    if (album.artist?.name) return album.artist.name;
+    if (album.artist_id === null) return 'Various Artists';
     return 'Unknown Artist';
 }

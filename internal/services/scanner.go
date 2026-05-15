@@ -243,6 +243,16 @@ func (s *ScannerService) runScan(scanID int64) {
 		s.fallbackArtistParsing(ctx, scanID, enrichInfos, nil)
 	}
 
+	// Reconciliation: derive albums.artist_id from song_artists. Compilation
+	// albums (multiple distinct primary artists across songs) become NULL.
+	// This must run after enrichment/fallback so song_artists is populated,
+	// and before cleanup so phantom artists become orphan-eligible.
+	log.Printf("scan: reconciling album artists")
+	_, _ = s.db.ExecContext(ctx, `UPDATE scan_status SET phase = 'reconciling' WHERE id = ?`, scanID)
+	if err := s.reconcileAlbumArtists(ctx); err != nil {
+		log.Printf("scan: reconciliation failed: %v", err)
+	}
+
 	log.Printf("scan: starting cleanup phase")
 	_, _ = s.db.ExecContext(ctx, `UPDATE scan_status SET phase = 'cleanup' WHERE id = ?`, scanID)
 	if err := s.cleanup(ctx, seenSongs, seenAlbums, seenArtists); err != nil {
@@ -339,8 +349,29 @@ func (s *ScannerService) ingestFile(ctx context.Context, path string, seenSongs 
 	}
 	seenArtists[artistID] = struct{}{}
 
+	// Album identity lookup. Order matters:
+	//   1. If this file is already known, reuse its album. This is what makes
+	//      re-scans idempotent across reconciliation: an album whose artist_id
+	//      was reconciled to NULL (compilation) would otherwise miss the
+	//      (artist_id, title) lookup and a duplicate album row would be
+	//      created, orphaning play_history/favorites references.
+	//   2. Otherwise look up by (artist_id, title) for albums whose artist
+	//      hasn't changed.
+	//   3. Otherwise look up by (title, artist_id IS NULL) — the album was
+	//      previously reconciled to a compilation and we're adding a new
+	//      track to it.
+	//   4. Otherwise create a new album row.
 	var albumID int64
-	err = s.db.QueryRowContext(ctx, `SELECT id FROM albums WHERE artist_id = ? AND title = ?`, artistID, albumTitle).Scan(&albumID)
+	err = s.db.QueryRowContext(ctx, `SELECT album_id FROM songs WHERE file_path = ?`, path).Scan(&albumID)
+	if err != nil && !errors.Is(err, sql.ErrNoRows) {
+		return nil, err
+	}
+	if albumID == 0 {
+		err = s.db.QueryRowContext(ctx, `SELECT id FROM albums WHERE artist_id = ? AND title = ?`, artistID, albumTitle).Scan(&albumID)
+	}
+	if albumID == 0 && errors.Is(err, sql.ErrNoRows) {
+		err = s.db.QueryRowContext(ctx, `SELECT id FROM albums WHERE artist_id IS NULL AND title = ?`, albumTitle).Scan(&albumID)
+	}
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			year := meta.Year()
@@ -410,6 +441,104 @@ func (s *ScannerService) ingestFile(ctx context.Context, path string, seenSongs 
 	}, nil
 }
 
+// reconcileAlbumArtists derives albums.artist_id from song_artists.
+//
+// Two-tier rule based on confidence:
+//
+//   - Phantom-pointing albums (current artist_id is a row with no
+//     song_artists references and no external_id — i.e. created from a raw
+//     album_artist tag during ingest, never seen by enrichment): treat as
+//     untrusted, low evidence threshold.
+//       1 distinct primary AND >= 2 songs  -> reassign to that primary
+//       otherwise                          -> NULL (compilation)
+//
+//   - Real-artist-pointing albums (current artist_id has external_id or is
+//     referenced by song_artists somewhere): trusted by default, but recompute
+//     when evidence STRONGLY contradicts the existing tag.
+//       2+ distinct primaries AND >= 3 songs                -> NULL (compilation)
+//       1 distinct primary AND >= 3 songs AND differs       -> reassign
+//       otherwise                                            -> leave alone
+//
+// The 3-song threshold for real artists guards against partial-library
+// false positives (e.g. having 1-2 Pritam-composed tracks from a Mohit
+// Chauhan album shouldn't reattribute the album to Pritam).
+//
+// No string matching, no separator parsing, no language assumptions —
+// purely structural rules over song_artists. Idempotent.
+func (s *ScannerService) reconcileAlbumArtists(ctx context.Context) error {
+	// Tier 1: phantom-pointing albums.
+	res1, err := s.db.ExecContext(ctx, `
+		WITH phantom_ids AS (
+			SELECT id FROM artists
+			WHERE id NOT IN (SELECT artist_id FROM song_artists)
+			  AND external_id IS NULL
+		),
+		album_score AS (
+			SELECT s.album_id,
+			       COUNT(DISTINCT sa.artist_id) AS n,
+			       COUNT(DISTINCT s.id)         AS songs,
+			       MIN(sa.artist_id)            AS sole
+			FROM songs s
+			JOIN song_artists sa ON sa.song_id = s.id AND sa.role = 'primary'
+			GROUP BY s.album_id
+		)
+		UPDATE albums
+		SET artist_id = (
+			SELECT CASE WHEN n = 1 AND songs >= 2 THEN sole ELSE NULL END
+			FROM album_score WHERE album_id = albums.id
+		)
+		WHERE id IN (SELECT album_id FROM album_score)
+		  AND artist_id IN (SELECT id FROM phantom_ids)
+	`)
+	if err != nil {
+		return err
+	}
+
+	// Tier 2: real-artist-pointing albums with strong contrary evidence.
+	res2, err := s.db.ExecContext(ctx, `
+		WITH phantom_ids AS (
+			SELECT id FROM artists
+			WHERE id NOT IN (SELECT artist_id FROM song_artists)
+			  AND external_id IS NULL
+		),
+		album_score AS (
+			SELECT s.album_id,
+			       COUNT(DISTINCT sa.artist_id) AS n,
+			       COUNT(DISTINCT s.id)         AS songs,
+			       MIN(sa.artist_id)            AS sole
+			FROM songs s
+			JOIN song_artists sa ON sa.song_id = s.id AND sa.role = 'primary'
+			GROUP BY s.album_id
+		)
+		UPDATE albums
+		SET artist_id = (
+			SELECT CASE
+				WHEN n >= 2 AND songs >= 3 THEN NULL
+				WHEN n = 1 AND songs >= 3 AND sole <> albums.artist_id THEN sole
+				ELSE albums.artist_id
+			END
+			FROM album_score WHERE album_id = albums.id
+		)
+		WHERE id IN (
+			SELECT album_id FROM album_score
+			WHERE (n >= 2 AND songs >= 3)
+			   OR (n = 1 AND songs >= 3)
+		)
+		AND artist_id IS NOT NULL
+		AND artist_id NOT IN (SELECT id FROM phantom_ids)
+	`)
+	if err != nil {
+		return err
+	}
+
+	n1, _ := res1.RowsAffected()
+	n2, _ := res2.RowsAffected()
+	if n1+n2 > 0 {
+		log.Printf("reconciliation: updated %d phantom-pointing albums, %d real-artist albums with strong contrary evidence", n1, n2)
+	}
+	return nil
+}
+
 func (s *ScannerService) cleanup(ctx context.Context, songs map[int64]struct{}, albums map[int64]struct{}, artists map[int64]struct{}) error {
 	// Collect IDs to delete first, then delete in separate operations
 	// This avoids holding open cursors while writing
@@ -455,13 +584,14 @@ func (s *ScannerService) cleanup(ctx context.Context, songs map[int64]struct{}, 
 		_, _ = s.db.ExecContext(ctx, `DELETE FROM albums WHERE id = ?`, id)
 	}
 
-	// Remove artists not seen AND not referenced in song_artists
-	// Artists created by enrichment are linked via song_artists, so we must preserve them
+	// Remove artists not seen AND not referenced in song_artists.
+	// Artists created by enrichment are linked via song_artists, so we must preserve them.
+	// albums.artist_id is nullable for compilations — filter NULL to avoid NOT IN/NULL pitfall.
 	var artistsToDelete []int64
 	artRows, err := s.db.QueryContext(ctx, `
-		SELECT id FROM artists 
+		SELECT id FROM artists
 		WHERE id NOT IN (SELECT DISTINCT artist_id FROM song_artists)
-		AND id NOT IN (SELECT DISTINCT artist_id FROM albums)
+		  AND id NOT IN (SELECT DISTINCT artist_id FROM albums WHERE artist_id IS NOT NULL)
 	`)
 	if err != nil {
 		return err

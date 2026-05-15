@@ -25,6 +25,7 @@
         scanning: "Scanning files",
         enriching: "Enriching metadata",
         processing: "Processing artists",
+        reconciling: "Reconciling album artists",
         cleanup: "Cleaning up",
         playlists: "Importing playlists",
         completed: "Complete",

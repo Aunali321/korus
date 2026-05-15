@@ -6,6 +6,7 @@
     import { player } from "$lib/stores/player.svelte";
     import { favorites } from "$lib/stores/favorites.svelte";
     import TrackRow from "$lib/components/TrackRow.svelte";
+    import { getAlbumArtistName } from "$lib/types";
     import type { PageData } from "./$types";
 
     let { data }: { data: PageData } = $props();
@@ -33,12 +34,16 @@
             <p class="text-sm text-zinc-400 uppercase tracking-wider">Album</p>
             <h1 class="text-5xl font-bold mt-2 mb-4">{album.title}</h1>
             <div class="flex items-center gap-2 text-sm text-zinc-400">
-                <a
-                    href="/artists/{album.artist?.id}"
-                    class="hover:text-zinc-100 hover:underline"
-                >
-                    {album.artist?.name || "Unknown"}
-                </a>
+                {#if album.artist?.id}
+                    <a
+                        href="/artists/{album.artist.id}"
+                        class="hover:text-zinc-100 hover:underline"
+                    >
+                        {album.artist.name}
+                    </a>
+                {:else}
+                    <span>{getAlbumArtistName(album)}</span>
+                {/if}
                 <span>•</span>
                 <span>{album.year || "Unknown year"}</span>
                 <span>•</span>
