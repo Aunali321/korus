@@ -406,13 +406,27 @@ func (s *ScannerService) ingestFile(ctx context.Context, path string, seenSongs 
 	}
 	mbid := existingMBID
 
+	// UPSERT, NOT INSERT OR REPLACE. SQLite's REPLACE deletes the existing
+	// row and inserts a new one when there's a PK/UNIQUE conflict, which
+	// fires ON DELETE CASCADE on play_history.song_id and song_artists.song_id
+	// — wiping the user's listening history on every re-scan of an existing
+	// file. ON CONFLICT DO UPDATE updates the row in place; FK references
+	// stay intact.
 	_, err = s.db.ExecContext(ctx, `
-		INSERT OR REPLACE INTO songs(id, album_id, title, track_number, duration_ms, sample_rate, bit_depth, channels, file_path, lyrics, lyrics_synced, mbid)
-		VALUES (
-			COALESCE((SELECT id FROM songs WHERE file_path = ?), NULL),
-			?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULLIF(?, '')
-		)
-	`, path, albumID, title, trackNo, audioMeta.DurationMs, audioMeta.SampleRate, audioMeta.BitDepth, audioMeta.Channels, path, lyrics, lyricsSynced, mbid)
+		INSERT INTO songs(album_id, title, track_number, duration_ms, sample_rate, bit_depth, channels, file_path, lyrics, lyrics_synced, mbid)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULLIF(?, ''))
+		ON CONFLICT(file_path) DO UPDATE SET
+			album_id = excluded.album_id,
+			title = excluded.title,
+			track_number = excluded.track_number,
+			duration_ms = excluded.duration_ms,
+			sample_rate = excluded.sample_rate,
+			bit_depth = excluded.bit_depth,
+			channels = excluded.channels,
+			lyrics = excluded.lyrics,
+			lyrics_synced = excluded.lyrics_synced,
+			mbid = COALESCE(excluded.mbid, songs.mbid)
+	`, albumID, title, trackNo, audioMeta.DurationMs, audioMeta.SampleRate, audioMeta.BitDepth, audioMeta.Channels, path, lyrics, lyricsSynced, mbid)
 	if err != nil {
 		return nil, fmt.Errorf("insert song: %w", err)
 	}

@@ -28,4 +28,10 @@ WHERE type = 'table' AND name = 'albums';
 
 PRAGMA writable_schema = OFF;
 
+-- Bump schema_version to invalidate any cached schema in connections that
+-- saw the old NOT NULL definition. Without this, the active Go connection
+-- continues to enforce the old constraint even after the schema text
+-- changes, causing post-migration UPDATEs to NULL to fail spuriously.
+PRAGMA schema_version = (SELECT schema_version + 1 FROM pragma_schema_version);
+
 PRAGMA integrity_check;
