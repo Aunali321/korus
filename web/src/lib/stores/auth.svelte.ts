@@ -4,6 +4,14 @@ import { favorites } from './favorites.svelte';
 import { library } from './library.svelte';
 import { settings } from './settings.svelte';
 import { player } from './player.svelte';
+import {
+    homeCache,
+    favoritesPageCache,
+    playlistsCache,
+    albumDetailCache,
+    artistDetailCache,
+    playlistDetailCache,
+} from './pageData.svelte';
 
 let initPromise: Promise<void> | null = null;
 
@@ -73,6 +81,12 @@ function createAuthStore() {
         library.reset();
         settings.reset();
         player.reset();
+        homeCache.invalidate();
+        favoritesPageCache.invalidate();
+        playlistsCache.invalidate();
+        albumDetailCache.invalidate();
+        artistDetailCache.invalidate();
+        playlistDetailCache.invalidate();
     }
 
     return {

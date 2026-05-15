@@ -1,11 +1,9 @@
 <script lang="ts">
 	import "../app.css";
-	import { onMount } from "svelte";
-	import { goto } from "$app/navigation";
+	import { goto, onNavigate } from "$app/navigation";
 	import { page } from "$app/stores";
 	import { auth } from "$lib/stores/auth.svelte";
 	import { player } from "$lib/stores/player.svelte";
-	import { settings } from "$lib/stores/settings.svelte";
 	import Sidebar from "$lib/components/Sidebar.svelte";
 	import Player from "$lib/components/Player.svelte";
 	import Queue from "$lib/components/Queue.svelte";
@@ -17,12 +15,16 @@
 	import Menu from "@lucide/svelte/icons/menu";
 
 	let { children } = $props();
+
 	let showQueue = $state(false);
 	let showLyrics = $state(false);
 	let showOnboarding = $state(false);
 	let showSidebar = $state(false);
 
 	const publicRoutes = ["/login", "/register", "/setup"];
+	const isPublicRoute = $derived(
+		publicRoutes.some((r) => $page.url.pathname.startsWith(r))
+	);
 
 	const pageTitle = $derived(
 		player.currentSong
@@ -30,12 +32,19 @@
 			: "Korus"
 	);
 
-	onMount(async () => {
-		await auth.init();
-		if (auth.isAuthenticated) {
-			await settings.load();
-			await player.loadState();
-		}
+	// Native View Transitions API — cross-fade routes without remounting.
+	onNavigate((navigation) => {
+		const doc = document as Document & {
+			startViewTransition?: (cb: () => void | Promise<void>) => unknown;
+		};
+		if (!doc.startViewTransition) return;
+
+		return new Promise<void>((resolve) => {
+			doc.startViewTransition!(async () => {
+				resolve();
+				await navigation.complete;
+			});
+		});
 	});
 
 	$effect(() => {
@@ -44,14 +53,11 @@
 		}
 	});
 
+	// Post-logout: logout() clears auth state but doesn't navigate; route the
+	// user back to /login once they're unauthenticated and not on a public route.
 	$effect(() => {
-		if (!auth.isLoading && !auth.isAuthenticated) {
-			const isPublic = publicRoutes.some((r) =>
-				$page.url.pathname.startsWith(r),
-			);
-			if (!isPublic) {
-				goto("/login");
-			}
+		if (!auth.isAuthenticated && !isPublicRoute) {
+			goto("/login");
 		}
 	});
 
@@ -61,7 +67,6 @@
 			auth.user.onboarded = true;
 		}
 	}
-
 </script>
 
 <svelte:head>
@@ -69,11 +74,7 @@
 	<meta name="description" content="Self-hosted music streaming" />
 </svelte:head>
 
-{#if auth.isLoading}
-	<div class="h-screen bg-black flex items-center justify-center">
-		<div class="text-zinc-400">Loading...</div>
-	</div>
-{:else if auth.isAuthenticated}
+{#if auth.isAuthenticated && !isPublicRoute}
 	<div
 		class="h-screen h-[100dvh] bg-black text-zinc-100 flex flex-col overflow-hidden font-sans"
 	>
@@ -82,11 +83,10 @@
 			<main
 				class="flex-1 overflow-y-auto scrollbar-thin bg-gradient-to-b from-zinc-900 to-black pb-[100px] md:pb-0"
 			>
-				<!-- Mobile header with hamburger -->
 				<div class="sticky top-0 z-30 bg-zinc-900/95 backdrop-blur border-b border-zinc-800 px-4 py-3 flex items-center gap-3 md:hidden">
 					<button
 						onclick={() => (showSidebar = true)}
-						class="p-2 -ml-2 hover:bg-zinc-800 rounded-lg transition-colors"
+						class="p-2 -ml-2 hover:bg-zinc-800 rounded-lg"
 						aria-label="Open menu"
 					>
 						<Menu size={24} />

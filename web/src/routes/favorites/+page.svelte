@@ -1,37 +1,16 @@
 <script lang="ts">
     import { api } from "$lib/api";
-    import { auth } from "$lib/stores/auth.svelte";
-    import { player } from "$lib/stores/player.svelte";
-    import type { Song, Album, Artist } from "$lib/types";
     import Card from "$lib/components/Card.svelte";
     import TrackRow from "$lib/components/TrackRow.svelte";
+    import type { PageData } from "./$types";
 
-    let songs = $state<Song[]>([]);
-    let albums = $state<Album[]>([]);
-    let artists = $state<Artist[]>([]);
-    let loading = $state(true);
-    let loaded = $state(false);
+    let { data }: { data: PageData } = $props();
+
     let activeTab = $state<"songs" | "albums" | "artists">("songs");
 
-    $effect(() => {
-        if (auth.isAuthenticated && !loaded) {
-            loadFavorites();
-        }
-    });
-
-    async function loadFavorites() {
-        loaded = true;
-        try {
-            const data = await api.getFavorites();
-            songs = data.songs || [];
-            albums = data.albums || [];
-            artists = data.artists || [];
-        } catch (e) {
-            console.error("Failed to load favorites:", e);
-        } finally {
-            loading = false;
-        }
-    }
+    const songs = $derived(data.favorites.songs);
+    const albums = $derived(data.favorites.albums);
+    const artists = $derived(data.favorites.artists);
 </script>
 
 <div class="p-6 space-y-6">
@@ -41,8 +20,7 @@
         {#each [["songs", `Songs (${songs.length})`], ["albums", `Albums (${albums.length})`], ["artists", `Artists (${artists.length})`]] as [tab, label]}
             <button
                 onclick={() => (activeTab = tab as typeof activeTab)}
-                class="px-4 py-2 rounded-full text-sm transition-colors {activeTab ===
-                tab
+                class="px-4 py-2 rounded-full text-sm {activeTab === tab
                     ? 'bg-emerald-500 text-black'
                     : 'text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800'}"
             >
@@ -51,11 +29,7 @@
         {/each}
     </div>
 
-    {#if loading}
-        <div class="flex justify-center py-12">
-            <div class="text-zinc-500">Loading...</div>
-        </div>
-    {:else if activeTab === "songs"}
+    {#if activeTab === "songs"}
         {#if songs.length > 0}
             <div class="space-y-1">
                 {#each songs as song, i (song.id)}

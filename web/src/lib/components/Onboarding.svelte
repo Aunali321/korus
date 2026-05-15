@@ -5,6 +5,8 @@
     import Music from "@lucide/svelte/icons/music";
     import Settings from "@lucide/svelte/icons/settings";
     import FolderSync from "@lucide/svelte/icons/folder-sync";
+    import { fade, fly, scale } from "svelte/transition";
+    import { cubicOut } from "svelte/easing";
     import { api } from "$lib/api";
     import { settings } from "$lib/stores/settings.svelte";
     import type { StreamingPreset } from "$lib/types";
@@ -91,8 +93,14 @@
     }
 </script>
 
-<div class="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
-    <div class="bg-zinc-900 border border-zinc-800 rounded-xl max-w-lg w-full p-6 relative">
+<div
+    transition:fade={{ duration: 200 }}
+    class="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4"
+>
+    <div
+        in:scale={{ duration: 360, start: 0.94, opacity: 0, easing: cubicOut }}
+        class="bg-zinc-900 border border-zinc-800 rounded-xl max-w-lg w-full p-6 relative shadow-2xl shadow-black/50"
+    >
         <button
             onclick={finish}
             class="absolute top-4 right-4 p-1 text-zinc-500 hover:text-zinc-300"
@@ -102,7 +110,12 @@
 
         <div class="flex gap-2 mb-6">
             {#each [0, 1, 2] as i}
-                <div class="flex-1 h-1 rounded-full {step >= i ? 'bg-emerald-500' : 'bg-zinc-700'}"></div>
+                <div class="flex-1 h-1 rounded-full bg-zinc-700 overflow-hidden">
+                    <div
+                        class="h-full bg-gradient-to-r from-emerald-500 to-emerald-400 transition-[width] duration-500 ease-[cubic-bezier(0.16,1,0.3,1)]"
+                        style="width: {step >= i ? '100%' : '0%'};"
+                    ></div>
+                </div>
             {/each}
         </div>
 
@@ -129,9 +142,9 @@
                     {#each presets as preset}
                         <button
                             onclick={() => settings.setPreset(preset.value)}
-                            class="w-full p-3 rounded-lg border text-left transition-colors {settings.preset === preset.value
+                            class="w-full p-3 rounded-lg border text-left {settings.preset === preset.value
                                 ? 'border-emerald-500 bg-emerald-500/10'
-                                : 'border-zinc-700 hover:border-zinc-600'}"
+                                : 'border-zinc-700 hover:border-zinc-600 hover:bg-zinc-800/40'}"
                         >
                             <div class="font-medium">{preset.label}</div>
                             <div class="text-xs text-zinc-400">{preset.desc}</div>

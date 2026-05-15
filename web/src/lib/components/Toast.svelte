@@ -3,6 +3,9 @@
     import CheckCircle from "@lucide/svelte/icons/check-circle";
     import AlertCircle from "@lucide/svelte/icons/alert-circle";
     import Info from "@lucide/svelte/icons/info";
+    import { fly, fade } from "svelte/transition";
+    import { cubicOut } from "svelte/easing";
+    import { flip } from "svelte/animate";
     import { toast, type Toast } from "$lib/stores/toast.svelte";
 
     const icons = {
@@ -22,7 +25,10 @@
     {#each toast.toasts as t (t.id)}
         {@const Icon = icons[t.type]}
         <div
-            class="flex items-center gap-3 px-4 py-3 rounded-lg border backdrop-blur-sm {colors[
+            in:fly={{ x: 24, duration: 320, easing: cubicOut }}
+            out:fade={{ duration: 180 }}
+            animate:flip={{ duration: 320 }}
+            class="flex items-center gap-3 px-4 py-3 rounded-lg border backdrop-blur-sm shadow-lg shadow-black/30 {colors[
                 t.type
             ]}"
         >

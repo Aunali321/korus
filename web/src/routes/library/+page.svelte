@@ -1,20 +1,9 @@
 <script lang="ts">
     import { VList } from "virtua/svelte";
     import Shuffle from "@lucide/svelte/icons/shuffle";
-    import { auth } from "$lib/stores/auth.svelte";
     import { library } from "$lib/stores/library.svelte";
     import { player } from "$lib/stores/player.svelte";
     import TrackRow from "$lib/components/TrackRow.svelte";
-
-    let loading = $state(true);
-    let loaded = $state(false);
-
-    $effect(() => {
-        if (auth.isAuthenticated && !loaded) {
-            loaded = true;
-            library.load().finally(() => loading = false);
-        }
-    });
 
     function shuffleLibrary() {
         if (library.songs.length === 0) return;
@@ -35,7 +24,7 @@
         {#if library.songs.length > 0}
             <button
                 onclick={shuffleLibrary}
-                class="px-3 md:px-4 py-2 bg-emerald-500 hover:bg-emerald-600 text-black font-semibold rounded-full flex items-center gap-2 transition-all hover:scale-105"
+                class="px-3 md:px-4 py-2 bg-emerald-500 hover:bg-emerald-600 text-black font-semibold rounded-full flex items-center gap-2"
             >
                 <Shuffle size={18} />
                 <span class="hidden md:inline">Shuffle</span>
@@ -50,10 +39,6 @@
                     <TrackRow {song} {index} songs={library.songs} />
                 {/snippet}
             </VList>
-        </div>
-    {:else if loading}
-        <div class="flex justify-center py-12">
-            <div class="text-zinc-500">Loading...</div>
         </div>
     {:else}
         <div class="text-center py-12 text-zinc-500">

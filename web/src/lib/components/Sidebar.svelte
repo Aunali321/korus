@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { page } from "$app/stores";
+	import { fade } from "svelte/transition";
 	import Home from "@lucide/svelte/icons/home";
 	import Search from "@lucide/svelte/icons/search";
 	import Library from "@lucide/svelte/icons/library";
@@ -53,6 +54,7 @@
 <!-- Mobile overlay -->
 {#if isOpen}
 	<button
+		transition:fade={{ duration: 200 }}
 		class="fixed inset-0 bg-black/50 z-40 md:hidden"
 		onclick={onClose}
 		aria-label="Close menu"
@@ -62,7 +64,7 @@
 <!-- Sidebar -->
 <div class="
 	fixed inset-y-0 left-0 z-50 w-64 bg-zinc-950 border-r border-zinc-800 flex flex-col h-full
-	transform transition-transform duration-300 ease-in-out
+	transform transition-transform duration-[420ms] ease-[cubic-bezier(0.32,0.72,0,1)] will-change-transform
 	md:relative md:translate-x-0
 	{isOpen ? 'translate-x-0' : '-translate-x-full'}
 ">
@@ -87,16 +89,14 @@
 	<nav class="flex-1 overflow-y-auto scrollbar-thin">
 		<div class="p-3 space-y-1">
 			{#each navItems as item}
+				{@const active = isActive(item.href)}
 				<a
 					href={item.href}
 					onclick={handleNavClick}
-					class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all {isActive(
-						item.href,
-					)
-						? 'bg-zinc-800 text-emerald-400'
-						: 'text-zinc-400 hover:text-zinc-100 hover:bg-zinc-900'}"
+					class="nav-link {active ? 'is-active' : ''}"
 				>
-					<item.icon size={20} />
+					<span class="nav-indicator" aria-hidden="true"></span>
+					<item.icon size={20} class="nav-icon" />
 					<span class="font-medium">{item.label}</span>
 				</a>
 			{/each}
@@ -110,16 +110,14 @@
 			</h2>
 			<div class="space-y-1 mt-1">
 				{#each libraryItems as item}
+					{@const active = isActive(item.href)}
 					<a
 						href={item.href}
 						onclick={handleNavClick}
-						class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all {isActive(
-							item.href,
-						)
-							? 'bg-zinc-800 text-emerald-400'
-							: 'text-zinc-400 hover:text-zinc-100 hover:bg-zinc-900'}"
+						class="nav-link nav-link--sm {active ? 'is-active' : ''}"
 					>
-						<item.icon size={18} />
+						<span class="nav-indicator" aria-hidden="true"></span>
+						<item.icon size={18} class="nav-icon" />
 						<span class="text-sm">{item.label}</span>
 					</a>
 				{/each}
@@ -136,26 +134,20 @@
 				<a
 					href="/stats"
 					onclick={handleNavClick}
-					class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all {isActive(
-						'/stats',
-					)
-						? 'bg-zinc-800 text-emerald-400'
-						: 'text-zinc-400 hover:text-zinc-100 hover:bg-zinc-900'}"
+					class="nav-link nav-link--sm {isActive('/stats') ? 'is-active' : ''}"
 				>
-					<BarChart3 size={18} />
+					<span class="nav-indicator" aria-hidden="true"></span>
+					<BarChart3 size={18} class="nav-icon" />
 					<span class="text-sm">Stats</span>
 				</a>
 				{#if isWrappedSeason()}
 					<a
 						href="/wrapped"
 						onclick={handleNavClick}
-						class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all {isActive(
-							'/wrapped',
-						)
-							? 'bg-zinc-800 text-emerald-400'
-							: 'text-zinc-400 hover:text-zinc-100 hover:bg-zinc-900'}"
+						class="nav-link nav-link--sm {isActive('/wrapped') ? 'is-active' : ''}"
 					>
-						<Sparkles size={18} />
+						<span class="nav-indicator" aria-hidden="true"></span>
+						<Sparkles size={18} class="nav-icon" />
 						<span class="text-sm">Wrapped</span>
 					</a>
 				{/if}
@@ -168,27 +160,65 @@
 			<a
 				href="/admin"
 				onclick={handleNavClick}
-				class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all {isActive(
-					'/admin',
-				)
-					? 'bg-zinc-800 text-emerald-400'
-					: 'text-zinc-400 hover:text-zinc-100 hover:bg-zinc-900'}"
+				class="nav-link nav-link--sm {isActive('/admin') ? 'is-active' : ''}"
 			>
-				<Shield size={18} />
+				<span class="nav-indicator" aria-hidden="true"></span>
+				<Shield size={18} class="nav-icon" />
 				<span class="text-sm">Admin</span>
 			</a>
 		{/if}
 		<a
 			href="/settings"
 			onclick={handleNavClick}
-			class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all {isActive(
-				'/settings',
-			)
-				? 'bg-zinc-800 text-emerald-400'
-				: 'text-zinc-400 hover:text-zinc-100 hover:bg-zinc-900'}"
+			class="nav-link nav-link--sm {isActive('/settings') ? 'is-active' : ''}"
 		>
-			<Settings size={18} />
+			<span class="nav-indicator" aria-hidden="true"></span>
+			<Settings size={18} class="nav-icon" />
 			<span class="text-sm">Settings</span>
 		</a>
 	</div>
 </div>
+
+<style>
+	.nav-link {
+		position: relative;
+		display: flex;
+		align-items: center;
+		gap: 0.75rem;
+		width: 100%;
+		padding: 0.625rem 0.75rem;
+		border-radius: 0.5rem;
+		color: rgb(161 161 170);
+		transition:
+			color var(--dur-base) var(--ease-soft),
+			background-color var(--dur-base) var(--ease-soft);
+	}
+	.nav-link:hover {
+		color: rgb(244 244 245);
+		background-color: rgb(24 24 27);
+	}
+	.nav-link.is-active {
+		color: rgb(52 211 153);
+		background-color: rgb(39 39 42);
+	}
+
+	.nav-indicator {
+		position: absolute;
+		left: 0;
+		top: 50%;
+		width: 3px;
+		height: 60%;
+		background: #10b981;
+		border-radius: 0 3px 3px 0;
+		transform: translateY(-50%) scaleY(0);
+		transform-origin: center;
+		opacity: 0;
+		transition:
+			transform var(--dur-base) var(--ease-out-expo),
+			opacity var(--dur-fast) var(--ease-soft);
+	}
+	.nav-link.is-active .nav-indicator {
+		transform: translateY(-50%) scaleY(1);
+		opacity: 1;
+	}
+</style>

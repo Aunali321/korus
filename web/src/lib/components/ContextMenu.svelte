@@ -5,10 +5,14 @@
     import Plus from "@lucide/svelte/icons/plus";
     import Minus from "@lucide/svelte/icons/minus";
     import ChevronRight from "@lucide/svelte/icons/chevron-right";
+    import { scale, fly } from "svelte/transition";
+    import { cubicOut } from "svelte/easing";
+    import { invalidate } from "$app/navigation";
     import type { Playlist } from "$lib/types";
     import { contextMenu } from "$lib/stores/contextMenu.svelte";
     import { settings } from "$lib/stores/settings.svelte";
     import { player } from "$lib/stores/player.svelte";
+    import { playlistDetailCache } from "$lib/stores/pageData.svelte";
     import { api } from "$lib/api";
 
     let showPlaylistSubmenu = $state(false);
@@ -53,7 +57,8 @@
                 if (playlistId) {
                     try {
                         await api.removeSongFromPlaylist(playlistId, song.id);
-                        window.dispatchEvent(new CustomEvent('playlist-updated', { detail: playlistId }));
+                        playlistDetailCache.invalidate(playlistId);
+                        await invalidate(`app:playlist-${playlistId}`);
                     } catch (err) {
                         console.error('Failed to remove from playlist:', err);
                     }
@@ -64,6 +69,8 @@
                     const plId = parseInt(id.split(":")[1]);
                     try {
                         await api.addSongToPlaylist(plId, song.id);
+                        playlistDetailCache.invalidate(plId);
+                        await invalidate(`app:playlist-${plId}`);
                     } catch (err) {
                         console.error('Failed to add to playlist:', err);
                     }
@@ -98,7 +105,8 @@
 
 {#if contextMenu.isOpen && contextMenu.song}
     <div
-        class="fixed bg-zinc-800 border border-zinc-700 rounded-lg shadow-xl py-1 min-w-[200px]"
+        in:scale={{ duration: 160, start: 0.94, opacity: 0, easing: cubicOut }}
+        class="fixed bg-zinc-800 border border-zinc-700 rounded-lg shadow-2xl shadow-black/40 py-1 min-w-[200px] origin-top-left"
         style="left: {contextMenu.position.x}px; top: {contextMenu.position.y}px; z-index: 99999;"
         onclick={handleMenuClick}
         oncontextmenu={(e) => { e.preventDefault(); e.stopPropagation(); }}
@@ -152,7 +160,8 @@
 
             {#if showPlaylistSubmenu}
                 <div
-                    class="absolute top-0 bg-zinc-800 border border-zinc-700 rounded-lg shadow-xl py-1 min-w-[180px] max-h-64 overflow-y-auto"
+                    in:fly={{ x: submenuPosition === 'right' ? -8 : 8, duration: 160, easing: cubicOut }}
+                    class="absolute top-0 bg-zinc-800 border border-zinc-700 rounded-lg shadow-2xl shadow-black/40 py-1 min-w-[180px] max-h-64 overflow-y-auto"
                     class:left-full={submenuPosition === 'right'}
                     class:right-full={submenuPosition === 'left'}
                     style="margin-left: {submenuPosition === 'right' ? '4px' : '0'}; margin-right: {submenuPosition === 'left' ? '4px' : '0'};"

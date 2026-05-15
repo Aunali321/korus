@@ -77,8 +77,8 @@
         <div class="md:hidden min-h-[100px]">
             <!-- Progress bar at top (thin, full width) -->
             <div class="h-1 bg-zinc-800 relative">
-                <div 
-                    class="absolute inset-y-0 left-0 bg-emerald-500"
+                <div
+                    class="absolute inset-y-0 left-0 bg-gradient-to-r from-emerald-500 to-emerald-400 progress-fill"
                     style="width: {progressPercent}%"
                 ></div>
                 <input
@@ -111,9 +111,10 @@
                 </div>
                 <button
                     onclick={handleFavorite}
-                    class="p-1.5 shrink-0"
+                    class="p-1.5 shrink-0 heart-btn"
+                    aria-label={isFavorited ? 'Unfavorite' : 'Favorite'}
                 >
-                    <Heart size={18} class={isFavorited ? 'fill-red-500 text-red-500' : 'text-zinc-400'} />
+                    <Heart size={18} class={isFavorited ? 'fill-red-500 text-red-500 heart-pop' : 'text-zinc-400'} />
                 </button>
             </div>
 
@@ -147,7 +148,8 @@
                     </button>
                     <button
                         onclick={() => player.toggle()}
-                        class="w-10 h-10 bg-white text-black rounded-full flex items-center justify-center"
+                        class="w-10 h-10 bg-white text-black rounded-full flex items-center justify-center play-btn"
+                        aria-label={player.isPlaying ? 'Pause' : 'Play'}
                     >
                         {#if player.isPlaying}
                             <Pause size={20} fill="currentColor" />
@@ -186,7 +188,7 @@
                 <img
                     src={api.getArtworkUrl(player.currentSong.id)}
                     alt={player.currentSong.title}
-                    class="w-14 h-14 rounded-lg object-cover bg-zinc-800"
+                    class="w-14 h-14 rounded-lg object-cover bg-zinc-800 shadow-lg shadow-black/40"
                 />
                 <div class="flex-1 min-w-0">
                     <h4 class="font-semibold text-sm truncate">
@@ -207,9 +209,10 @@
                 </div>
                 <button
                     onclick={handleFavorite}
-                    class="p-2 hover:bg-zinc-800 rounded-full transition-colors"
+                    class="p-2 hover:bg-zinc-800 rounded-full heart-btn"
+                    aria-label={isFavorited ? 'Unfavorite' : 'Favorite'}
                 >
-                    <Heart size={18} class={isFavorited ? 'fill-red-500 text-red-500' : 'text-zinc-400 hover:text-red-400'} />
+                    <Heart size={18} class={isFavorited ? 'fill-red-500 text-red-500 heart-pop' : 'text-zinc-400 hover:text-red-400'} />
                 </button>
             </div>
 
@@ -217,7 +220,7 @@
                 <div class="flex items-center gap-4">
                     <button
                         onclick={() => player.toggleShuffle()}
-                        class="p-2 transition-colors {player.shuffle
+                        class="p-2 {player.shuffle
                             ? 'text-emerald-400'
                             : 'text-zinc-400 hover:text-zinc-100'}"
                     >
@@ -225,13 +228,14 @@
                     </button>
                     <button
                         onclick={() => player.prev()}
-                        class="p-2 text-zinc-400 hover:text-zinc-100 transition-colors"
+                        class="p-2 text-zinc-400 hover:text-zinc-100"
                     >
                         <SkipBack size={20} />
                     </button>
                     <button
                         onclick={() => player.toggle()}
-                        class="w-10 h-10 bg-white hover:bg-zinc-200 text-black rounded-full flex items-center justify-center transition-all hover:scale-105"
+                        class="play-btn w-10 h-10 bg-white text-black rounded-full flex items-center justify-center"
+                        aria-label={player.isPlaying ? 'Pause' : 'Play'}
                     >
                         {#if player.isPlaying}
                             <Pause size={20} fill="currentColor" />
@@ -241,13 +245,13 @@
                     </button>
                     <button
                         onclick={() => player.next()}
-                        class="p-2 text-zinc-400 hover:text-zinc-100 transition-colors"
+                        class="p-2 text-zinc-400 hover:text-zinc-100"
                     >
                         <SkipForward size={20} />
                     </button>
                     <button
                         onclick={() => player.toggleRepeat()}
-                        class="p-2 transition-colors {player.repeat !== 'off'
+                        class="p-2 {player.repeat !== 'off'
                             ? 'text-emerald-400'
                             : 'text-zinc-400 hover:text-zinc-100'}"
                     >
@@ -326,3 +330,23 @@
         </div>
     {/if}
 </div>
+
+<style>
+    .play-btn {
+        transition:
+            background-color var(--dur-base) var(--ease-soft),
+            box-shadow var(--dur-base) var(--ease-soft);
+    }
+    .play-btn:hover {
+        background-color: rgb(228 228 231);
+        box-shadow: 0 6px 18px -8px rgba(255, 255, 255, 0.25);
+    }
+    @keyframes heart-pop {
+        0%   { transform: scale(1); }
+        40%  { transform: scale(1.18); }
+        100% { transform: scale(1); }
+    }
+    :global(.heart-pop) {
+        animation: heart-pop 280ms var(--ease-out-expo);
+    }
+</style>

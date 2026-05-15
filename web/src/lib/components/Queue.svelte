@@ -3,6 +3,7 @@
     import X from "@lucide/svelte/icons/x";
     import Play from "@lucide/svelte/icons/play";
     import Loader2 from "@lucide/svelte/icons/loader-2";
+    import { fade } from "svelte/transition";
     import { player } from "$lib/stores/player.svelte";
     import { api } from "$lib/api";
 
@@ -21,6 +22,7 @@
 
 {#if isOpen}
     <button
+        transition:fade={{ duration: 280 }}
         class="fixed inset-0 bg-black/50 z-40 backdrop-blur-sm"
         onclick={onClose}
         aria-label="Close queue"
@@ -28,7 +30,7 @@
 {/if}
 
 <div
-    class="fixed right-0 top-0 h-full w-full md:w-96 bg-zinc-950 border-l border-zinc-800 z-50 transform transition-transform duration-300 {isOpen
+    class="fixed right-0 top-0 h-full w-full md:w-96 bg-zinc-950 border-l border-zinc-800 z-50 transform transition-transform duration-[420ms] ease-[cubic-bezier(0.32,0.72,0,1)] will-change-transform {isOpen
         ? 'translate-x-0'
         : 'translate-x-full'}"
 >
@@ -50,7 +52,7 @@
                 <img
                     src={api.getArtworkUrl(player.currentSong.id)}
                     alt={player.currentSong.title}
-                    class="w-full aspect-square object-cover rounded-lg mb-4 bg-zinc-800"
+                    class="w-full aspect-square object-cover rounded-lg mb-4 bg-zinc-800 shadow-lg shadow-black/40"
                 />
                 <h3 class="font-bold text-xl mb-1">{player.currentSong.title}</h3>
                 <p class="text-zinc-400">

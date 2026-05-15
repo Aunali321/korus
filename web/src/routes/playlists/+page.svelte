@@ -1,45 +1,31 @@
 <script lang="ts">
     import Plus from "@lucide/svelte/icons/plus";
+    import { invalidate } from "$app/navigation";
     import { api } from "$lib/api";
-    import { auth } from "$lib/stores/auth.svelte";
     import { toast } from "$lib/stores/toast.svelte";
-    import type { Playlist } from "$lib/types";
+    import { playlistsCache } from "$lib/stores/pageData.svelte";
     import Card from "$lib/components/Card.svelte";
+    import type { PageData } from "./$types";
 
-    let playlists = $state<Playlist[]>([]);
-    let loading = $state(true);
-    let loaded = $state(false);
+    let { data }: { data: PageData } = $props();
+
     let showCreate = $state(false);
     let newName = $state("");
     let creating = $state(false);
 
-    $effect(() => {
-        if (auth.isAuthenticated && !loaded) {
-            loadPlaylists();
-        }
-    });
-
-    async function loadPlaylists() {
-        loaded = true;
-        try {
-            playlists = await api.getPlaylists();
-        } catch (e) {
-            console.error("Failed to load playlists:", e);
-        } finally {
-            loading = false;
-        }
-    }
+    const playlists = $derived(data.playlists);
 
     async function createPlaylist() {
         if (!newName.trim()) return;
         creating = true;
         try {
             const playlist = await api.createPlaylist(newName);
-            playlists = [playlist, ...playlists];
+            playlistsCache.set([playlist, ...playlists]);
+            await invalidate('app:playlists');
             newName = "";
             showCreate = false;
             toast.success("Playlist created");
-        } catch (e) {
+        } catch {
             toast.error("Failed to create playlist");
         } finally {
             creating = false;
@@ -52,7 +38,7 @@
         <h2 class="text-3xl font-bold">Playlists</h2>
         <button
             onclick={() => (showCreate = !showCreate)}
-            class="p-2 hover:bg-zinc-800 rounded-full transition-colors"
+            class="p-2 hover:bg-zinc-800 rounded-full"
         >
             <Plus size={24} class="text-zinc-400 hover:text-zinc-100" />
         </button>
@@ -82,11 +68,7 @@
         </form>
     {/if}
 
-    {#if loading}
-        <div class="flex justify-center py-12">
-            <div class="text-zinc-500">Loading...</div>
-        </div>
-    {:else if playlists.length > 0}
+    {#if playlists.length > 0}
         <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
             {#each playlists as playlist (playlist.id)}
                 <Card

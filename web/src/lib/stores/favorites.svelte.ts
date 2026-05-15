@@ -1,4 +1,6 @@
+import { invalidate } from '$app/navigation';
 import { api } from '$lib/api';
+import { favoritesPageCache } from './pageData.svelte';
 
 function createFavoritesStore() {
     let songIds = $state<Set<number>>(new Set());
@@ -49,6 +51,8 @@ function createFavoritesStore() {
                 songIds.add(songId);
                 songIds = new Set(songIds);
             }
+            favoritesPageCache.invalidate();
+            invalidate('app:favorites');
             return !wasFavorite;
         } catch (err) {
             console.error('Failed to toggle favorite:', err);
@@ -68,6 +72,8 @@ function createFavoritesStore() {
                 albumIds.add(albumId);
                 albumIds = new Set(albumIds);
             }
+            favoritesPageCache.invalidate();
+            invalidate('app:favorites');
             return !wasFavorite;
         } catch (err) {
             console.error('Failed to toggle album favorite:', err);
@@ -87,6 +93,8 @@ function createFavoritesStore() {
                 artistIds.add(artistId);
                 artistIds = new Set(artistIds);
             }
+            favoritesPageCache.invalidate();
+            invalidate('app:favorites');
             return !wasFollowed;
         } catch (err) {
             console.error('Failed to toggle artist follow:', err);

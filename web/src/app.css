@@ -6,6 +6,21 @@
 	--color-brand-secondary: #06b6d4;
 	--color-brand-accent: #34d399;
 	--font-family-sans: 'Space Grotesk', system-ui, sans-serif;
+
+	/* Motion tokens — shared across the app. */
+	--ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+	--ease-out-quart: cubic-bezier(0.25, 1, 0.5, 1);
+	--ease-spring: cubic-bezier(0.32, 0.72, 0, 1);
+	--ease-soft: cubic-bezier(0.4, 0, 0.2, 1);
+
+	--dur-fast: 120ms;
+	--dur-base: 180ms;
+	--dur-slow: 280ms;
+	--dur-overlay: 360ms;
+}
+
+html {
+	color-scheme: dark;
 }
 
 body {
@@ -14,12 +29,92 @@ body {
 	color: #fafafa;
 }
 
+/* Default hover/focus transitions on interactive elements.
+   Deliberately *no* transform here — layout-driven transform changes
+   should not animate by default. Components opt-in to transform. */
+:where(a, button, [role='button'], input, select, textarea, summary) {
+	transition:
+		background-color var(--dur-base) var(--ease-soft),
+		color var(--dur-base) var(--ease-soft),
+		border-color var(--dur-base) var(--ease-soft),
+		box-shadow var(--dur-base) var(--ease-soft),
+		opacity var(--dur-base) var(--ease-soft);
+}
+
+/* ---- View Transitions API ------------------------------------------------
+   Native cross-fade between routes — no remount, no loading flash.
+   Chromium + Safari 18+ enable it; Firefox just navigates instantly. */
+@view-transition {
+	navigation: auto;
+}
+::view-transition-old(root),
+::view-transition-new(root) {
+	animation-duration: 280ms;
+	animation-timing-function: var(--ease-out-expo);
+	mix-blend-mode: normal;
+}
+::view-transition-old(root) {
+	animation-name: vt-fade-out;
+}
+::view-transition-new(root) {
+	animation-name: vt-fade-in;
+}
+@keyframes vt-fade-out {
+	to { opacity: 0; }
+}
+@keyframes vt-fade-in {
+	from { opacity: 0; }
+}
+/* Elements with `view-transition-name: persistent` stay put — don't fade. */
+
+/* ---- Reusable keyframes -------------------------------------------------- */
+
+@keyframes fade-in {
+	from { opacity: 0; }
+	to { opacity: 1; }
+}
+
+@keyframes fade-up {
+	from { opacity: 0; transform: translate3d(0, 6px, 0); }
+	to { opacity: 1; transform: translate3d(0, 0, 0); }
+}
+
+@keyframes scale-in {
+	from { opacity: 0; transform: scale(0.97); }
+	to { opacity: 1; transform: scale(1); }
+}
+
+@keyframes shimmer {
+	0% { background-position: -200% 0; }
+	100% { background-position: 200% 0; }
+}
+
+/* Loading skeleton. */
+.skeleton {
+	background: linear-gradient(
+		90deg,
+		rgba(63, 63, 70, 0.4) 0%,
+		rgba(82, 82, 91, 0.6) 50%,
+		rgba(63, 63, 70, 0.4) 100%
+	);
+	background-size: 200% 100%;
+	animation: shimmer 1.4s linear infinite;
+}
+
+/* Smooth progress fill — tracks the playhead between sparse timeupdate events. */
+.progress-fill {
+	transition: width 250ms linear;
+	will-change: width;
+}
+
 .bg-grid {
-	background-image: 
+	background-image:
 		linear-gradient(to right, #18181b 1px, transparent 1px),
 		linear-gradient(to bottom, #18181b 1px, transparent 1px);
 	background-size: 48px 48px;
 }
+
+/* ---- Inputs -------------------------------------------------------------- */
 
 input[type='text'],
 input[type='password'],
@@ -75,6 +170,8 @@ input[type='radio']:focus {
 	--tw-ring-offset-color: #000;
 }
 
+/* ---- Range sliders ------------------------------------------------------- */
+
 input[type='range'] {
 	-webkit-appearance: none;
 	appearance: none;
@@ -86,6 +183,7 @@ input[type='range']::-webkit-slider-runnable-track {
 	height: 4px;
 	background: #3f3f46;
 	border-radius: 2px;
+	transition: height 160ms var(--ease-out-quart);
 }
 
 input[type='range'].range-progress::-webkit-slider-runnable-track {
@@ -100,16 +198,37 @@ input[type='range']::-webkit-slider-thumb {
 	background: #fff;
 	border-radius: 50%;
 	margin-top: -4px;
+	transform: scale(0);
+	opacity: 0;
+	transition:
+		transform 160ms var(--ease-out-expo),
+		opacity 160ms var(--ease-soft);
+}
+
+input[type='range']:hover::-webkit-slider-thumb,
+input[type='range']:focus::-webkit-slider-thumb,
+input[type='range']:active::-webkit-slider-thumb {
+	transform: scale(1);
+	opacity: 1;
+}
+
+input[type='range']:hover::-webkit-slider-runnable-track {
+	height: 6px;
 }
 
 input[type='range']::-moz-range-track {
 	height: 4px;
 	background: #3f3f46;
 	border-radius: 2px;
+	transition: height 160ms var(--ease-out-quart);
 }
 
 input[type='range'].range-progress::-moz-range-track {
 	background: linear-gradient(to right, #10b981 var(--progress, 0%), #3f3f46 var(--progress, 0%));
+}
+
+input[type='range']:hover::-moz-range-track {
+	height: 6px;
 }
 
 input[type='range']::-moz-range-thumb {
@@ -118,7 +237,21 @@ input[type='range']::-moz-range-thumb {
 	background: #fff;
 	border-radius: 50%;
 	border: none;
+	transform: scale(0);
+	opacity: 0;
+	transition:
+		transform 160ms var(--ease-out-expo),
+		opacity 160ms var(--ease-soft);
 }
+
+input[type='range']:hover::-moz-range-thumb,
+input[type='range']:focus::-moz-range-thumb,
+input[type='range']:active::-moz-range-thumb {
+	transform: scale(1);
+	opacity: 1;
+}
+
+/* ---- Scrollbar ----------------------------------------------------------- */
 
 .scrollbar-thin::-webkit-scrollbar {
 	width: 8px;
@@ -135,4 +268,16 @@ input[type='range']::-moz-range-thumb {
 
 .scrollbar-thin::-webkit-scrollbar-thumb:hover {
 	background: #52525b;
+}
+
+/* Reduced motion: honor user preference. */
+@media (prefers-reduced-motion: reduce) {
+	*,
+	*::before,
+	*::after {
+		animation-duration: 0.01ms !important;
+		animation-iteration-count: 1 !important;
+		transition-duration: 0.01ms !important;
+		scroll-behavior: auto !important;
+	}
 }

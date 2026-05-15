@@ -73,27 +73,24 @@
 </script>
 
 <div
-    class="flex items-center gap-2 md:gap-4 p-2 md:p-3 rounded-lg hover:bg-zinc-900 group cursor-pointer {isPlaying
-        ? 'bg-zinc-900'
+    class="track-row flex items-center gap-2 md:gap-4 p-2 md:p-3 rounded-lg group cursor-pointer {isPlaying
+        ? 'is-playing'
         : ''}"
     oncontextmenu={handleContextMenu}
     role="button"
     tabindex="-1"
 >
     {#if index !== undefined}
-        <div class="w-5 md:w-6 text-center group-hover:hidden shrink-0">
-            <span
-                class="text-xs md:text-sm text-zinc-500 {isPlaying
-                    ? 'text-emerald-400'
-                    : ''}">{index + 1}</span
+        <div class="w-5 md:w-6 text-center shrink-0 relative h-5 md:h-6 flex items-center justify-center">
+            <span class="num text-xs md:text-sm text-zinc-500 {isPlaying ? 'text-emerald-400' : ''}">{index + 1}</span>
+            <button
+                onclick={handlePlay}
+                aria-label="Play"
+                class="play-icon absolute inset-0 flex items-center justify-center"
             >
+                <Play size={14} class="text-emerald-400" />
+            </button>
         </div>
-        <button
-            onclick={handlePlay}
-            class="hidden group-hover:flex w-5 md:w-6 h-5 md:h-6 items-center justify-center shrink-0"
-        >
-            <Play size={14} class="text-emerald-400" />
-        </button>
     {/if}
 
     {#if !compact}
@@ -145,9 +142,42 @@
     {#if index === undefined}
         <button
             onclick={handlePlay}
-            class="hidden md:flex opacity-0 group-hover:opacity-100 w-8 h-8 md:w-10 md:h-10 bg-emerald-500 rounded-full items-center justify-center transition-all hover:scale-110"
+            aria-label="Play"
+            class="row-fab hidden md:flex w-8 h-8 md:w-10 md:h-10 bg-emerald-500 rounded-full items-center justify-center text-black shadow-[0_8px_20px_-8px_rgba(16,185,129,0.6)]"
         >
-            <Play size={14} fill="currentColor" class="text-black ml-0.5 md:w-4 md:h-4" />
+            <Play size={14} fill="currentColor" class="ml-0.5 md:w-4 md:h-4" />
         </button>
     {/if}
 </div>
+
+<style>
+    .track-row {
+        transition: background-color var(--dur-base) var(--ease-soft);
+    }
+    .track-row:hover {
+        background-color: rgb(24 24 27);
+    }
+    .track-row.is-playing {
+        background-color: rgba(24, 24, 27, 0.7);
+    }
+    .track-row .num,
+    .track-row .play-icon {
+        transition: opacity 140ms var(--ease-soft);
+    }
+    .track-row .play-icon {
+        opacity: 0;
+    }
+    .track-row:hover .num {
+        opacity: 0;
+    }
+    .track-row:hover .play-icon {
+        opacity: 1;
+    }
+    .row-fab {
+        opacity: 0;
+        transition: opacity 200ms var(--ease-out-expo);
+    }
+    .track-row:hover .row-fab {
+        opacity: 1;
+    }
+</style>

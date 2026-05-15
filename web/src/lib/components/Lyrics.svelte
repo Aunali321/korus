@@ -103,7 +103,7 @@
 </script>
 
 <div
-    class="fixed top-0 right-0 bottom-0 w-full md:w-96 bg-zinc-900 border-l border-zinc-800 transform transition-transform duration-300 z-30 flex flex-col {isOpen
+    class="fixed top-0 right-0 bottom-0 w-full md:w-96 bg-zinc-900 border-l border-zinc-800 transform transition-transform duration-[420ms] ease-[cubic-bezier(0.32,0.72,0,1)] will-change-transform z-30 flex flex-col {isOpen
         ? 'translate-x-0'
         : 'translate-x-full'}"
 >
@@ -134,10 +134,10 @@
                     <button
                         data-line={i}
                         onclick={() => handleLineClick(line.time)}
-                        class="block w-full text-left text-lg transition-all duration-300 {i === currentLineIndex
-                            ? 'text-emerald-400 font-semibold scale-105 origin-left'
+                        class="block w-full text-left text-lg transition-[color,transform,filter] duration-500 ease-[cubic-bezier(0.16,1,0.3,1)] origin-left {i === currentLineIndex
+                            ? 'text-emerald-400 font-semibold scale-[1.06]'
                             : i < currentLineIndex
-                              ? 'text-zinc-600'
+                              ? 'text-zinc-600 blur-[0.3px]'
                               : 'text-zinc-400 hover:text-zinc-200'}"
                     >
                         {line.text}

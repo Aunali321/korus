@@ -1,22 +1,17 @@
 <script lang="ts">
+    import { goto } from "$app/navigation";
     import Lock from "@lucide/svelte/icons/lock";
-    import { api } from "$lib/api";
-    import { auth } from "$lib/stores/auth.svelte";
     import type { WrappedData } from "$lib/types";
     import type { Component } from "svelte";
+    import type { PageData } from "./$types";
 
-    let wrapped = $state<WrappedData | null>(null);
-    let loading = $state(true);
-    let period = $state<"year" | "month">("year");
+    let { data }: { data: PageData } = $props();
+
     let ThemeComponent = $state<Component<{ wrapped: WrappedData }> | null>(null);
 
-    function isWrappedSeason(): boolean {
-        const now = new Date();
-        const month = now.getMonth();
-        const date = now.getDate();
-        const lastDay = new Date(now.getFullYear(), month + 1, 0).getDate();
-        return month === 11 || lastDay - date < 7;
-    }
+    const period = $derived(data.period);
+    const wrapped = $derived(data.wrapped);
+    const inSeason = $derived(data.inSeason);
 
     function getThemeKey(): string {
         const now = new Date();
@@ -25,52 +20,23 @@
         return `${year}-${month}`;
     }
 
-    async function loadTheme() {
+    $effect(() => {
+        if (!inSeason) return;
         const key = getThemeKey();
         const modules = import.meta.glob<{ default: Component<{ wrapped: WrappedData }> }>(
             "./themes/*.svelte"
         );
         const path = `./themes/${key}.svelte`;
-
-        if (modules[path]) {
-            const mod = await modules[path]();
-            ThemeComponent = mod.default;
-        } else {
-            // Fallback to latest available theme
-            const keys = Object.keys(modules).sort().reverse();
-            if (keys.length > 0) {
-                const mod = await modules[keys[0]]();
-                ThemeComponent = mod.default;
-            }
-        }
-    }
-
-    $effect(() => {
-        if (auth.isAuthenticated && isWrappedSeason()) {
-            loadWrapped();
-            loadTheme();
-        } else {
-            loading = false;
-        }
+        const target = modules[path] ?? modules[Object.keys(modules).sort().reverse()[0]];
+        target?.().then((mod) => { ThemeComponent = mod.default; });
     });
 
-    async function loadWrapped() {
-        loading = true;
-        try {
-            wrapped = await api.getWrapped(period);
-        } catch (e) {
-            console.error("Failed to load wrapped:", e);
-        } finally {
-            loading = false;
-        }
+    function selectPeriod(p: "year" | "month") {
+        goto(`?period=${p}`, { replaceState: true, noScroll: true, keepFocus: true });
     }
 </script>
 
-{#if loading}
-    <div class="flex justify-center items-center min-h-screen bg-black">
-        <div class="text-zinc-500">Loading...</div>
-    </div>
-{:else if !isWrappedSeason()}
+{#if !inSeason}
     <div class="flex flex-col items-center justify-center min-h-screen bg-black text-center p-6">
         <Lock class="text-zinc-600 mb-4" size={64} />
         <h3 class="text-2xl font-bold text-zinc-400 mb-2">Wrapped Not Available</h3>
@@ -82,16 +48,10 @@
 {:else if wrapped && ThemeComponent}
     <div class="wrapped-container">
         <div class="period-toggle">
-            <button
-                onclick={() => { period = "year"; loadWrapped(); }}
-                class:active={period === "year"}
-            >
+            <button onclick={() => selectPeriod("year")} class:active={period === "year"}>
                 This Year
             </button>
-            <button
-                onclick={() => { period = "month"; loadWrapped(); }}
-                class:active={period === "month"}
-            >
+            <button onclick={() => selectPeriod("month")} class:active={period === "month"}>
                 This Month
             </button>
         </div>
