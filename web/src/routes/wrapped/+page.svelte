@@ -1,103 +1,77 @@
 <script lang="ts">
-    import { goto } from "$app/navigation";
-    import Lock from "@lucide/svelte/icons/lock";
-    import type { WrappedData } from "$lib/types";
-    import type { Component } from "svelte";
-    import type { PageData } from "./$types";
+	import { onMount } from 'svelte';
+	import { RefreshCw } from '@lucide/svelte';
+	import { getWrapped } from '$lib/ai';
+	import WrappedRenderer from '$lib/components/WrappedRenderer.svelte';
 
-    let { data }: { data: PageData } = $props();
+	let period = $state<'month' | 'year'>('month');
+	let html = $state<string>('');
+	let loading = $state(true);
+	let regenerating = $state(false);
+	let error = $state('');
 
-    let ThemeComponent = $state<Component<{ wrapped: WrappedData }> | null>(null);
+	async function load(refresh = false) {
+		if (refresh) regenerating = true;
+		else loading = true;
+		error = '';
+		try {
+			const res = await getWrapped(period, refresh);
+			html = res.html;
+		} catch (e) {
+			error = e instanceof Error ? e.message : 'Failed to load your Wrapped.';
+		} finally {
+			loading = false;
+			regenerating = false;
+		}
+	}
 
-    const period = $derived(data.period);
-    const wrapped = $derived(data.wrapped);
-    const inSeason = $derived(data.inSeason);
+	function setPeriod(p: 'month' | 'year') {
+		if (p !== period && !regenerating) {
+			period = p;
+			html = '';
+			load();
+		}
+	}
 
-    function getThemeKey(): string {
-        const now = new Date();
-        const year = now.getFullYear();
-        const month = String(now.getMonth() + 1).padStart(2, "0");
-        return `${year}-${month}`;
-    }
-
-    $effect(() => {
-        if (!inSeason) return;
-        const key = getThemeKey();
-        const modules = import.meta.glob<{ default: Component<{ wrapped: WrappedData }> }>(
-            "./themes/*.svelte"
-        );
-        const path = `./themes/${key}.svelte`;
-        const target = modules[path] ?? modules[Object.keys(modules).sort().reverse()[0]];
-        target?.().then((mod) => { ThemeComponent = mod.default; });
-    });
-
-    function selectPeriod(p: "year" | "month") {
-        goto(`?period=${p}`, { replaceState: true, noScroll: true, keepFocus: true });
-    }
+	onMount(() => load());
 </script>
 
-{#if !inSeason}
-    <div class="flex flex-col items-center justify-center min-h-screen bg-black text-center p-6">
-        <Lock class="text-zinc-600 mb-4" size={64} />
-        <h3 class="text-2xl font-bold text-zinc-400 mb-2">Wrapped Not Available</h3>
-        <p class="text-zinc-500 max-w-md">
-            Your Wrapped summary is only available during the last week of each month
-            and throughout December. Check back soon!
-        </p>
-    </div>
-{:else if wrapped && ThemeComponent}
-    <div class="wrapped-container">
-        <div class="period-toggle">
-            <button onclick={() => selectPeriod("year")} class:active={period === "year"}>
-                This Year
-            </button>
-            <button onclick={() => selectPeriod("month")} class:active={period === "month"}>
-                This Month
-            </button>
-        </div>
-        <ThemeComponent {wrapped} />
-    </div>
-{:else}
-    <div class="flex flex-col items-center justify-center min-h-screen bg-black text-center">
-        <p class="text-zinc-500">No wrapped data available yet</p>
-        <p class="text-sm text-zinc-600 mt-1">Keep listening to build your story!</p>
-    </div>
-{/if}
+<div class="relative min-h-screen bg-[#060608]">
+	<div class="absolute top-4 right-4 z-20 flex items-center gap-2">
+		<button
+			onclick={() => load(true)}
+			disabled={loading || regenerating}
+			title="Regenerate this Wrapped with a fresh design"
+			class="flex items-center gap-1.5 rounded-full bg-black/40 px-3 py-1.5 text-sm text-white/70 backdrop-blur transition-colors hover:text-white disabled:opacity-50"
+		>
+			<RefreshCw class="h-4 w-4 {regenerating ? 'animate-spin' : ''}" />
+			<span class="hidden sm:inline">{regenerating ? 'Regenerating…' : 'Regenerate'}</span>
+		</button>
+		<div class="flex gap-1 rounded-full bg-black/40 p-1 backdrop-blur">
+			<button
+				onclick={() => setPeriod('month')}
+				class="rounded-full px-4 py-1.5 text-sm transition-colors {period === 'month'
+					? 'bg-white/15 text-white'
+					: 'text-white/60 hover:text-white'}">Month</button
+			>
+			<button
+				onclick={() => setPeriod('year')}
+				class="rounded-full px-4 py-1.5 text-sm transition-colors {period === 'year'
+					? 'bg-white/15 text-white'
+					: 'text-white/60 hover:text-white'}">Year</button
+			>
+		</div>
+	</div>
 
-<style>
-    .wrapped-container {
-        position: relative;
-        min-height: 100vh;
-    }
-
-    .period-toggle {
-        position: fixed;
-        top: 1rem;
-        right: 1rem;
-        z-index: 100;
-        display: flex;
-        gap: 0.5rem;
-    }
-
-    .period-toggle button {
-        padding: 0.5rem 1rem;
-        border-radius: 9999px;
-        font-size: 0.875rem;
-        background: rgba(39, 39, 42, 0.8);
-        backdrop-filter: blur(8px);
-        color: rgb(161, 161, 170);
-        border: 1px solid rgba(255, 255, 255, 0.1);
-        cursor: pointer;
-        transition: all 0.2s;
-    }
-
-    .period-toggle button:hover {
-        background: rgba(63, 63, 70, 0.8);
-    }
-
-    .period-toggle button.active {
-        background: rgb(16, 185, 129);
-        color: black;
-        border-color: transparent;
-    }
-</style>
+	{#if loading}
+		<div class="mx-auto max-w-2xl space-y-6 px-6 py-24">
+			{#each Array.from({ length: 5 }) as _, i (i)}
+				<div class="h-24 animate-pulse rounded-2xl bg-white/5"></div>
+			{/each}
+		</div>
+	{:else if error}
+		<div class="px-6 py-24 text-center text-white/60">{error}</div>
+	{:else if html}
+		<WrappedRenderer {html} />
+	{/if}
+</div>

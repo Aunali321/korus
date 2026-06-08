@@ -30,10 +30,13 @@ type Config struct {
 	ScanWorkers           int
 	ScanAutoPlaylists     bool
 	CoverCachePath        string
-	RadioLLMEnabled       bool
-	RadioLLMAPIKey        string
-	RadioLLMModel         string
 	RadioDefaultLimit     int
+	AIEnabled             bool
+	AIAPIKey              string
+	AIProvider            string
+	AIBaseURL             string
+	AIModel               string
+	AIReasoning           string
 	MetadataEnrichEnabled bool
 	MetadataEnrichURL     string
 	HLSCacheDir         string
@@ -67,10 +70,13 @@ func FromEnv() (Config, error) {
 		ScanWorkers:           intEnv("SCAN_WORKERS", 8),
 		ScanAutoPlaylists:     boolEnv("SCAN_AUTO_PLAYLISTS", true),
 		CoverCachePath:        getenv("COVER_CACHE_PATH", "./cache/covers"),
-		RadioLLMEnabled:       boolEnv("RADIO_LLM_ENABLED", false),
-		RadioLLMAPIKey:        getenv("OPENROUTER_API_KEY", ""),
-		RadioLLMModel:         getenv("RADIO_LLM_MODEL", "google/gemini-3-flash-preview"),
 		RadioDefaultLimit:     intEnv("RADIO_DEFAULT_LIMIT", 20),
+		AIEnabled:             boolEnv("AI_ENABLED", false),
+		AIAPIKey:              getenv("AI_API_KEY", getenv("OPENROUTER_API_KEY", "")),
+		AIProvider:            getenv("AI_PROVIDER", "openrouter"),
+		AIBaseURL:             getenv("AI_BASE_URL", ""),
+		AIModel:               getenv("AI_MODEL", "arcee-ai/trinity-large-thinking:arcee-ai"),
+		AIReasoning:           getenv("AI_REASONING", "medium"),
 		MetadataEnrichEnabled: boolEnv("METADATA_ENRICH_ENABLED", true),
 		MetadataEnrichURL:     getenv("METADATA_ENRICH_URL", "https://metadata.aun.rest"),
 		HLSCacheDir:         getenv("CACHE_HLS_DIR", "./cache/hls"),

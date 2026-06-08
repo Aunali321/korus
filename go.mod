@@ -1,11 +1,11 @@
 module github.com/Aunali321/korus
 
-go 1.24.5
+go 1.26
 
 require (
+	github.com/aunali321/pi-go v0.0.0-20260529084353-546c4170b74f
 	github.com/dhowden/tag v0.0.0-20240417053706-3d75831295e8
 	github.com/fsnotify/fsnotify v1.7.0
-	github.com/go-pdf/fpdf v0.9.0
 	github.com/go-playground/validator/v10 v10.28.0
 	github.com/golang-jwt/jwt/v5 v5.3.0
 	github.com/golang-migrate/migrate/v4 v4.19.1

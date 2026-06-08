@@ -20,6 +20,7 @@
 	const navItems = [
 		{ icon: Home, label: "Home", href: "/" },
 		{ icon: Search, label: "Search", href: "/search" },
+		{ icon: Sparkles, label: "Ask", href: "/ask" },
 		{ icon: Library, label: "Library", href: "/library" },
 	];
 
@@ -29,17 +30,6 @@
 		{ icon: Mic2, label: "Artists", href: "/artists" },
 		{ icon: Heart, label: "Favorites", href: "/favorites" },
 	];
-
-	// Wrapped is shown only during last week of month or in December
-	function isWrappedSeason(): boolean {
-		const now = new Date();
-		const month = now.getMonth(); // 0-11
-		const date = now.getDate();
-		const lastDay = new Date(now.getFullYear(), month + 1, 0).getDate();
-
-		// Show in December (month 11) or last 7 days of any month
-		return month === 11 || lastDay - date < 7;
-	}
 
 	function isActive(href: string): boolean {
 		if (href === "/") return $page.url.pathname === "/";
@@ -140,17 +130,15 @@
 					<BarChart3 size={18} class="nav-icon" />
 					<span class="text-sm">Stats</span>
 				</a>
-				{#if isWrappedSeason()}
-					<a
-						href="/wrapped"
-						onclick={handleNavClick}
-						class="nav-link nav-link--sm {isActive('/wrapped') ? 'is-active' : ''}"
-					>
-						<span class="nav-indicator" aria-hidden="true"></span>
-						<Sparkles size={18} class="nav-icon" />
-						<span class="text-sm">Wrapped</span>
-					</a>
-				{/if}
+				<a
+					href="/wrapped"
+					onclick={handleNavClick}
+					class="nav-link nav-link--sm {isActive('/wrapped') ? 'is-active' : ''}"
+				>
+					<span class="nav-indicator" aria-hidden="true"></span>
+					<Sparkles size={18} class="nav-icon" />
+					<span class="text-sm">Wrapped</span>
+				</a>
 			</div>
 		</div>
 	</nav>

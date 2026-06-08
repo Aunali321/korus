@@ -43,8 +43,26 @@
 				player.seek(player.progress + 10);
 			}
 		}
+
+		// The player + command-palette shortcuts are bound on `window` (bubble).
+		// Stop them firing while typing in a text field: this runs on document's
+		// bubble phase (before window), so the field still gets the keystroke but
+		// the shortcut handlers never do. The palette's own input is exempt so its
+		// arrow/enter navigation works, and $mod combos / Escape pass through.
+		function blockShortcutsWhileTyping(e: KeyboardEvent) {
+			const t = e.target;
+			if (!(t instanceof HTMLElement) || t.id === 'paletteInput') return;
+			if (!isEditableElement(t)) return;
+			if (e.metaKey || e.ctrlKey || e.key === 'Escape') return;
+			e.stopPropagation();
+		}
+
 		window.addEventListener('keydown', handleKeydown);
-		return () => window.removeEventListener('keydown', handleKeydown);
+		document.addEventListener('keydown', blockShortcutsWhileTyping);
+		return () => {
+			window.removeEventListener('keydown', handleKeydown);
+			document.removeEventListener('keydown', blockShortcutsWhileTyping);
+		};
 	});
 
 	function volumeUp() {

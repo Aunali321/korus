@@ -622,7 +622,7 @@ function createPlayerStore() {
         audio?.play().catch(console.error);
 
         try {
-            const { songs: radioSongs } = await api.getRadio(song.id, 20, settings.radioMode);
+            const { songs: radioSongs } = await api.getRadio(song.id, 20);
             if (radioSongs && radioSongs.length > 0) {
                 const newSongs = radioSongs.filter(s => s.id !== song.id);
                 queue = [song, ...newSongs];
@@ -633,6 +633,39 @@ function createPlayerStore() {
             console.error('Failed to fetch radio songs:', err);
         } finally {
             radioLoading = false;
+        }
+    }
+
+    function removeFromQueue(index: number) {
+        if (index < 0 || index >= queue.length || index === queueIndex) return;
+        queue = queue.filter((_, i) => i !== index);
+        if (index < queueIndex) queueIndex--;
+        saveStateDebounced();
+    }
+
+    function reorderQueue(orderedIds: number[]) {
+        const byId = new Map(queue.map((s) => [s.id, s] as const));
+        const reordered: Song[] = [];
+        for (const id of orderedIds) {
+            const s = byId.get(id);
+            if (s) reordered.push(s);
+        }
+        for (const s of queue) {
+            if (!orderedIds.includes(s.id)) reordered.push(s);
+        }
+        queue = reordered;
+        if (currentSong) {
+            const idx = queue.findIndex((s) => s.id === currentSong!.id);
+            if (idx >= 0) queueIndex = idx;
+        }
+        saveStateDebounced();
+    }
+
+    function enqueue(songs: Song[], position: 'next' | 'end' = 'end') {
+        if (position === 'next') {
+            for (let i = songs.length - 1; i >= 0; i--) playNext(songs[i]);
+        } else {
+            for (const s of songs) addToQueue(s);
         }
     }
 
@@ -688,6 +721,9 @@ function createPlayerStore() {
         addToQueue,
         playNext,
         clearQueue,
+        removeFromQueue,
+        reorderQueue,
+        enqueue,
         playQueue,
         playShuffled,
         startRadio,

@@ -26,12 +26,10 @@ SET sql = 'CREATE TABLE albums (
 )'
 WHERE type = 'table' AND name = 'albums';
 
-PRAGMA writable_schema = OFF;
-
--- Bump schema_version to invalidate any cached schema in connections that
--- saw the old NOT NULL definition. Without this, the active Go connection
--- continues to enforce the old constraint even after the schema text
--- changes, causing post-migration UPDATEs to NULL to fail spuriously.
-PRAGMA schema_version = (SELECT schema_version + 1 FROM pragma_schema_version);
+-- RESET turns writable_schema off and reloads the cached schema, so the active
+-- connection sees the rewritten (nullable) albums definition. The previous
+-- `PRAGMA schema_version = (SELECT ...)` was invalid SQLite syntax and left
+-- not-yet-migrated databases wedged at this migration.
+PRAGMA writable_schema = RESET;
 
 PRAGMA integrity_check;

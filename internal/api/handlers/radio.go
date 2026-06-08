@@ -1,11 +1,11 @@
 package handlers
 
 import (
+	"context"
 	"database/sql"
 	"net/http"
 
 	"github.com/Aunali321/korus/internal/models"
-	"github.com/Aunali321/korus/internal/services"
 	"github.com/labstack/echo/v4"
 )
 
@@ -15,7 +15,6 @@ import (
 // @Produce json
 // @Param id path int true "Song ID to seed radio from"
 // @Param limit query int false "Number of songs to return" default(20)
-// @Param mode query string false "Radio mode: curator or mainstream" default(curator)
 // @Success 200 {object} map[string][]models.Song
 // @Failure 404 {object} map[string]string
 // @Router /radio/{id} [get]
@@ -35,21 +34,14 @@ func (h *Handler) Radio(c echo.Context) error {
 		}
 	}
 
-	mode := c.QueryParam("mode")
-
 	ctx := c.Request().Context()
 
-	// Try LLM-based recommendations if available
-	if h.radio != nil {
-		radioMode := services.RadioModeCurator
-		if mode == "mainstream" {
-			radioMode = services.RadioModeMainstream
-		}
-		ids, err := h.radio.GetRecommendations(ctx, songID, limit, radioMode)
+	if h.ai != nil {
+		user, _ := currentUser(c)
+		ids, err := h.ai.Radio(ctx, user.ID, songID, limit)
 		if err == nil && len(ids) > 0 {
 			return h.getSongsByIDs(c, ids)
 		}
-		// Fall through to metadata-based if LLM fails
 	}
 
 	// Fallback to metadata-based recommendations.
@@ -78,8 +70,10 @@ func (h *Handler) Radio(c echo.Context) error {
 }
 
 func (h *Handler) getSongsByIDs(c echo.Context, ids []int64) error {
-	ctx := c.Request().Context()
+	return c.JSON(http.StatusOK, map[string]any{"songs": h.songsByIDs(c.Request().Context(), ids)})
+}
 
+func (h *Handler) songsByIDs(ctx context.Context, ids []int64) []models.Song {
 	songs := make([]models.Song, 0, len(ids))
 	for _, id := range ids {
 		var s models.Song
@@ -142,7 +136,7 @@ func (h *Handler) getSongsByIDs(c echo.Context, ids []int64) error {
 		songs = append(songs, s)
 	}
 
-	return c.JSON(http.StatusOK, map[string]any{"songs": songs})
+	return songs
 }
 
 func (h *Handler) radioByMetadata(c echo.Context, seedID int64, artistID sql.NullInt64, albumID int64, year sql.NullInt64, limit int) error {

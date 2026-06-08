@@ -60,7 +60,7 @@ Self-hosted music streaming server with a web interface.
 - Node.js / Bun (for frontend)
 - FFmpeg and FFprobe in PATH (or set `FFMPEG_PATH` / `FFPROBE_PATH`)
 
-**Note:** Korus can run fully offline with no external service dependencies. All integrations (metadata enrichment, radio, MusicBrainz, ListenBrainz) are optional and disabled by default except metadata enrichment. To run completely standalone, set `METADATA_ENRICH_ENABLED=false`. However, enabling radio (requires an OpenRouter API key) is recommended for the best music discovery experience.
+**Note:** Korus can run fully offline with no external service dependencies. All integrations (metadata enrichment, radio, MusicBrainz, ListenBrainz) are optional and disabled by default except metadata enrichment. To run completely standalone, set `METADATA_ENRICH_ENABLED=false`. However, enabling AI features (requires an OpenRouter API key) is recommended for the best experience — they power the Ask assistant, smarter radio, and a dynamic Wrapped.
 
 ## Setup
 
@@ -134,26 +134,24 @@ The default metadata API is hosted at `https://metadata.aun.rest`. You can self-
 | `RATE_LIMIT_AUTH_COUNT` | `5` | Auth attempts allowed |
 | `RATE_LIMIT_AUTH_WINDOW` | `1m` | Time window for auth rate limit |
 
-### Radio (LLM Recommendations)
+### AI (Ask, Radio, Wrapped)
+
+Korus's AI features run on a single LLM agent that reads your library and listening history through tools — nothing is sent to the model except what the tools return, via the provider you configure.
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `RADIO_LLM_ENABLED` | `false` | Enable LLM-powered radio recommendations |
-| `OPENROUTER_API_KEY` | - | OpenRouter API key (required if radio enabled) |
-| `RADIO_LLM_MODEL` | `google/gemini-3-flash-preview` | LLM model to use |
-| `RADIO_DEFAULT_LIMIT` | `20` | Default number of recommendations to return |
+| `AI_ENABLED` | `false` | Enable AI features (Ask, smart radio, dynamic Wrapped) |
+| `OPENROUTER_API_KEY` | - | OpenRouter API key (required when AI is enabled) |
+| `AI_MODEL` | `arcee-ai/trinity-large-thinking:arcee-ai` | OpenRouter model id |
+| `AI_REASONING` | `medium` | Reasoning effort: `off`, `minimal`, `low`, `medium`, `high`, `xhigh` |
+| `RADIO_DEFAULT_LIMIT` | `20` | Default number of radio songs to return |
 
-When enabled, the radio feature uses an LLM to find similar songs from your library based on genre, style, mood, and language. The entire library is rendered as a PDF and sent to the model for context.
+**What it powers:**
+- **Ask** — a streaming chat assistant that searches your library, builds/edits playlists, controls playback, and answers questions. Replies can include inline cards, charts, and song lists.
+- **Radio** — `GET /api/radio/{id}` builds a personalized queue from a seed song using your taste, falling back to metadata scoring (same artist/album/year) when AI is disabled or fails.
+- **Wrapped** — a month/year listening recap rendered from an AI-generated UI, generated once per period and cached.
 
-**Radio Modes:**
-- **Curator** (default): Better quality recommendations. Best for most queries, indie music, and discovery. Uses a compact PDF format.
-- **Mainstream**: More predictable recommendations. Best for mainstream music only. Uses a detailed PDF format.
-
-**Estimated costs (using OpenRouter with Gemini Flash):**
-- Curator mode: ~1500 requests per $1
-- Mainstream mode: ~400 requests per $1
-
-If disabled or if the LLM fails, radio falls back to metadata-based recommendations (same artist/album/year).
+**Endpoints:** `POST /api/ai/chat` (SSE: `text`/`tool`/`ui`/`action`/`done`), `GET|DELETE /api/ai/conversations[/{id}]`, `GET /api/ai/wrapped?period=month|year`, `GET /api/radio/{id}`.
 
 ## API
 

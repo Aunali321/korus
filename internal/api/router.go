@@ -15,6 +15,7 @@ import (
 	"github.com/Aunali321/korus/internal/api/middleware"
 	"github.com/Aunali321/korus/internal/api/validators"
 	"github.com/Aunali321/korus/internal/services"
+	aisvc "github.com/Aunali321/korus/internal/services/ai"
 	"github.com/Aunali321/korus/internal/services/hls"
 )
 
@@ -27,7 +28,7 @@ type Deps struct {
 	Transcoder        *services.Transcoder
 	MusicBrainz       *services.MusicBrainzService
 	ListenBrainz      *services.ListenBrainzService
-	Radio             *services.RadioService
+	AI                *aisvc.Service
 	HLS               *hls.Service
 	MediaRoot         string
 	AuthRate          int
@@ -52,7 +53,7 @@ func New(deps Deps) *echo.Echo {
 	e.Use(echomw.Recover())
 	e.Use(echomw.CORS())
 
-	h := handlers.New(deps.DB, deps.DBPath, deps.Auth, deps.Scanner, deps.Search, deps.Transcoder, deps.MusicBrainz, deps.ListenBrainz, deps.Radio, deps.MediaRoot, deps.RadioDefaultLimit)
+	h := handlers.New(deps.DB, deps.DBPath, deps.Auth, deps.Scanner, deps.Search, deps.Transcoder, deps.MusicBrainz, deps.ListenBrainz, deps.AI, deps.MediaRoot, deps.RadioDefaultLimit)
 	hlsHandler := handlers.NewHLSHandler(deps.DB, deps.HLS)
 
 	api := e.Group("/api")
@@ -121,6 +122,12 @@ func New(deps Deps) *echo.Echo {
 	api.GET("/stats/insights", h.Insights, middleware.Auth(deps.Auth))
 	api.GET("/home", h.Home, middleware.Auth(deps.Auth))
 	api.GET("/radio/:id", h.Radio, middleware.Auth(deps.Auth))
+
+	api.POST("/ai/chat", h.AIChat, middleware.Auth(deps.Auth))
+	api.GET("/ai/conversations", h.ListConversations, middleware.Auth(deps.Auth))
+	api.GET("/ai/conversations/:id", h.GetConversation, middleware.Auth(deps.Auth))
+	api.DELETE("/ai/conversations/:id", h.DeleteConversation, middleware.Auth(deps.Auth))
+	api.GET("/ai/wrapped", h.AIWrapped, middleware.Auth(deps.Auth))
 
 	api.GET("/settings", h.GetSettings, middleware.Auth(deps.Auth))
 	api.PUT("/settings", h.UpdateSettings, middleware.Auth(deps.Auth))

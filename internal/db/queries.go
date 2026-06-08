@@ -131,7 +131,7 @@ func GetSongsByFavorites(ctx context.Context, db *sql.DB, userID int64) ([]model
 }
 
 func scanSongs(rows *sql.Rows) ([]models.Song, error) {
-	var songs []models.Song
+	songs := []models.Song{}
 	for rows.Next() {
 		song, err := ScanSong(rows)
 		if err != nil {

@@ -4,6 +4,7 @@ import (
 	"database/sql"
 
 	"github.com/Aunali321/korus/internal/services"
+	aisvc "github.com/Aunali321/korus/internal/services/ai"
 )
 
 type Handler struct {
@@ -15,12 +16,12 @@ type Handler struct {
 	transcoder        *services.Transcoder
 	musicBrainz       *services.MusicBrainzService
 	listenBrainz      *services.ListenBrainzService
-	radio             *services.RadioService
+	ai                *aisvc.Service
 	mediaRoot         string
 	radioDefaultLimit int
 }
 
-func New(db *sql.DB, dbPath string, auth *services.AuthService, scanner *services.ScannerService, search *services.SearchService, transcoder *services.Transcoder, mb *services.MusicBrainzService, lb *services.ListenBrainzService, radio *services.RadioService, mediaRoot string, radioDefaultLimit int) *Handler {
+func New(db *sql.DB, dbPath string, auth *services.AuthService, scanner *services.ScannerService, search *services.SearchService, transcoder *services.Transcoder, mb *services.MusicBrainzService, lb *services.ListenBrainzService, aiSvc *aisvc.Service, mediaRoot string, radioDefaultLimit int) *Handler {
 	return &Handler{
 		db:                db,
 		dbPath:            dbPath,
@@ -30,7 +31,7 @@ func New(db *sql.DB, dbPath string, auth *services.AuthService, scanner *service
 		transcoder:        transcoder,
 		musicBrainz:       mb,
 		listenBrainz:      lb,
-		radio:             radio,
+		ai:                aiSvc,
 		mediaRoot:         mediaRoot,
 		radioDefaultLimit: radioDefaultLimit,
 	}

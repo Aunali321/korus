@@ -18,7 +18,7 @@ const API_URL_KEY = "korus_api_url";
 const ACCESS_TOKEN_KEY = "korus_access_token";
 const REFRESH_TOKEN_KEY = "korus_refresh_token";
 
-function getApiUrl(): string {
+export function getApiUrl(): string {
   if (typeof localStorage === "undefined") return "/api";
   return localStorage.getItem(API_URL_KEY) || "/api";
 }
@@ -400,12 +400,8 @@ export const api = {
 
   health: () => request<{ status: string }>("/health"),
 
-  getRadio: (
-    songId: number,
-    limit = 20,
-    mode: "curator" | "mainstream" = "curator",
-  ) =>
-    request<{ songs: Song[] }>(`/radio/${songId}?limit=${limit}&mode=${mode}`),
+  getRadio: (songId: number, limit = 20) =>
+    request<{ songs: Song[] }>(`/radio/${songId}?limit=${limit}`),
 
   getAppSettings: () => request<{ radio_enabled: boolean }>("/admin/settings"),
 

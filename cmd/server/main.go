@@ -20,6 +20,7 @@ import (
 	"github.com/Aunali321/korus/internal/config"
 	"github.com/Aunali321/korus/internal/db"
 	"github.com/Aunali321/korus/internal/services"
+	aisvc "github.com/Aunali321/korus/internal/services/ai"
 	"github.com/Aunali321/korus/internal/services/hls"
 )
 
@@ -92,7 +93,7 @@ func main() {
 	if err := seedAdmin(ctx, authSvc, database, adminUser, adminEmail, adminPass); err != nil {
 		log.Fatalf("seed admin: %v", err)
 	}
-	if err := db.SeedAppSettings(ctx, database, cfg.RadioLLMEnabled); err != nil {
+	if err := db.SeedAppSettings(ctx, database, cfg.AIEnabled); err != nil {
 		log.Fatalf("seed app settings: %v", err)
 	}
 
@@ -122,10 +123,10 @@ func main() {
 		lb = services.NewListenBrainzService(cfg.ListenBrainzToken, cfg.ListenBrainzUser)
 	}
 
-	var radio *services.RadioService
-	if cfg.RadioLLMEnabled && cfg.RadioLLMAPIKey != "" {
-		radio = services.NewRadioService(database, cfg.RadioLLMAPIKey, cfg.RadioLLMModel)
-		log.Printf("Radio LLM enabled with model: %s", cfg.RadioLLMModel)
+	var aiSvc *aisvc.Service
+	if cfg.AIEnabled && cfg.AIAPIKey != "" {
+		aiSvc = aisvc.New(database, cfg.AIAPIKey, cfg.AIProvider, cfg.AIBaseURL, cfg.AIModel, cfg.AIReasoning)
+		log.Printf("AI enabled with model: %s", aiSvc.ModelID())
 	}
 
 	// Initialize HLS service
@@ -154,7 +155,7 @@ func main() {
 		Transcoder:        transcoder,
 		MusicBrainz:       mb,
 		ListenBrainz:      lb,
-		Radio:             radio,
+		AI:                aiSvc,
 		HLS:               hlsService,
 		MediaRoot:         cfg.MediaRoot,
 		AuthRate:          cfg.RateLimitAuthCount,

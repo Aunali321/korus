@@ -14,8 +14,8 @@
 
     let currentSlide = $state(0);
 
-    const recentPlays = $derived(data.home.recent_plays);
-    const newAdditions = $derived(data.home.new_additions);
+    const recentPlays = $derived(data.home?.recent_plays ?? []);
+    const newAdditions = $derived(data.home?.new_additions ?? []);
 
     function playTrack(song: Song, songs: Song[]) {
         player.playQueue(

@@ -30,7 +30,7 @@
 {/if}
 
 <div
-    class="fixed right-0 top-0 h-full w-full md:w-96 bg-zinc-950 border-l border-zinc-800 z-50 transform transition-transform duration-[420ms] ease-[cubic-bezier(0.32,0.72,0,1)] will-change-transform {isOpen
+    class="fixed right-0 top-0 h-full w-full md:w-96 bg-zinc-950 border-l border-zinc-800 z-50 flex flex-col transform transition-transform duration-[420ms] ease-[cubic-bezier(0.32,0.72,0,1)] will-change-transform {isOpen
         ? 'translate-x-0'
         : 'translate-x-full'}"
 >
@@ -61,7 +61,7 @@
             </div>
         {/if}
 
-        <div class="flex-1 flex flex-col">
+        <div class="flex-1 flex flex-col min-h-0">
             <div class="px-6 py-4 border-b border-zinc-800">
                 <h3
                     class="text-sm font-semibold text-zinc-400 uppercase tracking-wider"
@@ -75,7 +75,8 @@
                     <span class="text-sm">Loading radio...</span>
                 </div>
             {:else if upNextTracks.length > 0}
-                <VList data={upNextTracks} style="height: calc(100vh - 28rem);" getKey={(track) => track.id}>
+                <div class="flex-1 min-h-0 pb-4">
+                <VList data={upNextTracks} style="height: 100%;" getKey={(track) => track.id}>
                     {#snippet children(track, index)}
                         <button
                             onclick={() => player.playQueue(player.queue, player.queueIndex + 1 + index)}
@@ -110,6 +111,7 @@
                         </button>
                     {/snippet}
                 </VList>
+                </div>
             {:else}
                 <p class="text-center text-zinc-500 py-8 text-sm">
                     Queue is empty

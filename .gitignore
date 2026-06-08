@@ -29,6 +29,7 @@ go.work.sum
 *.db-journal
 *.sqlite
 *.sqlite3
+*.bak
 
 # Logs
 *.log
