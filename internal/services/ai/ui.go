@@ -57,8 +57,8 @@ func (s *Service) resolveSpecSongs(ctx context.Context, node any) any {
 				props["songs"] = s.briefsByIDs(ctx, ids)
 			}
 			if id := toInt64(props["song_id"]); id > 0 {
-				if b, err := s.songBriefByID(ctx, id); err == nil {
-					props["song"] = b
+				if song, err := s.library.Song(ctx, id); err == nil {
+					props["song"] = brief(song)
 				}
 			}
 		}
@@ -78,13 +78,11 @@ func (s *Service) resolveSpecSongs(ctx context.Context, node any) any {
 }
 
 func (s *Service) briefsByIDs(ctx context.Context, ids []int64) []songBrief {
-	out := make([]songBrief, 0, len(ids))
-	for _, id := range ids {
-		if b, err := s.songBriefByID(ctx, id); err == nil {
-			out = append(out, b)
-		}
+	songs, err := s.library.Songs(ctx, ids)
+	if err != nil {
+		return []songBrief{}
 	}
-	return out
+	return briefs(songs)
 }
 
 func toInt64(v any) int64 {

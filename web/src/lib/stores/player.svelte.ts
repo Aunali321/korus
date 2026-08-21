@@ -1,5 +1,5 @@
 import type Hls from 'hls.js';
-import type { Song } from '$lib/types';
+import type { RepeatMode, Song } from '$lib/types';
 import { api, getAccessToken } from '$lib/api';
 import { settings } from './settings.svelte';
 import { library } from './library.svelte';
@@ -529,8 +529,9 @@ function createPlayerStore() {
         saveVolumeLocal();
     }
 
-    async function toggleShuffle() {
-        await settings.toggleShuffle();
+    async function setShuffle(value: boolean) {
+        if (settings.shuffle === value) return;
+        await settings.setShuffle(value);
         if (queue.length === 0 || !currentSong) return;
 
         if (settings.shuffle) {
@@ -547,8 +548,16 @@ function createPlayerStore() {
         saveStateDebounced();
     }
 
+    async function toggleShuffle() {
+        await setShuffle(!settings.shuffle);
+    }
+
     async function toggleRepeat() {
         await settings.toggleRepeat();
+    }
+
+    async function setRepeat(mode: RepeatMode) {
+        await settings.setRepeat(mode);
     }
 
     function addToQueue(song: Song) {
@@ -571,6 +580,29 @@ function createPlayerStore() {
         queue = [];
         queueIndex = 0;
         saveStateDebounced();
+    }
+
+    // stop ends the session: nothing playing, nothing queued. Unlike reset it
+    // keeps the store initialized, and it saves immediately so the server's
+    // player_state stops reporting a song that is no longer playing.
+    function stop() {
+        recordHistory();
+        destroyHls();
+        if (audio) {
+            audio.pause();
+            audio.removeAttribute('src');
+            audio.load();
+        }
+        currentSong = null;
+        queue = [];
+        originalQueue = [];
+        queueIndex = 0;
+        isPlaying = false;
+        isBuffering = false;
+        progress = 0;
+        duration = 0;
+        playStartTime = 0;
+        saveStateImmediate();
     }
 
     function playQueue(songs: Song[], startIndex = 0) {
@@ -643,6 +675,17 @@ function createPlayerStore() {
         saveStateDebounced();
     }
 
+    // setUpcoming replaces everything after the current song. Removing,
+    // reordering and clearing the queue all come through here, so the caller
+    // sends the queue it wants rather than an edit to apply.
+    function setUpcoming(songs: Song[]) {
+        const upcoming = currentSong ? songs.filter((s) => s.id !== currentSong!.id) : songs;
+        queue = currentSong ? [currentSong, ...upcoming] : upcoming;
+        queueIndex = 0;
+        originalQueue = [...queue];
+        saveStateDebounced();
+    }
+
     function reorderQueue(orderedIds: number[]) {
         const byId = new Map(queue.map((s) => [s.id, s] as const));
         const reordered: Song[] = [];
@@ -711,6 +754,7 @@ function createPlayerStore() {
         get radioLoading() { return radioLoading; },
         play,
         pause,
+        stop,
         toggle,
         next,
         prev,
@@ -718,11 +762,14 @@ function createPlayerStore() {
         setVolume,
         toggleShuffle,
         toggleRepeat,
+        setShuffle,
+        setRepeat,
         addToQueue,
         playNext,
         clearQueue,
         removeFromQueue,
         reorderQueue,
+        setUpcoming,
         enqueue,
         playQueue,
         playShuffled,

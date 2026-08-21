@@ -6,6 +6,7 @@
 *.dylib
 
 # Go
+/korus
 *.test
 *.out
 go.work

@@ -113,6 +113,9 @@ func main() {
 		}()
 	}
 	search := services.NewSearchService(database)
+	library := services.NewLibraryService(database)
+	playlists := services.NewPlaylistService(database)
+	stats := services.NewStatsService(database, library)
 	transcoder := services.NewTranscoder(cfg.FFmpegPath)
 	var mb *services.MusicBrainzService
 	var lb *services.ListenBrainzService
@@ -125,7 +128,18 @@ func main() {
 
 	var aiSvc *aisvc.Service
 	if cfg.AIEnabled && cfg.AIAPIKey != "" {
-		aiSvc = aisvc.New(database, cfg.AIAPIKey, cfg.AIProvider, cfg.AIBaseURL, cfg.AIModel, cfg.AIReasoning)
+		aiSvc = aisvc.New(aisvc.Config{
+			DB:        database,
+			Library:   library,
+			Playlists: playlists,
+			Search:    search,
+			Stats:     stats,
+			APIKey:    cfg.AIAPIKey,
+			Provider:  cfg.AIProvider,
+			BaseURL:   cfg.AIBaseURL,
+			Model:     cfg.AIModel,
+			Reasoning: cfg.AIReasoning,
+		})
 		log.Printf("AI enabled with model: %s", aiSvc.ModelID())
 	}
 
@@ -152,6 +166,9 @@ func main() {
 		Auth:              authSvc,
 		Scanner:           scanner,
 		Search:            search,
+		Library:           library,
+		Playlists:         playlists,
+		Stats:             stats,
 		Transcoder:        transcoder,
 		MusicBrainz:       mb,
 		ListenBrainz:      lb,

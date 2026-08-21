@@ -25,6 +25,9 @@ type Deps struct {
 	Auth              *services.AuthService
 	Scanner           *services.ScannerService
 	Search            *services.SearchService
+	Library           *services.LibraryService
+	Playlists         *services.PlaylistService
+	Stats             *services.StatsService
 	Transcoder        *services.Transcoder
 	MusicBrainz       *services.MusicBrainzService
 	ListenBrainz      *services.ListenBrainzService
@@ -53,7 +56,22 @@ func New(deps Deps) *echo.Echo {
 	e.Use(echomw.Recover())
 	e.Use(echomw.CORS())
 
-	h := handlers.New(deps.DB, deps.DBPath, deps.Auth, deps.Scanner, deps.Search, deps.Transcoder, deps.MusicBrainz, deps.ListenBrainz, deps.AI, deps.MediaRoot, deps.RadioDefaultLimit)
+	h := handlers.New(handlers.Deps{
+		DB:                deps.DB,
+		DBPath:            deps.DBPath,
+		Auth:              deps.Auth,
+		Scanner:           deps.Scanner,
+		Search:            deps.Search,
+		Library:           deps.Library,
+		Playlists:         deps.Playlists,
+		Stats:             deps.Stats,
+		Transcoder:        deps.Transcoder,
+		MusicBrainz:       deps.MusicBrainz,
+		ListenBrainz:      deps.ListenBrainz,
+		AI:                deps.AI,
+		MediaRoot:         deps.MediaRoot,
+		RadioDefaultLimit: deps.RadioDefaultLimit,
+	})
 	hlsHandler := handlers.NewHLSHandler(deps.DB, deps.HLS)
 
 	api := e.Group("/api")

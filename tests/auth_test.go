@@ -18,7 +18,8 @@ func newTestDB(t *testing.T) *sql.DB {
 	if err != nil {
 		t.Fatalf("open db: %v", err)
 	}
-	if err := db.Migrate(context.Background(), database); err != nil {
+	database.SetMaxOpenConns(1) // each connection to ":memory:" is its own database
+	if err := db.RunMigrations(database); err != nil {
 		t.Fatalf("migrate: %v", err)
 	}
 	return database

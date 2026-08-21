@@ -39,11 +39,11 @@ type Config struct {
 	AIReasoning           string
 	MetadataEnrichEnabled bool
 	MetadataEnrichURL     string
-	HLSCacheDir         string
-	HLSCacheSizeMB      int64
-	HLSCacheTTLHours    int
-	HLSCacheMinTTLHours int
-	HLSSegmentDuration  int
+	HLSCacheDir           string
+	HLSCacheSizeMB        int64
+	HLSCacheTTLHours      int
+	HLSCacheMinTTLHours   int
+	HLSSegmentDuration    int
 }
 
 // FromEnv builds Config from environment with sane defaults.
@@ -75,15 +75,15 @@ func FromEnv() (Config, error) {
 		AIAPIKey:              getenv("AI_API_KEY", getenv("OPENROUTER_API_KEY", "")),
 		AIProvider:            getenv("AI_PROVIDER", "openrouter"),
 		AIBaseURL:             getenv("AI_BASE_URL", ""),
-		AIModel:               getenv("AI_MODEL", "arcee-ai/trinity-large-thinking:arcee-ai"),
+		AIModel:               os.Getenv("AI_MODEL"),
 		AIReasoning:           getenv("AI_REASONING", "medium"),
 		MetadataEnrichEnabled: boolEnv("METADATA_ENRICH_ENABLED", true),
 		MetadataEnrichURL:     getenv("METADATA_ENRICH_URL", "https://metadata.aun.rest"),
-		HLSCacheDir:         getenv("CACHE_HLS_DIR", "./cache/hls"),
-		HLSCacheSizeMB:      int64Env("CACHE_HLS_SIZE_MB", 5000),
-		HLSCacheTTLHours:    intEnv("CACHE_HLS_TTL_HOURS", 24),
-		HLSCacheMinTTLHours: intEnv("CACHE_HLS_MIN_TTL_HOURS", 1),
-		HLSSegmentDuration:  intEnv("CACHE_HLS_SEGMENT_DURATION", 4),
+		HLSCacheDir:           getenv("CACHE_HLS_DIR", "./cache/hls"),
+		HLSCacheSizeMB:        int64Env("CACHE_HLS_SIZE_MB", 5000),
+		HLSCacheTTLHours:      intEnv("CACHE_HLS_TTL_HOURS", 24),
+		HLSCacheMinTTLHours:   intEnv("CACHE_HLS_MIN_TTL_HOURS", 1),
+		HLSSegmentDuration:    intEnv("CACHE_HLS_SEGMENT_DURATION", 4),
 	}
 	if cfg.JWTSecret == "" {
 		return cfg, errors.New("JWT_SECRET is required")

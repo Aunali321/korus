@@ -12,6 +12,7 @@ import (
 	_ "github.com/joho/godotenv/autoload"
 
 	"github.com/Aunali321/korus/internal/db"
+	"github.com/Aunali321/korus/internal/services"
 	aisvc "github.com/Aunali321/korus/internal/services/ai"
 )
 
@@ -26,9 +27,12 @@ func main() {
 		log.Fatalf("invalid song id: %v", err)
 	}
 
-	apiKey := os.Getenv("OPENROUTER_API_KEY")
+	apiKey := os.Getenv("AI_API_KEY")
 	if apiKey == "" {
-		log.Fatal("OPENROUTER_API_KEY not set")
+		apiKey = os.Getenv("OPENROUTER_API_KEY")
+	}
+	if apiKey == "" {
+		log.Fatal("AI_API_KEY not set")
 	}
 	dbPath := os.Getenv("DB_PATH")
 	if dbPath == "" {
@@ -46,9 +50,19 @@ func main() {
 		log.Fatalf("no users in db: %v", err)
 	}
 
-	svc := aisvc.New(database, apiKey, os.Getenv("AI_PROVIDER"), os.Getenv("AI_BASE_URL"), os.Getenv("AI_MODEL"), os.Getenv("AI_REASONING"))
+	svc := aisvc.New(aisvc.Config{
+		DB:        database,
+		Library:   services.NewLibraryService(database),
+		Playlists: services.NewPlaylistService(database),
+		Search:    services.NewSearchService(database),
+		APIKey:    apiKey,
+		Provider:  os.Getenv("AI_PROVIDER"),
+		BaseURL:   os.Getenv("AI_BASE_URL"),
+		Model:     os.Getenv("AI_MODEL"),
+		Reasoning: os.Getenv("AI_REASONING"),
+	})
 
-	ctx, cancel := context.WithTimeout(context.Background(), 120*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 300*time.Second)
 	defer cancel()
 
 	start := time.Now()

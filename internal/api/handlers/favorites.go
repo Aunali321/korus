@@ -1,16 +1,22 @@
 package handlers
 
 import (
-	"context"
-	"database/sql"
 	"net/http"
-	"strconv"
 
 	"github.com/labstack/echo/v4"
 
-	"github.com/Aunali321/korus/internal/db"
-	"github.com/Aunali321/korus/internal/models"
+	"github.com/Aunali321/korus/internal/services"
 )
+
+// setFavorite is the shared body of the six favourite and follow endpoints.
+func (h *Handler) setFavorite(c echo.Context, kind services.EntityKind, on bool) error {
+	user, _ := currentUser(c)
+	err := h.library.SetFavorite(c.Request().Context(), user.ID, kind, pathID(c, "id"), on)
+	if err != nil {
+		return serviceError(err, string(kind)+" not found", "FAVORITE_FAILED")
+	}
+	return c.JSON(http.StatusOK, map[string]bool{"success": true})
+}
 
 // FavSong godoc
 // @Summary Favorite song
@@ -22,15 +28,7 @@ import (
 // @Router /favorites/songs/{id} [post]
 // @Security BearerAuth
 func (h *Handler) FavSong(c echo.Context) error {
-	user, _ := currentUser(c)
-	id, _ := strconv.ParseInt(c.Param("id"), 10, 64)
-	if !h.songExists(c.Request().Context(), id) {
-		return echo.NewHTTPError(http.StatusNotFound, map[string]string{"error": "song not found", "code": "NOT_FOUND"})
-	}
-	if _, err := h.db.ExecContext(c.Request().Context(), `INSERT OR IGNORE INTO favorites_songs(user_id, song_id) VALUES(?, ?)`, user.ID, id); err != nil {
-		return echo.NewHTTPError(http.StatusInternalServerError, map[string]string{"error": err.Error(), "code": "FAV_FAILED"})
-	}
-	return c.JSON(http.StatusOK, map[string]bool{"success": true})
+	return h.setFavorite(c, services.EntitySong, true)
 }
 
 // UnfavSong godoc
@@ -42,12 +40,7 @@ func (h *Handler) FavSong(c echo.Context) error {
 // @Router /favorites/songs/{id} [delete]
 // @Security BearerAuth
 func (h *Handler) UnfavSong(c echo.Context) error {
-	user, _ := currentUser(c)
-	id, _ := strconv.ParseInt(c.Param("id"), 10, 64)
-	if _, err := h.db.ExecContext(c.Request().Context(), `DELETE FROM favorites_songs WHERE user_id = ? AND song_id = ?`, user.ID, id); err != nil {
-		return echo.NewHTTPError(http.StatusInternalServerError, map[string]string{"error": err.Error(), "code": "UNFAV_FAILED"})
-	}
-	return c.JSON(http.StatusOK, map[string]bool{"success": true})
+	return h.setFavorite(c, services.EntitySong, false)
 }
 
 // FavAlbum godoc
@@ -60,15 +53,7 @@ func (h *Handler) UnfavSong(c echo.Context) error {
 // @Router /favorites/albums/{id} [post]
 // @Security BearerAuth
 func (h *Handler) FavAlbum(c echo.Context) error {
-	user, _ := currentUser(c)
-	id, _ := strconv.ParseInt(c.Param("id"), 10, 64)
-	if !h.albumExists(c.Request().Context(), id) {
-		return echo.NewHTTPError(http.StatusNotFound, map[string]string{"error": "album not found", "code": "NOT_FOUND"})
-	}
-	if _, err := h.db.ExecContext(c.Request().Context(), `INSERT OR IGNORE INTO favorites_albums(user_id, album_id) VALUES(?, ?)`, user.ID, id); err != nil {
-		return echo.NewHTTPError(http.StatusInternalServerError, map[string]string{"error": err.Error(), "code": "FAV_FAILED"})
-	}
-	return c.JSON(http.StatusOK, map[string]bool{"success": true})
+	return h.setFavorite(c, services.EntityAlbum, true)
 }
 
 // UnfavAlbum godoc
@@ -80,12 +65,7 @@ func (h *Handler) FavAlbum(c echo.Context) error {
 // @Router /favorites/albums/{id} [delete]
 // @Security BearerAuth
 func (h *Handler) UnfavAlbum(c echo.Context) error {
-	user, _ := currentUser(c)
-	id, _ := strconv.ParseInt(c.Param("id"), 10, 64)
-	if _, err := h.db.ExecContext(c.Request().Context(), `DELETE FROM favorites_albums WHERE user_id = ? AND album_id = ?`, user.ID, id); err != nil {
-		return echo.NewHTTPError(http.StatusInternalServerError, map[string]string{"error": err.Error(), "code": "UNFAV_FAILED"})
-	}
-	return c.JSON(http.StatusOK, map[string]bool{"success": true})
+	return h.setFavorite(c, services.EntityAlbum, false)
 }
 
 // FollowArtist godoc
@@ -98,15 +78,7 @@ func (h *Handler) UnfavAlbum(c echo.Context) error {
 // @Router /follows/artists/{id} [post]
 // @Security BearerAuth
 func (h *Handler) FollowArtist(c echo.Context) error {
-	user, _ := currentUser(c)
-	id, _ := strconv.ParseInt(c.Param("id"), 10, 64)
-	if !h.artistExists(c.Request().Context(), id) {
-		return echo.NewHTTPError(http.StatusNotFound, map[string]string{"error": "artist not found", "code": "NOT_FOUND"})
-	}
-	if _, err := h.db.ExecContext(c.Request().Context(), `INSERT OR IGNORE INTO follows_artists(user_id, artist_id) VALUES(?, ?)`, user.ID, id); err != nil {
-		return echo.NewHTTPError(http.StatusInternalServerError, map[string]string{"error": err.Error(), "code": "FOLLOW_FAILED"})
-	}
-	return c.JSON(http.StatusOK, map[string]bool{"success": true})
+	return h.setFavorite(c, services.EntityArtist, true)
 }
 
 // UnfollowArtist godoc
@@ -118,12 +90,7 @@ func (h *Handler) FollowArtist(c echo.Context) error {
 // @Router /follows/artists/{id} [delete]
 // @Security BearerAuth
 func (h *Handler) UnfollowArtist(c echo.Context) error {
-	user, _ := currentUser(c)
-	id, _ := strconv.ParseInt(c.Param("id"), 10, 64)
-	if _, err := h.db.ExecContext(c.Request().Context(), `DELETE FROM follows_artists WHERE user_id = ? AND artist_id = ?`, user.ID, id); err != nil {
-		return echo.NewHTTPError(http.StatusInternalServerError, map[string]string{"error": err.Error(), "code": "UNFOLLOW_FAILED"})
-	}
-	return c.JSON(http.StatusOK, map[string]bool{"success": true})
+	return h.setFavorite(c, services.EntityArtist, false)
 }
 
 // ListFavorites godoc
@@ -136,85 +103,23 @@ func (h *Handler) UnfollowArtist(c echo.Context) error {
 func (h *Handler) ListFavorites(c echo.Context) error {
 	user, _ := currentUser(c)
 	ctx := c.Request().Context()
-	songs, _ := db.GetSongsByFavorites(ctx, h.db, user.ID)
-	_ = db.PopulateSongArtists(ctx, h.db, songs)
-	albums, _ := h.fetchAlbumsByFav(ctx, user.ID)
-	artists, _ := h.fetchArtistsByFollow(ctx, user.ID)
+
+	songs, err := h.library.UserSongs(ctx, user.ID, services.SliceFavorites, 0, -1)
+	if err != nil {
+		return serviceError(err, "not found", "FAVORITES_FAILED")
+	}
+	albums, err := h.library.FavoriteAlbums(ctx, user.ID)
+	if err != nil {
+		return serviceError(err, "not found", "FAVORITES_FAILED")
+	}
+	artists, err := h.library.FollowedArtists(ctx, user.ID)
+	if err != nil {
+		return serviceError(err, "not found", "FAVORITES_FAILED")
+	}
+
 	return c.JSON(http.StatusOK, map[string]any{
 		"songs":   songs,
 		"albums":  albums,
 		"artists": artists,
 	})
-}
-
-func (h *Handler) fetchAlbumsByFav(ctx context.Context, userID int64) ([]models.Album, error) {
-	// LEFT JOIN artists so compilation albums (artist_id IS NULL) still
-	// appear; their artist comes back null and the frontend renders the
-	// compilation label.
-	rows, err := h.db.QueryContext(ctx, `
-		SELECT a.id, a.title, a.cover_path, a.artist_id, ar.id, ar.name
-		FROM favorites_albums f
-		JOIN albums a ON a.id = f.album_id
-		LEFT JOIN artists ar ON ar.id = a.artist_id
-		WHERE f.user_id = ?
-	`, userID)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var res []models.Album
-	for rows.Next() {
-		var a models.Album
-		var albumArtistID, joinedArtistID sql.NullInt64
-		var artistName sql.NullString
-		if err := rows.Scan(&a.ID, &a.Title, &a.CoverPath, &albumArtistID, &joinedArtistID, &artistName); err == nil {
-			if albumArtistID.Valid {
-				a.ArtistID = &albumArtistID.Int64
-			}
-			if joinedArtistID.Valid {
-				a.Artist = &models.Artist{ID: joinedArtistID.Int64, Name: artistName.String}
-			}
-			res = append(res, a)
-		}
-	}
-	return res, nil
-}
-
-func (h *Handler) fetchArtistsByFollow(ctx context.Context, userID int64) ([]models.Artist, error) {
-	rows, err := h.db.QueryContext(ctx, `
-		SELECT ar.id, ar.name
-		FROM follows_artists f
-		JOIN artists ar ON ar.id = f.artist_id
-		WHERE f.user_id = ?
-	`, userID)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var res []models.Artist
-	for rows.Next() {
-		var a models.Artist
-		if err := rows.Scan(&a.ID, &a.Name); err == nil {
-			res = append(res, a)
-		}
-	}
-	return res, nil
-}
-
-func (h *Handler) songExists(ctx context.Context, id int64) bool {
-	var exists int
-	_ = h.db.QueryRowContext(ctx, `SELECT 1 FROM songs WHERE id = ?`, id).Scan(&exists)
-	return exists == 1
-}
-
-func (h *Handler) albumExists(ctx context.Context, id int64) bool {
-	var exists int
-	_ = h.db.QueryRowContext(ctx, `SELECT 1 FROM albums WHERE id = ?`, id).Scan(&exists)
-	return exists == 1
-}
-
-func (h *Handler) artistExists(ctx context.Context, id int64) bool {
-	var exists int
-	_ = h.db.QueryRowContext(ctx, `SELECT 1 FROM artists WHERE id = ?`, id).Scan(&exists)
-	return exists == 1
 }

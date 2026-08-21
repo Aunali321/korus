@@ -1,0 +1,2 @@
+-- The previous numbering carried no meaning beyond sort order, which dense
+-- positions preserve, so there is nothing to restore.

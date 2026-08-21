@@ -33,8 +33,12 @@ func (s *Service) AppendMessage(ctx context.Context, convID int64, role, content
 	return err
 }
 
+// maxHistoryMessages bounds how much of a conversation is replayed into the
+// model's context; older turns stay stored but are not sent.
+const maxHistoryMessages = 40
+
 func (s *Service) LoadHistory(ctx context.Context, convID int64) ([]ChatMessage, error) {
-	rows, err := s.db.QueryContext(ctx, `SELECT role, content FROM ai_messages WHERE conversation_id = ? ORDER BY id`, convID)
+	rows, err := s.db.QueryContext(ctx, `SELECT role, content FROM ai_messages WHERE conversation_id = ? ORDER BY id DESC LIMIT ?`, convID, maxHistoryMessages)
 	if err != nil {
 		return nil, err
 	}
@@ -46,6 +50,9 @@ func (s *Service) LoadHistory(ctx context.Context, convID int64) ([]ChatMessage,
 			continue
 		}
 		out = append(out, m)
+	}
+	for i, j := 0, len(out)-1; i < j; i, j = i+1, j-1 {
+		out[i], out[j] = out[j], out[i]
 	}
 	return out, rows.Err()
 }

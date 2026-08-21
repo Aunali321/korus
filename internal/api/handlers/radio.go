@@ -2,11 +2,11 @@ package handlers
 
 import (
 	"context"
-	"database/sql"
 	"net/http"
 
-	"github.com/Aunali321/korus/internal/models"
 	"github.com/labstack/echo/v4"
+
+	"github.com/Aunali321/korus/internal/models"
 )
 
 // Radio godoc
@@ -27,9 +27,7 @@ func (h *Handler) Radio(c echo.Context) error {
 
 	limit := h.radioDefaultLimit
 	if l := c.QueryParam("limit"); l != "" {
-		if err := echo.QueryParamsBinder(c).Int("limit", &limit).BindError(); err == nil && limit > 0 && limit <= 100 {
-			// valid
-		} else {
+		if err := echo.QueryParamsBinder(c).Int("limit", &limit).BindError(); err != nil || limit <= 0 || limit > 100 {
 			limit = h.radioDefaultLimit
 		}
 	}
@@ -40,199 +38,21 @@ func (h *Handler) Radio(c echo.Context) error {
 		user, _ := currentUser(c)
 		ids, err := h.ai.Radio(ctx, user.ID, songID, limit)
 		if err == nil && len(ids) > 0 {
-			return h.getSongsByIDs(c, ids)
+			return c.JSON(http.StatusOK, map[string]any{"songs": h.songsByIDs(ctx, ids)})
 		}
 	}
 
-	// Fallback to metadata-based recommendations.
-	// Seed artist comes from song_artists (per-song truth); fall back to
-	// album artist if the song lacks a song_artists row.
-	var artistID sql.NullInt64
-	var albumID int64
-	var year sql.NullInt64
-	err := h.db.QueryRowContext(ctx, `
-		SELECT COALESCE(
-		         (SELECT artist_id FROM song_artists
-		          WHERE song_id = s.id AND role = 'primary'
-		          ORDER BY position LIMIT 1),
-		         al.artist_id
-		       ),
-		       s.album_id, al.year
-		FROM songs s
-		JOIN albums al ON s.album_id = al.id
-		WHERE s.id = ?
-	`, songID).Scan(&artistID, &albumID, &year)
+	songs, err := h.library.SimilarSongs(ctx, songID, limit)
 	if err != nil {
-		return echo.NewHTTPError(http.StatusNotFound, map[string]string{"error": "song not found", "code": "NOT_FOUND"})
+		return serviceError(err, "song not found", "RADIO_FAILED")
 	}
-
-	return h.radioByMetadata(c, songID, artistID, albumID, year, limit)
-}
-
-func (h *Handler) getSongsByIDs(c echo.Context, ids []int64) error {
-	return c.JSON(http.StatusOK, map[string]any{"songs": h.songsByIDs(c.Request().Context(), ids)})
+	return c.JSON(http.StatusOK, map[string]any{"songs": songs})
 }
 
 func (h *Handler) songsByIDs(ctx context.Context, ids []int64) []models.Song {
-	songs := make([]models.Song, 0, len(ids))
-	for _, id := range ids {
-		var s models.Song
-		var al models.Album
-		var trackNum, duration sql.NullInt64
-		var lyrics, lyricsSynced, mbid, coverPath sql.NullString
-		var year sql.NullInt64
-		var artistID sql.NullInt64
-		var artistName sql.NullString
-		// Use song_artists for the song's primary artist; LEFT JOIN preserves
-		// rows for songs missing song_artists or albums lacking an album-artist.
-		err := h.db.QueryRowContext(ctx, `
-			SELECT s.id, s.album_id, s.title, s.track_number, s.duration_ms / 1000,
-				s.file_path, s.lyrics, s.lyrics_synced, s.mbid,
-				ar.id, ar.name, al.id, al.title, al.year, al.cover_path
-			FROM songs s
-			JOIN albums al ON s.album_id = al.id
-			LEFT JOIN song_artists sa ON sa.song_id = s.id AND sa.role = 'primary'
-			LEFT JOIN artists ar ON ar.id = sa.artist_id
-			WHERE s.id = ?
-		`, id).Scan(
-			&s.ID, &s.AlbumID, &s.Title, &trackNum, &duration,
-			&s.FilePath, &lyrics, &lyricsSynced, &mbid,
-			&artistID, &artistName, &al.ID, &al.Title, &year, &coverPath,
-		)
-		if err != nil {
-			continue
-		}
-		if trackNum.Valid {
-			t := int(trackNum.Int64)
-			s.TrackNumber = &t
-		}
-		if duration.Valid {
-			d := int(duration.Int64)
-			s.Duration = &d
-		}
-		if lyrics.Valid {
-			s.Lyrics = lyrics.String
-		}
-		if lyricsSynced.Valid {
-			s.LyricsSynced = lyricsSynced.String
-		}
-		if mbid.Valid {
-			s.MBID = &mbid.String
-		}
-		if year.Valid {
-			y := int(year.Int64)
-			al.Year = &y
-		}
-		if coverPath.Valid {
-			al.CoverPath = coverPath.String
-		}
-		if artistID.Valid {
-			ar := models.Artist{ID: artistID.Int64, Name: artistName.String}
-			al.ArtistID = &ar.ID
-			al.Artist = &ar
-			s.Artists = []models.Artist{ar}
-		}
-		s.Album = &al
-		songs = append(songs, s)
-	}
-
-	return songs
-}
-
-func (h *Handler) radioByMetadata(c echo.Context, seedID int64, artistID sql.NullInt64, albumID int64, year sql.NullInt64, limit int) error {
-	ctx := c.Request().Context()
-
-	// Score on song-level artist match so compilation tracks can match seeds
-	// via their actual performer. The inner subselect pins each candidate
-	// song to its lowest-position primary artist so a song with multiple
-	// primary rows isn't returned multiple times. LEFT JOINs preserve every
-	// candidate including songs lacking song_artists rows and albums lacking
-	// an album-level artist (compilations).
-	query := `
-		SELECT s.id, s.album_id, s.title, s.track_number, s.duration_ms / 1000,
-			s.file_path, s.lyrics, s.lyrics_synced, s.mbid,
-			ar.id, ar.name, al.id, al.title, al.year, al.cover_path,
-			(CASE WHEN s.album_id = ? THEN 3 ELSE 0 END) +
-			(CASE WHEN ar.id = ? THEN 2 ELSE 0 END) +
-			(CASE WHEN al.year = ? THEN 1 ELSE 0 END) AS score
-		FROM songs s
-		JOIN albums al ON s.album_id = al.id
-		LEFT JOIN artists ar ON ar.id = (
-			SELECT artist_id FROM song_artists
-			WHERE song_id = s.id AND role = 'primary'
-			ORDER BY position LIMIT 1
-		)
-		WHERE s.id != ?
-		ORDER BY score DESC, RANDOM()
-		LIMIT ?
-	`
-
-	var yearVal any = nil
-	if year.Valid {
-		yearVal = year.Int64
-	}
-	var artistVal any = nil
-	if artistID.Valid {
-		artistVal = artistID.Int64
-	}
-
-	rows, err := h.db.QueryContext(ctx, query, albumID, artistVal, yearVal, seedID, limit)
+	songs, err := h.library.Songs(ctx, ids)
 	if err != nil {
-		return echo.NewHTTPError(http.StatusInternalServerError, map[string]string{"error": "query failed", "code": "INTERNAL_ERROR"})
+		return []models.Song{}
 	}
-	defer rows.Close()
-
-	songs := make([]models.Song, 0)
-	for rows.Next() {
-		var s models.Song
-		var al models.Album
-		var score int
-		var trackNum, duration sql.NullInt64
-		var lyrics, lyricsSynced, mbid, coverPath sql.NullString
-		var albumYear sql.NullInt64
-		var artistID sql.NullInt64
-		var artistName sql.NullString
-		if err := rows.Scan(
-			&s.ID, &s.AlbumID, &s.Title, &trackNum, &duration,
-			&s.FilePath, &lyrics, &lyricsSynced, &mbid,
-			&artistID, &artistName, &al.ID, &al.Title, &albumYear, &coverPath,
-			&score,
-		); err != nil {
-			continue
-		}
-		if trackNum.Valid {
-			t := int(trackNum.Int64)
-			s.TrackNumber = &t
-		}
-		if duration.Valid {
-			d := int(duration.Int64)
-			s.Duration = &d
-		}
-		if lyrics.Valid {
-			s.Lyrics = lyrics.String
-		}
-		if lyricsSynced.Valid {
-			s.LyricsSynced = lyricsSynced.String
-		}
-		if mbid.Valid {
-			s.MBID = &mbid.String
-		}
-		if albumYear.Valid {
-			y := int(albumYear.Int64)
-			al.Year = &y
-		}
-		if coverPath.Valid {
-			al.CoverPath = coverPath.String
-		}
-		if artistID.Valid {
-			ar := models.Artist{ID: artistID.Int64, Name: artistName.String}
-			al.ArtistID = &ar.ID
-			al.Artist = &ar
-			s.Artists = []models.Artist{ar}
-		}
-		s.Album = &al
-		songs = append(songs, s)
-	}
-
-	return c.JSON(http.StatusOK, map[string]any{"songs": songs})
+	return songs
 }

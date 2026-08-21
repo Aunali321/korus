@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/labstack/echo/v4"
@@ -21,10 +22,20 @@ type chatRequest struct {
 	Message        string  `json:"message"`
 	NowPlayingID   int64   `json:"now_playing_id"`
 	QueueIDs       []int64 `json:"queue_ids"`
+	Shuffle        bool    `json:"shuffle"`
+	Repeat         string  `json:"repeat"`
 }
 
 // AIChat streams an assistant turn as Server-Sent Events. Events are JSON
 // objects with a "type": text, tool, action, done, or error.
+// @Summary Chat with the assistant
+// @Tags AI
+// @Accept json
+// @Produce text/event-stream
+// @Param body body chatRequest true "Message and player context"
+// @Success 200 {string} string "SSE stream of JSON events: text, tool, action, ui, done, error"
+// @Router /ai/chat [post]
+// @Security BearerAuth
 func (h *Handler) AIChat(c echo.Context) error {
 	if h.ai == nil {
 		return aiDisabled()
@@ -60,11 +71,34 @@ func (h *Handler) AIChat(c echo.Context) error {
 	res.Header().Set("X-Accel-Buffering", "no")
 	res.WriteHeader(http.StatusOK)
 
+	var wmu sync.Mutex
 	send := func(v any) {
 		b, _ := json.Marshal(v)
+		wmu.Lock()
 		fmt.Fprintf(res, "data: %s\n\n", b)
 		res.Flush()
+		wmu.Unlock()
 	}
+
+	// Reasoning phases can be silent for tens of seconds; a comment frame keeps
+	// idle-timeout proxies from closing the stream.
+	stopPing := make(chan struct{})
+	defer close(stopPing)
+	go func() {
+		t := time.NewTicker(15 * time.Second)
+		defer t.Stop()
+		for {
+			select {
+			case <-stopPing:
+				return
+			case <-t.C:
+				wmu.Lock()
+				fmt.Fprint(res, ": ping\n\n")
+				res.Flush()
+				wmu.Unlock()
+			}
+		}
+	}()
 
 	var assistant strings.Builder
 	sink := aisvc.ChatSink{
@@ -81,23 +115,24 @@ func (h *Handler) AIChat(c echo.Context) error {
 				return
 			}
 			payload := map[string]any{"type": "action", "action": eff.Action}
-			if len(eff.SongIDs) > 0 {
+			// set_queue sends an empty list to mean "clear", so the songs key
+			// is always present for the queue-shaped actions.
+			if len(eff.SongIDs) > 0 || eff.Action == "set_queue" {
 				payload["songs"] = h.songsByIDs(ctx, eff.SongIDs)
 			}
-			if eff.Position != "" {
-				payload["position"] = eff.Position
+			if eff.Mode != "" {
+				payload["mode"] = eff.Mode
 			}
 			if eff.PlaylistID != 0 {
 				payload["playlist_id"] = eff.PlaylistID
 			}
-			if len(eff.Indices) > 0 {
-				payload["indices"] = eff.Indices
-			}
-			if len(eff.Order) > 0 {
-				payload["order"] = eff.Order
-			}
 			if eff.Control != "" {
 				payload["control"] = eff.Control
+			}
+			if eff.Entity != "" {
+				payload["entity"] = eff.Entity
+				payload["entity_id"] = eff.EntityID
+				payload["on"] = eff.On
 			}
 			send(payload)
 		},
@@ -105,7 +140,16 @@ func (h *Handler) AIChat(c echo.Context) error {
 
 	h.ai.AppendMessage(ctx, convID, "user", req.Message)
 
-	pc := aisvc.PlayerContext{NowPlayingID: req.NowPlayingID, QueueIDs: req.QueueIDs}
+	repeat := req.Repeat
+	if repeat == "" {
+		repeat = "off"
+	}
+	pc := aisvc.PlayerContext{
+		NowPlayingID: req.NowPlayingID,
+		QueueIDs:     req.QueueIDs,
+		Shuffle:      req.Shuffle,
+		Repeat:       repeat,
+	}
 	if err := h.ai.Chat(ctx, user.ID, history, req.Message, pc, sink); err != nil {
 		send(map[string]any{"type": "error", "message": err.Error()})
 		return nil
@@ -117,6 +161,12 @@ func (h *Handler) AIChat(c echo.Context) error {
 	return nil
 }
 
+// @Summary List conversations
+// @Tags AI
+// @Produce json
+// @Success 200 {object} map[string][]ai.Conversation
+// @Router /ai/conversations [get]
+// @Security BearerAuth
 func (h *Handler) ListConversations(c echo.Context) error {
 	if h.ai == nil {
 		return aiDisabled()
@@ -129,6 +179,13 @@ func (h *Handler) ListConversations(c echo.Context) error {
 	return c.JSON(http.StatusOK, map[string]any{"conversations": convs})
 }
 
+// @Summary Get conversation messages
+// @Tags AI
+// @Produce json
+// @Param id path int true "Conversation ID"
+// @Success 200 {object} map[string][]ai.ChatMessage
+// @Router /ai/conversations/{id} [get]
+// @Security BearerAuth
 func (h *Handler) GetConversation(c echo.Context) error {
 	if h.ai == nil {
 		return aiDisabled()
@@ -150,6 +207,13 @@ func (h *Handler) GetConversation(c echo.Context) error {
 	return c.JSON(http.StatusOK, map[string]any{"messages": msgs})
 }
 
+// @Summary Delete conversation
+// @Tags AI
+// @Produce json
+// @Param id path int true "Conversation ID"
+// @Success 200 {object} map[string]bool
+// @Router /ai/conversations/{id} [delete]
+// @Security BearerAuth
 func (h *Handler) DeleteConversation(c echo.Context) error {
 	if h.ai == nil {
 		return aiDisabled()
@@ -167,6 +231,15 @@ func (h *Handler) DeleteConversation(c echo.Context) error {
 
 // AIWrapped returns the cached Wrapped HTML diary page for a period, generating
 // and caching it on first request. period=month|year, optional key (YYYY-MM / YYYY).
+// @Summary Wrapped diary page
+// @Tags AI
+// @Produce json
+// @Param period query string false "month|year"
+// @Param key query string false "YYYY-MM or YYYY"
+// @Param refresh query bool false "Regenerate instead of serving the cached page"
+// @Success 200 {object} map[string]any
+// @Router /ai/wrapped [get]
+// @Security BearerAuth
 func (h *Handler) AIWrapped(c echo.Context) error {
 	if h.ai == nil {
 		return aiDisabled()

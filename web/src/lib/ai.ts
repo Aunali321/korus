@@ -1,6 +1,7 @@
 import { getAccessToken, getApiUrl } from './api';
 import { api } from './api';
 import { player } from './stores/player.svelte';
+import { favorites } from './stores/favorites.svelte';
 import type { Song } from './types';
 
 export interface UINode {
@@ -13,11 +14,12 @@ export type ChatAction = {
 	type: 'action';
 	action: string;
 	songs?: Song[];
-	position?: 'next' | 'end';
+	mode?: 'now' | 'next' | 'end';
 	playlist_id?: number;
-	indices?: number[];
-	order?: number[];
 	control?: string;
+	entity?: 'song' | 'album' | 'artist';
+	entity_id?: number;
+	on?: boolean;
 };
 
 export type ChatEvent =
@@ -37,7 +39,11 @@ function authHeaders(): Record<string, string> {
 // each event as it arrives.
 export interface PlayerContext {
 	now_playing_id?: number;
+	// Upcoming songs only: the current one is reported separately, and
+	// set_queue replaces exactly this list.
 	queue_ids?: number[];
+	shuffle?: boolean;
+	repeat?: string;
 }
 
 export async function streamChat(
@@ -55,6 +61,8 @@ export async function streamChat(
 			conversation_id: conversationId || 0,
 			now_playing_id: player?.now_playing_id ?? 0,
 			queue_ids: player?.queue_ids ?? [],
+			shuffle: player?.shuffle ?? false,
+			repeat: player?.repeat ?? 'off',
 		}),
 		signal,
 	});
@@ -82,34 +90,16 @@ export async function streamChat(
 	}
 }
 
-export interface Conversation {
-	id: number;
-	title: string;
-	created_at: string;
-	updated_at: string;
-}
-
-export interface AiMessage {
-	role: string;
-	content: string;
-}
-
 async function get<T>(path: string): Promise<T> {
 	const res = await fetch(`${getApiUrl()}${path}`, { headers: authHeaders() });
 	if (!res.ok) throw new Error(String(res.status));
 	return res.json();
 }
 
-export const listConversations = () => get<{ conversations: Conversation[] }>('/ai/conversations');
-export const getConversation = (id: number) => get<{ messages: AiMessage[] }>(`/ai/conversations/${id}`);
 export const getWrapped = (period: 'month' | 'year' = 'month', refresh = false) =>
 	get<{ html: string; period_type: string; period_key: string; cached: boolean }>(
 		`/ai/wrapped?period=${period}${refresh ? '&refresh=1' : ''}`,
 	);
-
-export async function deleteConversation(id: number): Promise<void> {
-	await fetch(`${getApiUrl()}/ai/conversations/${id}`, { method: 'DELETE', headers: authHeaders() });
-}
 
 // resolveSongs fetches full Song objects for the given IDs (UI specs only carry
 // brief song data; playback needs the full object).
@@ -139,26 +129,54 @@ export async function enqueueSongIds(ids: number[], position: 'next' | 'end' = '
 // Song objects, resolved server-side) to the player.
 export function runAction(ev: ChatAction): void {
 	switch (ev.action) {
-		case 'play_now':
-			if (ev.songs?.length) player.playQueue(ev.songs);
+		case 'play':
+			if (!ev.songs?.length) break;
+			if (ev.mode === 'next' || ev.mode === 'end') player.enqueue(ev.songs, ev.mode);
+			else player.playQueue(ev.songs);
 			break;
-		case 'queue':
-			if (ev.songs?.length) player.enqueue(ev.songs, ev.position === 'next' ? 'next' : 'end');
-			break;
-		case 'clear_queue':
-			player.clearQueue();
-			break;
-		case 'remove_from_queue':
-			[...(ev.indices ?? [])].sort((a, b) => b - a).forEach((i) => player.removeFromQueue(i));
-			break;
-		case 'reorder_queue':
-			if (ev.order) player.reorderQueue(ev.order);
+		case 'set_queue':
+			player.setUpcoming(ev.songs ?? []);
 			break;
 		case 'playback_control':
-			if (ev.control === 'pause') player.pause();
-			else if (ev.control === 'resume') player.play();
-			else if (ev.control === 'next') player.next();
-			else if (ev.control === 'previous') player.prev();
+			runPlaybackControl(ev.control);
+			break;
+		case 'favorite_changed':
+			if (ev.entity && ev.entity_id) favorites.applyRemote(ev.entity, ev.entity_id, ev.on ?? true);
+			break;
+	}
+}
+
+function runPlaybackControl(control?: string): void {
+	switch (control) {
+		case 'pause':
+			player.pause();
+			break;
+		case 'resume':
+			player.play();
+			break;
+		case 'stop':
+			player.stop();
+			break;
+		case 'next':
+			player.next();
+			break;
+		case 'previous':
+			player.prev();
+			break;
+		case 'shuffle_on':
+			player.setShuffle(true);
+			break;
+		case 'shuffle_off':
+			player.setShuffle(false);
+			break;
+		case 'repeat_off':
+			player.setRepeat('off');
+			break;
+		case 'repeat_one':
+			player.setRepeat('one');
+			break;
+		case 'repeat_all':
+			player.setRepeat('all');
 			break;
 	}
 }

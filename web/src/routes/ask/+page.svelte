@@ -9,16 +9,15 @@
 	import SpecRenderer from '$lib/components/SpecRenderer.svelte';
 
 	const TOOL_LABELS: Record<string, string> = {
-		search_songs: 'Searched the library',
-		get_top_tracks: 'Checked your top tracks',
-		get_recent_plays: 'Checked recent plays',
-		get_favorites: 'Checked your favorites',
-		get_artist_songs: 'Looked up an artist',
-		get_now_playing: "Checked what's playing",
-		get_queue: 'Checked the queue',
+		search_library: 'Searched the library',
+		get_details: 'Looked up the details',
+		my_library: 'Checked your listening',
+		get_player: 'Checked the player',
+		get_listening_stats: 'Pulled your stats',
 	};
+	const READ_TOOLS = new Set(Object.keys(TOOL_LABELS));
 	const toolLabel = (n: string) => TOOL_LABELS[n] ?? n.replace(/_/g, ' ');
-	const isReadTool = (n: string) => n.startsWith('get_') || n === 'search_songs';
+	const isReadTool = (n: string) => READ_TOOLS.has(n);
 
 	let input = $state('');
 	let scroller = $state<HTMLElement>();
@@ -41,23 +40,23 @@
 
 	function actionLabel(ev: ChatAction): string {
 		const n = ev.songs?.length ?? 0;
+		const songs = `${n} song${n === 1 ? '' : 's'}`;
 		switch (ev.action) {
-			case 'play_now':
-				return `▶ Playing ${n} song${n === 1 ? '' : 's'}`;
-			case 'queue':
-				return `＋ Queued ${n} song${n === 1 ? '' : 's'}${ev.position === 'next' ? ' next' : ''}`;
-			case 'clear_queue':
-				return '✕ Cleared the queue';
-			case 'remove_from_queue':
-				return '✕ Removed from queue';
-			case 'reorder_queue':
-				return '⇅ Reordered the queue';
+			case 'play':
+				if (ev.mode === 'next') return `＋ Queued ${songs} next`;
+				if (ev.mode === 'end') return `＋ Added ${songs} to the end`;
+				return `▶ Playing ${songs}`;
+			case 'set_queue':
+				return n === 0 ? '✕ Cleared the queue' : `⇅ Set the queue to ${songs}`;
 			case 'playback_control':
-				return `⏯ ${ev.control}`;
+				return `⏯ ${ev.control?.replace(/_/g, ' ')}`;
 			case 'playlist_created':
 				return '✓ Created a playlist';
 			case 'playlist_updated':
 				return '✓ Updated a playlist';
+			case 'favorite_changed':
+				if (ev.entity === 'artist') return ev.on ? '✓ Followed the artist' : '✓ Unfollowed the artist';
+				return ev.on ? `♥ Liked the ${ev.entity}` : `♡ Unliked the ${ev.entity}`;
 			default:
 				return ev.action;
 		}
@@ -81,7 +80,9 @@
 
 		const playerCtx = {
 			now_playing_id: player.currentSong?.id ?? 0,
-			queue_ids: player.queue.map((s) => s.id),
+			queue_ids: player.queue.slice(player.queueIndex + 1).map((s) => s.id),
+			shuffle: player.shuffle,
+			repeat: player.repeat,
 		};
 
 		try {

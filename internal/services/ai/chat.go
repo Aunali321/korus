@@ -2,7 +2,6 @@ package ai
 
 import (
 	"context"
-	"errors"
 
 	"github.com/aunali321/pi-go/agent"
 	"github.com/aunali321/pi-go/llm"
@@ -10,13 +9,14 @@ import (
 
 const askSystem = `You are the in-app music assistant for a personal music library ("Korus"). You help the user explore their library, build playlists, and control playback.
 
-- Ground every answer in the user's real library and listening history using the read tools. Only reference songs that appear in tool results — never invent songs or IDs.
-- get_now_playing and get_queue reflect the user's LIVE player. Check them before answering anything about the current song or queue, and before adding, removing, or reordering queue items.
-- Use get_listening_stats for listening summaries over a month or year (minutes, plays, days, top songs/artists, new artists discovered).
-- Act on requests with the action tools: play_now, queue_songs, remove_from_queue, reorder_queue, clear_queue, playback_control, create_playlist, add_to_playlist.
-- "Queue X" / "add X" means queue_songs (do NOT change what's playing). "Play X" means play_now.
-- When adding songs to the queue (e.g. "add similar songs", "queue these"), use position "next" so they play right after the current song — only use "end" if the user explicitly asks to add them at the end.
-- Prefer render_ui for lists, stats, and charts. Give the card its own title (a heading node) so it speaks for itself: when the card fully answers the request, call render_ui and add NO text around it — no lead-in before and no summary after. Add at most one short sentence only if it says something the card does not, and never repeat the card's items as text.
+- Ground every answer in the user's real library using the read tools. Only reference songs, albums, artists and playlists that appeared in a tool result, and never invent an id, a title, or a number.
+- search_library finds things by name and hands you ids. get_details expands an id into what is inside it: an album's tracks, an artist's albums and biography, a playlist's songs, a song's lyrics.
+- my_library is the user themselves: what they play most, what they played recently, what they liked, what they keep skipping, what they own but have never played, their playlists, and the artists they follow. Reach for "unplayed" when they ask to rediscover their own library, and "skipped" when you need to know what to avoid.
+- get_player is the live player. Check it before answering anything about the current song or the queue, and always before changing the queue.
+- get_listening_stats gives real numbers for a month or a year: minutes, plays, days listened, top songs and artists.
+- Act with the write tools. "Play X" means play with mode "now". "Queue X" or "add X" means mode "next", which leaves the current song playing. Only use "end" if they ask for it.
+- To remove, reorder, or clear queue items, read the queue with get_player, then send the queue you want with set_queue. The same applies to playlists: read with get_details, write with update_playlist in "replace" mode.
+- Prefer render_ui for lists, stats, and charts. Give the card its own title (a heading node) so it speaks for itself: when the card fully answers the request, call render_ui and add NO text around it, no lead-in before and no summary after. Add at most one short sentence only if it says something the card does not, and never repeat the card's items as text.
 - Keep replies short and friendly, and say briefly what you did.`
 
 // ChatMessage is one persisted turn.
@@ -36,56 +36,61 @@ type ChatSink struct {
 type PlayerContext struct {
 	NowPlayingID int64
 	QueueIDs     []int64
+	Shuffle      bool
+	Repeat       string
 }
 
-// playerTools expose the user's live now-playing and queue (passed per request;
-// now-playing falls back to persisted state when not supplied).
-func (s *Service) playerTools(userID int64, pc PlayerContext) []agent.Tool {
-	return []agent.Tool{
-		agent.NewTool(agent.ToolDef[struct{}]{
-			Name:        "get_now_playing",
-			Description: "Get the song the user is currently playing, if any.",
-			Label:       "now playing",
-			Schema:      map[string]any{"type": "object", "properties": map[string]any{}},
-			Run: func(ctx context.Context, _ string, _ struct{}, _ agent.UpdateFunc) (agent.ToolResult, error) {
-				id := pc.NowPlayingID
-				if id == 0 {
-					_ = s.db.QueryRowContext(ctx, `SELECT COALESCE(current_song_id, 0) FROM player_state WHERE user_id = ?`, userID).Scan(&id)
+// maxQueueBriefs bounds how much of a long queue is described to the model.
+const maxQueueBriefs = 100
+
+// playerTool exposes the live player in one call: what is playing, what is
+// queued, and the shuffle and repeat modes. Now-playing falls back to the
+// persisted state when the request did not carry it.
+func (s *Service) playerTool(userID int64, pc PlayerContext) agent.Tool {
+	return agent.NewTool(agent.ToolDef[struct{}]{
+		Name:        "get_player",
+		Description: "The live player: the song currently playing, the upcoming queue in order, and the shuffle and repeat settings. Check this before answering anything about the queue and before changing it.",
+		Label:       "player",
+		Schema:      map[string]any{"type": "object", "properties": map[string]any{}},
+		Run: func(ctx context.Context, _ string, _ struct{}, _ agent.UpdateFunc) (agent.ToolResult, error) {
+			out := map[string]any{
+				"now_playing": nil,
+				"shuffle":     pc.Shuffle,
+				"repeat":      pc.Repeat,
+			}
+
+			id := pc.NowPlayingID
+			if id == 0 {
+				_ = s.db.QueryRowContext(ctx,
+					`SELECT COALESCE(current_song_id, 0) FROM player_state WHERE user_id = ?`, userID).Scan(&id)
+			}
+			if id != 0 {
+				if song, err := s.library.Song(ctx, id); err == nil {
+					out["now_playing"] = brief(song)
 				}
-				if id == 0 {
-					return jsonResult(map[string]any{"now_playing": nil}), nil
-				}
-				b, err := s.songBriefByID(ctx, id)
-				if err != nil {
-					return jsonResult(map[string]any{"now_playing": nil}), nil
-				}
-				return jsonResult(map[string]any{"now_playing": b}), nil
-			},
-		}),
-		agent.NewTool(agent.ToolDef[struct{}]{
-			Name:        "get_queue",
-			Description: "Get the songs in the play queue, in order. Check this before adding, removing, or reordering queue items.",
-			Label:       "queue",
-			Schema:      map[string]any{"type": "object", "properties": map[string]any{}},
-			Run: func(ctx context.Context, _ string, _ struct{}, _ agent.UpdateFunc) (agent.ToolResult, error) {
-				ids := pc.QueueIDs
-				if len(ids) > 100 {
-					ids = ids[:100]
-				}
-				briefs := s.briefsByIDs(ctx, ids)
-				return jsonResult(map[string]any{"queue": briefs, "count": len(briefs)}), nil
-			},
-		}),
-	}
+			}
+
+			ids := pc.QueueIDs
+			if len(ids) > maxQueueBriefs {
+				ids = ids[:maxQueueBriefs]
+			}
+			songs, err := s.library.Songs(ctx, ids)
+			if err != nil {
+				return agent.ToolResult{}, err
+			}
+			out["queue"] = briefs(songs)
+			out["queue_length"] = len(pc.QueueIDs)
+			return jsonResult(out), nil
+		},
+	})
 }
 
 // Chat runs the assistant for one user turn, replaying prior history, and
 // streams output through sink.
 func (s *Service) Chat(ctx context.Context, userID int64, history []ChatMessage, userText string, pc PlayerContext, sink ChatSink) error {
-	tools := append(s.readTools(userID), s.playerTools(userID, pc)...)
-	tools = append(tools, s.effectTools(userID)...)
-	tools = append(tools, s.listeningStatsTool(userID))
-	tools = append(tools, s.uiTool())
+	tools := append(s.readTools(userID), s.playerTool(userID, pc), s.listeningStatsTool(userID), s.uiTool())
+	tools = append(tools, s.writeTools(userID)...)
+
 	agentCtx := &agent.Context{SystemPrompt: askSystem, Tools: tools}
 	for _, m := range history {
 		if m.Role == "assistant" {
@@ -99,11 +104,7 @@ func (s *Service) Chat(ctx context.Context, userID int64, history []ChatMessage,
 		Model:         s.model,
 		Reasoning:     s.reasoning,
 		ToolExecution: agent.ModeSequential,
-		Options: llm.StreamOptions{
-			APIKey:         s.apiKey,
-			CacheRetention: llm.CacheShort,
-			MaxTokens:      s.model.MaxTokens,
-		},
+		Options:       s.streamOptions(),
 	}
 
 	emit := func(e agent.Event) {
@@ -127,13 +128,5 @@ func (s *Service) Chat(ctx context.Context, userID int64, history []ChatMessage,
 	}
 
 	msgs := agent.Run(ctx, []agent.AgentMessage{llm.TextUser(userText)}, agentCtx, cfg, emit)
-	for _, m := range msgs {
-		if am, ok := m.(*llm.AssistantMessage); ok && (am.StopReason == llm.StopError || am.StopReason == llm.StopAborted) {
-			if am.ErrorMessage != "" {
-				return errors.New(am.ErrorMessage)
-			}
-			return errors.New("ai: chat run failed")
-		}
-	}
-	return nil
+	return runError(msgs, "ai: chat run failed")
 }

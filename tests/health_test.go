@@ -11,8 +11,11 @@ import (
 )
 
 func TestHealth(t *testing.T) {
+	database := newTestDB(t)
+	defer database.Close()
+
 	e := echo.New()
-	h := &handlers.Handler{}
+	h := handlers.New(handlers.Deps{DB: database})
 	req := httptest.NewRequest(http.MethodGet, "/api/health", nil)
 	rec := httptest.NewRecorder()
 	c := e.NewContext(req, rec)

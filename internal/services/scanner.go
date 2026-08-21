@@ -463,15 +463,15 @@ func (s *ScannerService) ingestFile(ctx context.Context, path string, seenSongs 
 //     song_artists references and no external_id — i.e. created from a raw
 //     album_artist tag during ingest, never seen by enrichment): treat as
 //     untrusted, low evidence threshold.
-//       1 distinct primary AND >= 2 songs  -> reassign to that primary
-//       otherwise                          -> NULL (compilation)
+//     1 distinct primary AND >= 2 songs  -> reassign to that primary
+//     otherwise                          -> NULL (compilation)
 //
 //   - Real-artist-pointing albums (current artist_id has external_id or is
 //     referenced by song_artists somewhere): trusted by default, but recompute
 //     when evidence STRONGLY contradicts the existing tag.
-//       2+ distinct primaries AND >= 3 songs                -> NULL (compilation)
-//       1 distinct primary AND >= 3 songs AND differs       -> reassign
-//       otherwise                                            -> leave alone
+//     2+ distinct primaries AND >= 3 songs                -> NULL (compilation)
+//     1 distinct primary AND >= 3 songs AND differs       -> reassign
+//     otherwise                                            -> leave alone
 //
 // The 3-song threshold for real artists guards against partial-library
 // false positives (e.g. having 1-2 Pritam-composed tracks from a Mohit

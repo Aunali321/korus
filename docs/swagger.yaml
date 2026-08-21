@@ -2,6 +2,24 @@ basePath: /api
 consumes:
 - application/json
 definitions:
+  ai.ChatMessage:
+    properties:
+      content:
+        type: string
+      role:
+        type: string
+    type: object
+  ai.Conversation:
+    properties:
+      created_at:
+        type: string
+      id:
+        type: integer
+      title:
+        type: string
+      updated_at:
+        type: string
+    type: object
   handlers.PlayerState:
     properties:
       current_song_id:
@@ -17,6 +35,23 @@ definitions:
     type: object
   handlers.UserSettings:
     properties:
+      repeat:
+        type: string
+      shuffle:
+        type: boolean
+    type: object
+  handlers.chatRequest:
+    properties:
+      conversation_id:
+        type: integer
+      message:
+        type: string
+      now_playing_id:
+        type: integer
+      queue_ids:
+        items:
+          type: integer
+        type: array
       repeat:
         type: string
       shuffle:
@@ -109,6 +144,192 @@ definitions:
       name:
         type: string
     type: object
+  models.Bucket:
+    properties:
+      label:
+        type: string
+      value:
+        type: integer
+    type: object
+  models.DiscoveryStats:
+    properties:
+      exploration_rate:
+        type: number
+      new_artists:
+        type: integer
+      new_songs:
+        type: integer
+    type: object
+  models.Insights:
+    properties:
+      current_streak:
+        type: integer
+      longest_streak:
+        type: integer
+    type: object
+  models.ListeningPatterns:
+    properties:
+      by_day:
+        items:
+          $ref: '#/definitions/models.Bucket'
+        type: array
+      by_hour:
+        items:
+          $ref: '#/definitions/models.Bucket'
+        type: array
+      by_month:
+        items:
+          $ref: '#/definitions/models.Bucket'
+        type: array
+    type: object
+  models.ListeningSummary:
+    properties:
+      avg_plays_per_day:
+        type: number
+      days_listened:
+        type: integer
+      new_artists_discovered:
+        type: integer
+      period:
+        type: string
+      top_albums:
+        items:
+          $ref: '#/definitions/models.PlayedAlbum'
+        type: array
+      top_artists:
+        items:
+          $ref: '#/definitions/models.PlayedArtist'
+        type: array
+      top_songs:
+        items:
+          $ref: '#/definitions/models.PlayedSong'
+        type: array
+      total_minutes:
+        type: integer
+      total_plays:
+        type: integer
+      unique_artists:
+        type: integer
+      unique_songs:
+        type: integer
+    type: object
+  models.PeriodRange:
+    properties:
+      end:
+        type: string
+      start:
+        type: string
+    type: object
+  models.PlayedAlbum:
+    properties:
+      artist:
+        $ref: '#/definitions/models.Artist'
+      id:
+        type: integer
+      plays:
+        type: integer
+      title:
+        type: string
+    type: object
+  models.PlayedArtist:
+    properties:
+      id:
+        type: integer
+      image_path:
+        type: string
+      name:
+        type: string
+      plays:
+        type: integer
+    type: object
+  models.PlayedSong:
+    properties:
+      artist:
+        $ref: '#/definitions/models.Artist'
+      id:
+        type: integer
+      plays:
+        type: integer
+      title:
+        type: string
+    type: object
+  models.Playlist:
+    properties:
+      cover_path:
+        type: string
+      created_at:
+        type: string
+      description:
+        type: string
+      first_song_id:
+        description: |-
+          FirstSongID lets a client fall back to the first track's artwork when the
+          playlist has no cover of its own.
+        type: integer
+      id:
+        type: integer
+      name:
+        type: string
+      owner:
+        $ref: '#/definitions/models.PlaylistOwner'
+      public:
+        type: boolean
+      song_count:
+        type: integer
+      songs:
+        items:
+          $ref: '#/definitions/models.Song'
+        type: array
+      user_id:
+        type: integer
+    type: object
+  models.PlaylistOwner:
+    properties:
+      id:
+        type: integer
+      username:
+        type: string
+    type: object
+  models.RankedAlbum:
+    properties:
+      album:
+        $ref: '#/definitions/models.Album'
+      completion_rate:
+        type: number
+      play_count:
+        type: integer
+      total_time:
+        type: integer
+    type: object
+  models.RankedArtist:
+    properties:
+      artist:
+        $ref: '#/definitions/models.Artist'
+      play_count:
+        type: integer
+      total_time:
+        type: integer
+      unique_songs:
+        type: integer
+    type: object
+  models.RankedGenre:
+    properties:
+      genre:
+        type: string
+      play_count:
+        type: integer
+    type: object
+  models.RankedSong:
+    properties:
+      avg_completion:
+        type: number
+      play_count:
+        type: integer
+      song:
+        $ref: '#/definitions/models.Song'
+      total_time:
+        type: integer
+    type: object
   models.Song:
     properties:
       album:
@@ -136,6 +357,44 @@ definitions:
       track_number:
         type: integer
     type: object
+  models.StatsReport:
+    properties:
+      discovery:
+        $ref: '#/definitions/models.DiscoveryStats'
+      listening_patterns:
+        $ref: '#/definitions/models.ListeningPatterns'
+      period:
+        $ref: '#/definitions/models.PeriodRange'
+      top_albums:
+        items:
+          $ref: '#/definitions/models.RankedAlbum'
+        type: array
+      top_artists:
+        items:
+          $ref: '#/definitions/models.RankedArtist'
+        type: array
+      top_genres:
+        description: |-
+          TopGenres is always empty: the library has no genre column to rank by.
+          The field stays because clients read it.
+        items:
+          $ref: '#/definitions/models.RankedGenre'
+        type: array
+      top_songs:
+        items:
+          $ref: '#/definitions/models.RankedSong'
+        type: array
+      total_duration:
+        type: integer
+      total_plays:
+        type: integer
+      unique_albums:
+        type: integer
+      unique_artists:
+        type: integer
+      unique_songs:
+        type: integer
+    type: object
 host: localhost:8080
 info:
   contact: {}
@@ -146,6 +405,65 @@ info:
   title: Korus API
   version: "0.1"
 paths:
+  /admin/database/backup:
+    get:
+      description: Creates a backup of the SQLite database and streams it to the client
+      produces:
+      - application/octet-stream
+      responses:
+        "200":
+          description: Database backup file
+          schema:
+            type: file
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Backup database
+      tags:
+      - Admin
+  /admin/database/restore:
+    post:
+      consumes:
+      - multipart/form-data
+      description: Restores the database from an uploaded backup file. Server will
+        restart after restore.
+      parameters:
+      - description: Database backup file
+        in: formData
+        name: backup
+        required: true
+        type: file
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Restore database
+      tags:
+      - Admin
   /admin/musicbrainz/enrich:
     post:
       consumes:
@@ -261,6 +579,120 @@ paths:
       summary: System info
       tags:
       - Admin
+  /ai/chat:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Message and player context
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.chatRequest'
+      produces:
+      - text/event-stream
+      responses:
+        "200":
+          description: 'SSE stream of JSON events: text, tool, action, ui, done, error'
+          schema:
+            type: string
+      security:
+      - BearerAuth: []
+      summary: Chat with the assistant
+      tags:
+      - AI
+  /ai/conversations:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              items:
+                $ref: '#/definitions/ai.Conversation'
+              type: array
+            type: object
+      security:
+      - BearerAuth: []
+      summary: List conversations
+      tags:
+      - AI
+  /ai/conversations/{id}:
+    delete:
+      parameters:
+      - description: Conversation ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              type: boolean
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Delete conversation
+      tags:
+      - AI
+    get:
+      parameters:
+      - description: Conversation ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              items:
+                $ref: '#/definitions/ai.ChatMessage'
+              type: array
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Get conversation messages
+      tags:
+      - AI
+  /ai/wrapped:
+    get:
+      parameters:
+      - description: month|year
+        in: query
+        name: period
+        type: string
+      - description: YYYY-MM or YYYY
+        in: query
+        name: key
+        type: string
+      - description: Regenerate instead of serving the cached page
+        in: query
+        name: refresh
+        type: boolean
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Wrapped diary page
+      tags:
+      - AI
   /albums/{id}:
     get:
       parameters:
@@ -990,8 +1422,7 @@ paths:
           description: OK
           schema:
             items:
-              additionalProperties: true
-              type: object
+              $ref: '#/definitions/models.Playlist'
             type: array
       security:
       - BearerAuth: []
@@ -1014,8 +1445,7 @@ paths:
         "200":
           description: OK
           schema:
-            additionalProperties: true
-            type: object
+            $ref: '#/definitions/models.Playlist'
       security:
       - BearerAuth: []
       summary: Create playlist
@@ -1068,8 +1498,7 @@ paths:
         "200":
           description: OK
           schema:
-            additionalProperties: true
-            type: object
+            $ref: '#/definitions/models.Playlist'
         "403":
           description: Forbidden
           schema:
@@ -1108,8 +1537,7 @@ paths:
         "200":
           description: OK
           schema:
-            additionalProperties: true
-            type: object
+            $ref: '#/definitions/models.Playlist'
         "403":
           description: Forbidden
           schema:
@@ -1340,11 +1768,6 @@ paths:
         in: query
         name: limit
         type: integer
-      - default: curator
-        description: 'Radio mode: curator or mainstream'
-        in: query
-        name: mode
-        type: string
       produces:
       - application/json
       responses:
@@ -1507,8 +1930,7 @@ paths:
         "200":
           description: OK
           schema:
-            additionalProperties: true
-            type: object
+            $ref: '#/definitions/models.StatsReport'
       security:
       - BearerAuth: []
       summary: Stats overview
@@ -1522,8 +1944,7 @@ paths:
         "200":
           description: OK
           schema:
-            additionalProperties: true
-            type: object
+            $ref: '#/definitions/models.Insights'
       security:
       - BearerAuth: []
       summary: Insights
@@ -1542,8 +1963,7 @@ paths:
         "200":
           description: OK
           schema:
-            additionalProperties: true
-            type: object
+            $ref: '#/definitions/models.ListeningSummary'
       security:
       - BearerAuth: []
       summary: Wrapped stats

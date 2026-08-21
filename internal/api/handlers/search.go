@@ -4,6 +4,8 @@ import (
 	"net/http"
 
 	"github.com/labstack/echo/v4"
+
+	"github.com/Aunali321/korus/internal/services"
 )
 
 // Search godoc
@@ -17,9 +19,10 @@ import (
 // @Router /search [get]
 // @Security BearerAuth
 func (h *Handler) Search(c echo.Context) error {
+	user, _ := currentUser(c)
 	q := c.QueryParam("q")
 	limit, offset := parseLimitOffset(c, 25, 200)
-	res, err := h.search.Search(c.Request().Context(), q, limit, offset)
+	res, err := h.search.Search(c.Request().Context(), user.ID, q, services.AllSearchKinds, limit, offset)
 	if err != nil {
 		return echo.NewHTTPError(http.StatusInternalServerError, map[string]string{"error": err.Error(), "code": "SEARCH_FAILED"})
 	}

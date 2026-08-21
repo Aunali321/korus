@@ -25,6 +25,98 @@ const docTemplate = `{
     "host": "{{.Host}}",
     "basePath": "{{.BasePath}}",
     "paths": {
+        "/admin/database/backup": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Creates a backup of the SQLite database and streams it to the client",
+                "produces": [
+                    "application/octet-stream"
+                ],
+                "tags": [
+                    "Admin"
+                ],
+                "summary": "Backup database",
+                "responses": {
+                    "200": {
+                        "description": "Database backup file",
+                        "schema": {
+                            "type": "file"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/admin/database/restore": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Restores the database from an uploaded backup file. Server will restart after restore.",
+                "consumes": [
+                    "multipart/form-data"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Admin"
+                ],
+                "summary": "Restore database",
+                "parameters": [
+                    {
+                        "type": "file",
+                        "description": "Database backup file",
+                        "name": "backup",
+                        "in": "formData",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        },
         "/admin/musicbrainz/enrich": {
             "post": {
                 "security": [
@@ -200,6 +292,192 @@ const docTemplate = `{
                     "Admin"
                 ],
                 "summary": "System info",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            }
+        },
+        "/ai/chat": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "text/event-stream"
+                ],
+                "tags": [
+                    "AI"
+                ],
+                "summary": "Chat with the assistant",
+                "parameters": [
+                    {
+                        "description": "Message and player context",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handlers.chatRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "SSE stream of JSON events: text, tool, action, ui, done, error",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                }
+            }
+        },
+        "/ai/conversations": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "AI"
+                ],
+                "summary": "List conversations",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "array",
+                                "items": {
+                                    "$ref": "#/definitions/ai.Conversation"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/ai/conversations/{id}": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "AI"
+                ],
+                "summary": "Get conversation messages",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Conversation ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "array",
+                                "items": {
+                                    "$ref": "#/definitions/ai.ChatMessage"
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "AI"
+                ],
+                "summary": "Delete conversation",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Conversation ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "boolean"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/ai/wrapped": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "AI"
+                ],
+                "summary": "Wrapped diary page",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "month|year",
+                        "name": "period",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "YYYY-MM or YYYY",
+                        "name": "key",
+                        "in": "query"
+                    },
+                    {
+                        "type": "boolean",
+                        "description": "Regenerate instead of serving the cached page",
+                        "name": "refresh",
+                        "in": "query"
+                    }
+                ],
                 "responses": {
                     "200": {
                         "description": "OK",
@@ -1366,8 +1644,7 @@ const docTemplate = `{
                         "schema": {
                             "type": "array",
                             "items": {
-                                "type": "object",
-                                "additionalProperties": true
+                                "$ref": "#/definitions/models.Playlist"
                             }
                         }
                     }
@@ -1404,8 +1681,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "type": "object",
-                            "additionalProperties": true
+                            "$ref": "#/definitions/models.Playlist"
                         }
                     }
                 }
@@ -1438,8 +1714,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "type": "object",
-                            "additionalProperties": true
+                            "$ref": "#/definitions/models.Playlist"
                         }
                     },
                     "403": {
@@ -1500,8 +1775,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "type": "object",
-                            "additionalProperties": true
+                            "$ref": "#/definitions/models.Playlist"
                         }
                     },
                     "403": {
@@ -1916,13 +2190,6 @@ const docTemplate = `{
                         "description": "Number of songs to return",
                         "name": "limit",
                         "in": "query"
-                    },
-                    {
-                        "type": "string",
-                        "default": "curator",
-                        "description": "Radio mode: curator or mainstream",
-                        "name": "mode",
-                        "in": "query"
                     }
                 ],
                 "responses": {
@@ -2183,8 +2450,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "type": "object",
-                            "additionalProperties": true
+                            "$ref": "#/definitions/models.StatsReport"
                         }
                     }
                 }
@@ -2208,8 +2474,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "type": "object",
-                            "additionalProperties": true
+                            "$ref": "#/definitions/models.Insights"
                         }
                     }
                 }
@@ -2241,8 +2506,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "type": "object",
-                            "additionalProperties": true
+                            "$ref": "#/definitions/models.ListeningSummary"
                         }
                     }
                 }
@@ -2619,6 +2883,34 @@ const docTemplate = `{
         }
     },
     "definitions": {
+        "ai.ChatMessage": {
+            "type": "object",
+            "properties": {
+                "content": {
+                    "type": "string"
+                },
+                "role": {
+                    "type": "string"
+                }
+            }
+        },
+        "ai.Conversation": {
+            "type": "object",
+            "properties": {
+                "created_at": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "title": {
+                    "type": "string"
+                },
+                "updated_at": {
+                    "type": "string"
+                }
+            }
+        },
         "handlers.PlayerState": {
             "type": "object",
             "properties": {
@@ -2642,6 +2934,32 @@ const docTemplate = `{
         "handlers.UserSettings": {
             "type": "object",
             "properties": {
+                "repeat": {
+                    "type": "string"
+                },
+                "shuffle": {
+                    "type": "boolean"
+                }
+            }
+        },
+        "handlers.chatRequest": {
+            "type": "object",
+            "properties": {
+                "conversation_id": {
+                    "type": "integer"
+                },
+                "message": {
+                    "type": "string"
+                },
+                "now_playing_id": {
+                    "type": "integer"
+                },
+                "queue_ids": {
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
+                },
                 "repeat": {
                     "type": "string"
                 },
@@ -2781,6 +3099,289 @@ const docTemplate = `{
                 }
             }
         },
+        "models.Bucket": {
+            "type": "object",
+            "properties": {
+                "label": {
+                    "type": "string"
+                },
+                "value": {
+                    "type": "integer"
+                }
+            }
+        },
+        "models.DiscoveryStats": {
+            "type": "object",
+            "properties": {
+                "exploration_rate": {
+                    "type": "number"
+                },
+                "new_artists": {
+                    "type": "integer"
+                },
+                "new_songs": {
+                    "type": "integer"
+                }
+            }
+        },
+        "models.Insights": {
+            "type": "object",
+            "properties": {
+                "current_streak": {
+                    "type": "integer"
+                },
+                "longest_streak": {
+                    "type": "integer"
+                }
+            }
+        },
+        "models.ListeningPatterns": {
+            "type": "object",
+            "properties": {
+                "by_day": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/models.Bucket"
+                    }
+                },
+                "by_hour": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/models.Bucket"
+                    }
+                },
+                "by_month": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/models.Bucket"
+                    }
+                }
+            }
+        },
+        "models.ListeningSummary": {
+            "type": "object",
+            "properties": {
+                "avg_plays_per_day": {
+                    "type": "number"
+                },
+                "days_listened": {
+                    "type": "integer"
+                },
+                "new_artists_discovered": {
+                    "type": "integer"
+                },
+                "period": {
+                    "type": "string"
+                },
+                "top_albums": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/models.PlayedAlbum"
+                    }
+                },
+                "top_artists": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/models.PlayedArtist"
+                    }
+                },
+                "top_songs": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/models.PlayedSong"
+                    }
+                },
+                "total_minutes": {
+                    "type": "integer"
+                },
+                "total_plays": {
+                    "type": "integer"
+                },
+                "unique_artists": {
+                    "type": "integer"
+                },
+                "unique_songs": {
+                    "type": "integer"
+                }
+            }
+        },
+        "models.PeriodRange": {
+            "type": "object",
+            "properties": {
+                "end": {
+                    "type": "string"
+                },
+                "start": {
+                    "type": "string"
+                }
+            }
+        },
+        "models.PlayedAlbum": {
+            "type": "object",
+            "properties": {
+                "artist": {
+                    "$ref": "#/definitions/models.Artist"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "plays": {
+                    "type": "integer"
+                },
+                "title": {
+                    "type": "string"
+                }
+            }
+        },
+        "models.PlayedArtist": {
+            "type": "object",
+            "properties": {
+                "id": {
+                    "type": "integer"
+                },
+                "image_path": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "plays": {
+                    "type": "integer"
+                }
+            }
+        },
+        "models.PlayedSong": {
+            "type": "object",
+            "properties": {
+                "artist": {
+                    "$ref": "#/definitions/models.Artist"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "plays": {
+                    "type": "integer"
+                },
+                "title": {
+                    "type": "string"
+                }
+            }
+        },
+        "models.Playlist": {
+            "type": "object",
+            "properties": {
+                "cover_path": {
+                    "type": "string"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "description": {
+                    "type": "string"
+                },
+                "first_song_id": {
+                    "description": "FirstSongID lets a client fall back to the first track's artwork when the\nplaylist has no cover of its own.",
+                    "type": "integer"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "owner": {
+                    "$ref": "#/definitions/models.PlaylistOwner"
+                },
+                "public": {
+                    "type": "boolean"
+                },
+                "song_count": {
+                    "type": "integer"
+                },
+                "songs": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/models.Song"
+                    }
+                },
+                "user_id": {
+                    "type": "integer"
+                }
+            }
+        },
+        "models.PlaylistOwner": {
+            "type": "object",
+            "properties": {
+                "id": {
+                    "type": "integer"
+                },
+                "username": {
+                    "type": "string"
+                }
+            }
+        },
+        "models.RankedAlbum": {
+            "type": "object",
+            "properties": {
+                "album": {
+                    "$ref": "#/definitions/models.Album"
+                },
+                "completion_rate": {
+                    "type": "number"
+                },
+                "play_count": {
+                    "type": "integer"
+                },
+                "total_time": {
+                    "type": "integer"
+                }
+            }
+        },
+        "models.RankedArtist": {
+            "type": "object",
+            "properties": {
+                "artist": {
+                    "$ref": "#/definitions/models.Artist"
+                },
+                "play_count": {
+                    "type": "integer"
+                },
+                "total_time": {
+                    "type": "integer"
+                },
+                "unique_songs": {
+                    "type": "integer"
+                }
+            }
+        },
+        "models.RankedGenre": {
+            "type": "object",
+            "properties": {
+                "genre": {
+                    "type": "string"
+                },
+                "play_count": {
+                    "type": "integer"
+                }
+            }
+        },
+        "models.RankedSong": {
+            "type": "object",
+            "properties": {
+                "avg_completion": {
+                    "type": "number"
+                },
+                "play_count": {
+                    "type": "integer"
+                },
+                "song": {
+                    "$ref": "#/definitions/models.Song"
+                },
+                "total_time": {
+                    "type": "integer"
+                }
+            }
+        },
         "models.Song": {
             "type": "object",
             "properties": {
@@ -2818,6 +3419,60 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "track_number": {
+                    "type": "integer"
+                }
+            }
+        },
+        "models.StatsReport": {
+            "type": "object",
+            "properties": {
+                "discovery": {
+                    "$ref": "#/definitions/models.DiscoveryStats"
+                },
+                "listening_patterns": {
+                    "$ref": "#/definitions/models.ListeningPatterns"
+                },
+                "period": {
+                    "$ref": "#/definitions/models.PeriodRange"
+                },
+                "top_albums": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/models.RankedAlbum"
+                    }
+                },
+                "top_artists": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/models.RankedArtist"
+                    }
+                },
+                "top_genres": {
+                    "description": "TopGenres is always empty: the library has no genre column to rank by.\nThe field stays because clients read it.",
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/models.RankedGenre"
+                    }
+                },
+                "top_songs": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/models.RankedSong"
+                    }
+                },
+                "total_duration": {
+                    "type": "integer"
+                },
+                "total_plays": {
+                    "type": "integer"
+                },
+                "unique_albums": {
+                    "type": "integer"
+                },
+                "unique_artists": {
+                    "type": "integer"
+                },
+                "unique_songs": {
                     "type": "integer"
                 }
             }

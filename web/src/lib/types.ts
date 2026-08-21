@@ -117,8 +117,7 @@ export interface WrappedData {
     avg_plays_per_day: number;
     unique_songs: number;
     unique_artists: number;
-    personality?: string;
-    milestones: string[];
+    new_artists_discovered: number;
 }
 
 export interface Insights {

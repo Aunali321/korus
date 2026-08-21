@@ -2,6 +2,8 @@ import { invalidate } from '$app/navigation';
 import { api } from '$lib/api';
 import { favoritesPageCache } from './pageData.svelte';
 
+export type FavoriteKind = 'song' | 'album' | 'artist';
+
 function createFavoritesStore() {
     let songIds = $state<Set<number>>(new Set());
     let albumIds = $state<Set<number>>(new Set());
@@ -27,6 +29,43 @@ function createFavoritesStore() {
         return promise;
     }
 
+    function idsFor(kind: FavoriteKind): Set<number> {
+        if (kind === 'song') return songIds;
+        if (kind === 'album') return albumIds;
+        return artistIds;
+    }
+
+    // applyLocal reflects a change that already happened on the server.
+    function applyLocal(kind: FavoriteKind, id: number, on: boolean) {
+        const next = new Set(idsFor(kind));
+        if (on) next.add(id);
+        else next.delete(id);
+
+        if (kind === 'song') songIds = next;
+        else if (kind === 'album') albumIds = next;
+        else artistIds = next;
+
+        favoritesPageCache.invalidate();
+        invalidate('app:favorites');
+    }
+
+    function callApi(kind: FavoriteKind, id: number, on: boolean): Promise<unknown> {
+        if (kind === 'song') return on ? api.favoriteSong(id) : api.unfavoriteSong(id);
+        if (kind === 'album') return on ? api.favoriteAlbum(id) : api.unfavoriteAlbum(id);
+        return on ? api.followArtist(id) : api.unfollowArtist(id);
+    }
+
+    async function set(kind: FavoriteKind, id: number, on: boolean): Promise<boolean> {
+        try {
+            await callApi(kind, id, on);
+            applyLocal(kind, id, on);
+            return on;
+        } catch (err) {
+            console.error(`Failed to update ${kind} favorite:`, err);
+            return idsFor(kind).has(id);
+        }
+    }
+
     function isFavorite(songId: number): boolean {
         return songIds.has(songId);
     }
@@ -37,69 +76,6 @@ function createFavoritesStore() {
 
     function isArtistFollowed(artistId: number): boolean {
         return artistIds.has(artistId);
-    }
-
-    async function toggle(songId: number): Promise<boolean> {
-        const wasFavorite = songIds.has(songId);
-        try {
-            if (wasFavorite) {
-                await api.unfavoriteSong(songId);
-                songIds.delete(songId);
-                songIds = new Set(songIds);
-            } else {
-                await api.favoriteSong(songId);
-                songIds.add(songId);
-                songIds = new Set(songIds);
-            }
-            favoritesPageCache.invalidate();
-            invalidate('app:favorites');
-            return !wasFavorite;
-        } catch (err) {
-            console.error('Failed to toggle favorite:', err);
-            return wasFavorite;
-        }
-    }
-
-    async function toggleAlbum(albumId: number): Promise<boolean> {
-        const wasFavorite = albumIds.has(albumId);
-        try {
-            if (wasFavorite) {
-                await api.unfavoriteAlbum(albumId);
-                albumIds.delete(albumId);
-                albumIds = new Set(albumIds);
-            } else {
-                await api.favoriteAlbum(albumId);
-                albumIds.add(albumId);
-                albumIds = new Set(albumIds);
-            }
-            favoritesPageCache.invalidate();
-            invalidate('app:favorites');
-            return !wasFavorite;
-        } catch (err) {
-            console.error('Failed to toggle album favorite:', err);
-            return wasFavorite;
-        }
-    }
-
-    async function toggleArtist(artistId: number): Promise<boolean> {
-        const wasFollowed = artistIds.has(artistId);
-        try {
-            if (wasFollowed) {
-                await api.unfollowArtist(artistId);
-                artistIds.delete(artistId);
-                artistIds = new Set(artistIds);
-            } else {
-                await api.followArtist(artistId);
-                artistIds.add(artistId);
-                artistIds = new Set(artistIds);
-            }
-            favoritesPageCache.invalidate();
-            invalidate('app:favorites');
-            return !wasFollowed;
-        } catch (err) {
-            console.error('Failed to toggle artist follow:', err);
-            return wasFollowed;
-        }
     }
 
     function reset() {
@@ -116,9 +92,12 @@ function createFavoritesStore() {
         isFavorite,
         isAlbumFavorite,
         isArtistFollowed,
-        toggle,
-        toggleAlbum,
-        toggleArtist,
+        toggle: (songId: number) => set('song', songId, !songIds.has(songId)),
+        toggleAlbum: (albumId: number) => set('album', albumId, !albumIds.has(albumId)),
+        toggleArtist: (artistId: number) => set('artist', artistId, !artistIds.has(artistId)),
+        set,
+        // applyRemote records a change made elsewhere, such as by the assistant.
+        applyRemote: applyLocal,
         reset
     };
 }
