@@ -24,8 +24,6 @@ const (
 	IDToggle     = "/player/toggle"
 	IDSkip       = "/player/skip"
 	IDStop       = "/player/stop"
-	IDNowPlaying = "/player/nowplaying"
-	IDQueue      = "/player/queue"
 	IDSearchPlay = "/search/play"
 	IDAlbumPlay  = "/album/play/"
 
@@ -202,10 +200,15 @@ func Controls(paused bool) discord.ActionRowComponent {
 	return discord.NewActionRow(
 		toggle,
 		discord.NewSecondaryButton("Skip", IDSkip),
-		discord.NewSecondaryButton("Queue", IDQueue),
-		discord.NewSecondaryButton("Now playing", IDNowPlaying),
 		discord.NewDangerButton("Stop", IDStop),
 	)
+}
+
+// CreateEphemeral is Create for a reply only the person who clicked sees.
+func CreateEphemeral(update discord.MessageUpdate) discord.MessageCreate {
+	create := Create(update)
+	create.Flags |= discord.MessageFlagEphemeral
+	return create
 }
 
 // Create turns a rendered reply into a standalone message. Captions live in a

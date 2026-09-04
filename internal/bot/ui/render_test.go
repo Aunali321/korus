@@ -55,11 +55,11 @@ func captionLines(n int) []korus.Line {
 	return lines
 }
 
-func TestViewsFitDiscordLimits(t *testing.T) {
+func testViews() map[string]discord.MessageUpdate {
 	year := 2024
 	long := strings.Repeat("biography ", 400)
 
-	views := map[string]discord.MessageUpdate{
+	return map[string]discord.MessageUpdate{
 		"fail": Fail("something broke"),
 		"search": Search(korus.SearchResult{
 			Songs:     songs(10),
@@ -92,9 +92,14 @@ func TestViewsFitDiscordLimits(t *testing.T) {
 			TopSongs:   []korus.PlayedSong{{ID: 1, Title: "Track", Plays: 12}},
 			TopArtists: []korus.PlayedArtist{{ID: 2, Name: "Artist", Plays: 30}},
 		}, "the last year"),
-		"nowplaying": NowPlaying(player.Snapshot{
+		"panel": Panel(player.Snapshot{
 			Current: player.Track{Song: song(1, "Track"), Requester: "listener"},
 			Elapsed: 42 * time.Second, Playing: true, Queue: tracks(3),
+		}, CoverRef),
+		// The preview is capped, so a long queue must not grow the panel.
+		"panelLongQueue": Panel(player.Snapshot{
+			Current: player.Track{Song: song(1, "Track"), Requester: "listener"},
+			Elapsed: 42 * time.Second, Playing: true, Queue: tracks(500),
 		}, CoverRef),
 		"queue": Queue(player.Snapshot{
 			Current: player.Track{Song: song(1, "Track"), Requester: "listener"},
@@ -107,8 +112,10 @@ func TestViewsFitDiscordLimits(t *testing.T) {
 		"captionsLong":    Captions(song(1, "Track"), []korus.Line{{Text: long}}, 0),
 		"captionsWaiting": CaptionsWaiting(song(1, "Track")),
 	}
+}
 
-	for name, view := range views {
+func TestViewsFitDiscordLimits(t *testing.T) {
+	for name, view := range testViews() {
 		t.Run(name, func(t *testing.T) {
 			if view.Flags == nil || !view.Flags.Has(discord.MessageFlagIsComponentsV2) {
 				t.Fatal("view is missing the components v2 flag")
@@ -159,5 +166,24 @@ func TestViewsFitDiscordLimits(t *testing.T) {
 			}
 			t.Logf("components=%d characters=%d", count, text)
 		})
+	}
+}
+
+// Only the live panel carries controls. Every other view either expires or goes
+// stale, and driving playback from one of those is what made a queue
+// confirmation delete itself out from under the listener.
+func TestOnlyPanelCarriesControls(t *testing.T) {
+	for name, view := range testViews() {
+		raw, err := json.Marshal(view.Components)
+		if err != nil {
+			t.Fatalf("%s: %v", name, err)
+		}
+		has := strings.Contains(string(raw), IDToggle) ||
+			strings.Contains(string(raw), IDSkip) ||
+			strings.Contains(string(raw), IDStop)
+		want := strings.HasPrefix(name, "panel")
+		if has != want {
+			t.Errorf("%s has controls = %v, want %v", name, has, want)
+		}
 	}
 }

@@ -279,7 +279,12 @@ func Playlist(playlist korus.Playlist) discord.MessageUpdate {
 	)
 }
 
-func NowPlaying(snapshot player.Snapshot, thumbnail string) discord.MessageUpdate {
+// panelPreview is how many upcoming tracks the live player lists.
+const panelPreview = 5
+
+// Panel is the live player: what is playing, how far in, and what follows. It is
+// the only view carrying controls, because it is the only one that stays right.
+func Panel(snapshot player.Snapshot, thumbnail string) discord.MessageUpdate {
 	song := snapshot.Current.Song
 	state := ""
 	if snapshot.Paused {
@@ -293,8 +298,25 @@ func NowPlaying(snapshot player.Snapshot, thumbnail string) discord.MessageUpdat
 		),
 		Text("%s%s", Progress(snapshot.Elapsed, song.Seconds()), state),
 		discord.NewSmallSeparator(),
+		discord.NewTextDisplay(panelUpNext(snapshot.Queue)),
+		discord.NewSmallSeparator(),
 		Controls(snapshot.Paused),
 	)
+}
+
+func panelUpNext(queue []player.Track) string {
+	if len(queue) == 0 {
+		return "-# Nothing queued up next."
+	}
+	shown := min(len(queue), panelPreview)
+	lines := make([]string, 0, shown+1)
+	for i := range shown {
+		lines = append(lines, fmt.Sprintf("`%2d.` %s", i+1, SongLine(queue[i].Song)))
+	}
+	if len(queue) > shown {
+		lines = append(lines, fmt.Sprintf("-# and %d more", len(queue)-shown))
+	}
+	return "**Up next**\n" + Join(lines)
 }
 
 func Queue(snapshot player.Snapshot) discord.MessageUpdate {
@@ -313,8 +335,6 @@ func Queue(snapshot player.Snapshot) discord.MessageUpdate {
 			Progress(snapshot.Elapsed, song.Seconds())),
 		discord.NewSmallSeparator(),
 		upNext,
-		discord.NewSmallSeparator(),
-		Controls(snapshot.Paused),
 	)
 }
 
@@ -330,8 +350,6 @@ func Queued(track player.Track, position int, paused bool, thumbnail string) dis
 			"**"+Escape(Truncate(track.Song.Title, maxTitle))+"** — "+Escape(track.Song.ArtistNames()),
 			fmt.Sprintf("-# %s · requested by %s", Duration(track.Song.Seconds()), Escape(track.Requester)),
 		),
-		discord.NewSmallSeparator(),
-		Controls(paused),
 	)
 }
 
@@ -347,8 +365,6 @@ func QueuedBatch(title string, tracks []player.Track, paused bool) discord.Messa
 		Text("## %s\n-# %d tracks · %s", Escape(title), len(tracks), Duration(total)),
 		discord.NewSmallSeparator(),
 		discord.NewTextDisplay(Join(lines)),
-		discord.NewSmallSeparator(),
-		Controls(paused),
 	)
 }
 

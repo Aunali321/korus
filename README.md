@@ -234,6 +234,13 @@ go run ./cmd/bot
 
 The bot needs the `applications.commands` and `bot` scopes, and the View Channels, Send Messages, Attach Files, Connect and Speak permissions. FFmpeg must be on `PATH`.
 
+The player is one live message per server. `/play` puts it in the channel and it
+rewrites itself as the track, queue and progress change, so there is never more
+than one and it is never stale. `/nowplaying` brings it back down to the bottom.
+It is the only view with Pause, Skip and Stop on it, since it is the only one
+that stays correct. Queue confirmations and acknowledgements disappear after ten
+seconds.
+
 `/captions` follows the playing track line by line, rewriting one message as the
 lyrics advance. It reads the `lyrics_synced` LRC column, so it only works for
 tracks that have timed lyrics, and it picks up again on the next track that does.

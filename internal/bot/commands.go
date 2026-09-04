@@ -167,5 +167,5 @@ var commands = []discord.ApplicationCommandCreate{
 	discord.SlashCommandCreate{Name: "skip", Description: "Skip the current track"},
 	discord.SlashCommandCreate{Name: "stop", Description: "Stop playback and leave the voice channel"},
 	discord.SlashCommandCreate{Name: "queue", Description: "Show what is playing and what is next"},
-	discord.SlashCommandCreate{Name: "nowplaying", Description: "Show the current track"},
+	discord.SlashCommandCreate{Name: "nowplaying", Description: "Bring the live player down to the bottom of the channel"},
 }

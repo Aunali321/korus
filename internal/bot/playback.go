@@ -3,8 +3,10 @@ package bot
 import (
 	"context"
 	"errors"
+	"fmt"
 	"slices"
 	"strconv"
+	"time"
 
 	"github.com/disgoorg/disgo/discord"
 	"github.com/disgoorg/disgo/handler"
@@ -165,16 +167,17 @@ func (b *Bot) play(ctx context.Context, e *handler.CommandEvent, data discord.Sl
 	if err != nil {
 		return discord.MessageUpdate{}, false, err
 	}
-	return b.queueOne(ctx, current, song)
+	return b.queueOne(ctx, current, song, e.Channel().ID())
 }
 
 // queueOne reports whether the reply is only a queue confirmation. A track that
 // started playing keeps its message, since that one carries the player controls.
-func (b *Bot) queueOne(ctx context.Context, current session, song korus.Song) (discord.MessageUpdate, bool, error) {
+func (b *Bot) queueOne(ctx context.Context, current session, song korus.Song, textChannel snowflake.ID) (discord.MessageUpdate, bool, error) {
 	active, tracks, position, err := b.enqueue(ctx, current, []korus.Song{song})
 	if err != nil {
 		return discord.MessageUpdate{}, false, err
 	}
+	b.showPanel(current.guildID, textChannel)
 	cover, ref := b.cover(ctx, current.source.Artwork, song.ID)
 	return ui.Attach(ui.Queued(tracks[0], position, active.Snapshot().Paused, ref), cover...), position > 0, nil
 }
@@ -203,6 +206,7 @@ func (b *Bot) radio(ctx context.Context, e *handler.CommandEvent, data discord.S
 	if err != nil {
 		return discord.MessageUpdate{}, false, err
 	}
+	b.showPanel(current.guildID, e.Channel().ID())
 	return ui.QueuedBatch("Radio from "+seed.Title, tracks, active.Snapshot().Paused), position > 0, nil
 }
 
@@ -275,8 +279,18 @@ func (b *Bot) queue(_ context.Context, e *handler.CommandEvent, _ discord.SlashC
 	return b.queueView(e)
 }
 
-func (b *Bot) nowPlaying(ctx context.Context, e *handler.CommandEvent, _ discord.SlashCommandInteractionData) (discord.MessageUpdate, error) {
-	return b.nowPlayingView(ctx, e)
+// nowPlaying brings the live player down to the bottom of the channel, rather
+// than posting a second copy that starts going stale immediately.
+func (b *Bot) nowPlaying(_ context.Context, e *handler.CommandEvent, _ discord.SlashCommandInteractionData) (discord.MessageUpdate, error) {
+	active, err := b.viewed(e)
+	if err != nil {
+		return discord.MessageUpdate{}, err
+	}
+	if !active.Snapshot().Playing {
+		return discord.MessageUpdate{}, userError("Nothing is playing.")
+	}
+	b.movePanel(active.GuildID(), e.Channel().ID())
+	return ui.Note(ui.ColorSuccess, "Player moved down here."), nil
 }
 
 func (b *Bot) queueView(e caller) (discord.MessageUpdate, error) {
@@ -291,82 +305,76 @@ func (b *Bot) queueView(e caller) (discord.MessageUpdate, error) {
 	return ui.Queue(snapshot), nil
 }
 
-func (b *Bot) nowPlayingView(ctx context.Context, e caller) (discord.MessageUpdate, error) {
-	active, err := b.viewed(e)
-	if err != nil {
-		return discord.MessageUpdate{}, err
+// panelStep coarsens elapsed time so the progress bar looks like it is moving
+// without editing the message every second.
+const panelStep = 5 * time.Second
+
+// panelDraw renders the live player. Artwork is only re-sent when the track
+// changes, so a progress tick leaves the attachment already on the message.
+func (b *Bot) panelDraw() draw {
+	var (
+		songID int64
+		ref    string
+	)
+	return func(active *player.Player, snapshot player.Snapshot) (discord.MessageUpdate, string, []*discord.File) {
+		var files []*discord.File
+		song := snapshot.Current.Song
+		if song.ID != songID {
+			songID = song.ID
+			ctx, cancel := context.WithTimeout(context.Background(), captionLoadWait)
+			files, ref = b.cover(ctx, active.Source().Artwork, song.ID)
+			cancel()
+		}
+		return ui.Panel(snapshot, ref), fmt.Sprintf("%d/%t/%d/%d",
+			song.ID, snapshot.Paused, len(snapshot.Queue), snapshot.Elapsed/panelStep), files
 	}
-	snapshot := active.Snapshot()
-	if !snapshot.Playing {
-		return discord.MessageUpdate{}, userError("Nothing is playing.")
-	}
-	cover, ref := b.cover(ctx, active.Source().Artwork, snapshot.Current.Song.ID)
-	return ui.Attach(ui.NowPlaying(snapshot, ref), cover...), nil
 }
 
-func (b *Bot) toggleButton(ctx context.Context, e *handler.ComponentEvent) (discord.MessageUpdate, error) {
+// showPanel puts the live player in the channel, leaving it alone when it is
+// already running there so queueing does not make it jump about.
+func (b *Bot) showPanel(guildID, channelID snowflake.ID) {
+	if at, running := b.live.channelOf(guildID, livePanel); running && at == channelID {
+		return
+	}
+	b.movePanel(guildID, channelID)
+}
+
+func (b *Bot) movePanel(guildID, channelID snowflake.ID) {
+	if err := b.live.start(guildID, channelID, livePanel, b.panelDraw()); err != nil {
+		b.log.Debug("cannot show the player panel", "err", err)
+	}
+}
+
+// The panel redraws itself, so a control only has to act and acknowledge.
+func (b *Bot) toggleAction(e *handler.ComponentEvent) error {
 	active, err := b.controlled(e)
 	if err != nil {
-		return discord.MessageUpdate{}, err
+		return err
 	}
 	if !active.Pause() {
 		active.Resume()
 	}
-	return b.nowPlayingView(ctx, e)
+	return nil
 }
 
-func (b *Bot) skipButton(ctx context.Context, e *handler.ComponentEvent) (discord.MessageUpdate, error) {
+func (b *Bot) skipAction(e *handler.ComponentEvent) error {
 	active, err := b.controlled(e)
 	if err != nil {
-		return discord.MessageUpdate{}, err
+		return err
 	}
-	result, ok := active.Skip()
-	if !ok {
-		return discord.MessageUpdate{}, userError("Nothing is playing.")
+	if _, ok := active.Skip(); !ok {
+		return userError("Nothing is playing.")
 	}
-	if len(result.Upcoming) == 0 {
-		return ui.Note(ui.ColorSuccess, "Skipped **%s**. Queue is empty.", ui.Escape(result.Skipped.Song.Title)), nil
-	}
-	next := player.Snapshot{Current: result.Upcoming[0], Playing: true, Queue: result.Upcoming[1:]}
-	cover, ref := b.cover(ctx, active.Source().Artwork, next.Current.Song.ID)
-	return ui.Attach(ui.NowPlaying(next, ref), cover...), nil
+	return nil
 }
 
-func (b *Bot) stopButton(_ context.Context, e *handler.ComponentEvent) (discord.MessageUpdate, error) {
+func (b *Bot) stopAction(e *handler.ComponentEvent) error {
 	active, err := b.controlled(e)
 	if err != nil {
-		return discord.MessageUpdate{}, err
+		return err
 	}
 	active.Stop()
-	return ui.Note(ui.ColorSuccess, "Stopped. Queue cleared."), nil
-}
-
-func (b *Bot) queueButton(_ context.Context, e *handler.ComponentEvent) (discord.MessageUpdate, error) {
-	return b.queueView(e)
-}
-
-func (b *Bot) nowPlayingButton(ctx context.Context, e *handler.ComponentEvent) (discord.MessageUpdate, error) {
-	return b.nowPlayingView(ctx, e)
-}
-
-func (b *Bot) searchPlaySelect(ctx context.Context, e *handler.ComponentEvent) (discord.MessageUpdate, bool, error) {
-	values := e.StringSelectMenuInteractionData().Values
-	if len(values) == 0 {
-		return discord.MessageUpdate{}, false, userError("Nothing selected.")
-	}
-	id, err := strconv.ParseInt(values[0], 10, 64)
-	if err != nil {
-		return discord.MessageUpdate{}, false, userError("That result is no longer valid.")
-	}
-	current, err := b.session(ctx, e)
-	if err != nil {
-		return discord.MessageUpdate{}, false, err
-	}
-	song, err := current.source.Song(ctx, id)
-	if err != nil {
-		return discord.MessageUpdate{}, false, err
-	}
-	return b.queueOne(ctx, current, song)
+	return nil
 }
 
 func (b *Bot) albumPlayButton(ctx context.Context, e *handler.ComponentEvent) (discord.MessageUpdate, bool, error) {
@@ -386,5 +394,26 @@ func (b *Bot) albumPlayButton(ctx context.Context, e *handler.ComponentEvent) (d
 	if err != nil {
 		return discord.MessageUpdate{}, false, err
 	}
+	b.showPanel(current.guildID, e.Channel().ID())
 	return ui.QueuedBatch(album.Title, tracks, active.Snapshot().Paused), position > 0, nil
+}
+
+func (b *Bot) searchPlaySelect(ctx context.Context, e *handler.ComponentEvent) (discord.MessageUpdate, bool, error) {
+	values := e.StringSelectMenuInteractionData().Values
+	if len(values) == 0 {
+		return discord.MessageUpdate{}, false, userError("Nothing selected.")
+	}
+	id, err := strconv.ParseInt(values[0], 10, 64)
+	if err != nil {
+		return discord.MessageUpdate{}, false, userError("That result is no longer valid.")
+	}
+	current, err := b.session(ctx, e)
+	if err != nil {
+		return discord.MessageUpdate{}, false, err
+	}
+	song, err := current.source.Song(ctx, id)
+	if err != nil {
+		return discord.MessageUpdate{}, false, err
+	}
+	return b.queueOne(ctx, current, song, e.Channel().ID())
 }

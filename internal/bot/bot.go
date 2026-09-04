@@ -66,7 +66,7 @@ type Bot struct {
 	accounts *accounts
 	client   *disgobot.Client
 	players  *player.Manager
-	captions *captions
+	live     *live
 
 	// Queue confirmations waiting to be dropped, keyed by message.
 	expiryMu sync.Mutex
@@ -104,7 +104,7 @@ func New(cfg Config, log *slog.Logger) (*Bot, error) {
 
 	b.client = client
 	b.players = player.NewManager(client, cfg.FFmpeg, log)
-	b.captions = newCaptions(b)
+	b.live = newLive(b)
 	return b, nil
 }
 
@@ -124,7 +124,7 @@ func (b *Bot) Start(ctx context.Context) error {
 }
 
 func (b *Bot) Close(ctx context.Context) {
-	b.captions.StopAll()
+	b.live.stopAll()
 	b.players.StopAll()
 	b.client.Close(ctx)
 	b.store.Close()
@@ -182,19 +182,15 @@ func (b *Bot) routes() *handler.Mux {
 		r.Autocomplete("/playlist/remove", b.complete(b.personalClient, b.completePlaylistRemove))
 	})
 
-	// Player buttons rewrite the message they live on.
-	router.Group(func(r handler.Router) {
-		r.Use(middleware.Defer(discord.InteractionTypeComponent, true, false))
-		r.Component(ui.IDToggle, b.component(b.toggleButton))
-		r.Component(ui.IDSkip, b.component(b.skipButton))
-		r.Component(ui.IDStop, b.component(b.stopButton))
-		r.Component(ui.IDQueue, b.component(b.queueButton))
-		r.Component(ui.IDNowPlaying, b.component(b.nowPlayingButton))
-	})
+	// Panel controls only act: the panel is already redrawing itself, so these
+	// acknowledge rather than render, and answer for themselves.
+	router.Component(ui.IDToggle, b.panelButton(b.toggleAction))
+	router.Component(ui.IDSkip, b.panelButton(b.skipAction))
+	router.Component(ui.IDStop, b.panelButton(b.stopAction))
 
 	router.Component(ui.IDCaptionsStop, func(e *handler.ComponentEvent) error {
 		if e.GuildID() != nil {
-			b.captions.Stop(*e.GuildID())
+			b.live.stop(*e.GuildID(), liveCaptions)
 		}
 		return e.DeferUpdateMessage()
 	})
@@ -275,6 +271,18 @@ func (b *Bot) slashNote(fn commandFunc) handler.SlashCommandHandler {
 	})
 }
 
+// panelButton acts on the session and acknowledges. The panel redraws itself, so
+// there is no message for the handler to render, and a failure is reported only
+// to whoever clicked.
+func (b *Bot) panelButton(act func(e *handler.ComponentEvent) error) handler.ComponentHandler {
+	return func(e *handler.ComponentEvent) error {
+		if err := act(e); err != nil {
+			return e.CreateMessage(ui.CreateEphemeral(b.render(err)))
+		}
+		return e.DeferUpdateMessage()
+	}
+}
+
 func (b *Bot) componentQueue(fn func(ctx context.Context, e *handler.ComponentEvent) (discord.MessageUpdate, bool, error)) handler.ComponentHandler {
 	return func(e *handler.ComponentEvent) error {
 		update, transient, err := fn(e.Ctx, e)
@@ -324,22 +332,8 @@ func (b *Bot) expire(messageID snowflake.ID, remove func(...rest.RequestOpt) err
 	}()
 }
 
-// keep cancels a pending removal. Player controls rewrite the message they live
-// on, so a listener using them has turned a confirmation into the view they are
-// working with, and deleting it out from under them is wrong.
-func (b *Bot) keep(messageID snowflake.ID) {
-	b.expiryMu.Lock()
-	cancel, pending := b.expiry[messageID]
-	delete(b.expiry, messageID)
-	b.expiryMu.Unlock()
-	if pending {
-		close(cancel)
-	}
-}
-
 func (b *Bot) component(fn func(ctx context.Context, e *handler.ComponentEvent) (discord.MessageUpdate, error)) handler.ComponentHandler {
 	return func(e *handler.ComponentEvent) error {
-		b.keep(e.Message.ID)
 		update, err := fn(e.Ctx, e)
 		if err != nil {
 			update = b.render(err)
