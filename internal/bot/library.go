@@ -8,6 +8,7 @@ import (
 	"github.com/disgoorg/disgo/discord"
 	"github.com/disgoorg/disgo/handler"
 
+	"github.com/Aunali321/korus/internal/bot/korus"
 	"github.com/Aunali321/korus/internal/bot/ui"
 )
 
@@ -50,11 +51,7 @@ func (b *Bot) artist(ctx context.Context, e *handler.CommandEvent, data discord.
 }
 
 func (b *Bot) lyrics(ctx context.Context, e *handler.CommandEvent, data discord.SlashCommandInteractionData) (discord.MessageUpdate, error) {
-	client, err := b.personalClient(ctx, e)
-	if err != nil {
-		return discord.MessageUpdate{}, err
-	}
-	song, err := resolveSong(ctx, client, data.String("song"))
+	client, song, err := b.lyricsTarget(ctx, e, data)
 	if err != nil {
 		return discord.MessageUpdate{}, err
 	}
@@ -71,6 +68,30 @@ func (b *Bot) lyrics(ctx context.Context, e *handler.CommandEvent, data discord.
 	}
 	cover, ref := b.cover(ctx, client.Artwork, song.ID)
 	return ui.Attach(ui.Lyrics(song, text, ref), cover...), nil
+}
+
+// lyricsTarget picks the song to look up. Without one named it falls back to
+// what the guild is playing, read from the library that track streams from
+// rather than the caller's own, since a session may run on someone else's.
+func (b *Bot) lyricsTarget(ctx context.Context, e *handler.CommandEvent, data discord.SlashCommandInteractionData) (*korus.Client, korus.Song, error) {
+	if query := strings.TrimSpace(data.String("song")); query != "" {
+		client, err := b.personalClient(ctx, e)
+		if err != nil {
+			return nil, korus.Song{}, err
+		}
+		song, err := resolveSong(ctx, client, query)
+		return client, song, err
+	}
+
+	active, err := b.viewed(e)
+	if err != nil {
+		return nil, korus.Song{}, userError("Name a song, or start playback and I will use the current track.")
+	}
+	snapshot := active.Snapshot()
+	if !snapshot.Playing {
+		return nil, korus.Song{}, userError("Name a song, or start playback and I will use the current track.")
+	}
+	return active.Source(), snapshot.Current.Song, nil
 }
 
 // cover uploads artwork as an attachment. Korus is often only reachable on a

@@ -5,6 +5,8 @@ import "github.com/disgoorg/disgo/discord"
 const (
 	radioMinLimit = 1
 	radioMaxLimit = 25
+
+	optShare = "share"
 )
 
 func autocompleteOption(name, description string, required bool) discord.ApplicationCommandOptionString {
@@ -21,6 +23,16 @@ func periodOption(choices ...discord.ApplicationCommandOptionChoiceString) disco
 		Name:        "period",
 		Description: "Window to summarise",
 		Choices:     choices,
+	}
+}
+
+// shareOption lets a caller override whether a reply is private to them. The
+// per-command default lives in the route, since Discord has no default for
+// boolean options.
+func shareOption(description string) discord.ApplicationCommandOptionBool {
+	return discord.ApplicationCommandOptionBool{
+		Name:        optShare,
+		Description: description,
 	}
 }
 
@@ -60,21 +72,27 @@ var commands = []discord.ApplicationCommandCreate{
 	},
 	discord.SlashCommandCreate{
 		Name:        "lyrics",
-		Description: "Show the lyrics of a song",
-		Options:     []discord.ApplicationCommandOption{autocompleteOption("song", "Song title", true)},
+		Description: "Show the lyrics of a song, or of whatever is playing",
+		Options: []discord.ApplicationCommandOption{
+			autocompleteOption("song", "Song title, defaults to the current track", false),
+			shareOption("Post to the channel instead of only to you (default true)"),
+		},
 	},
 
 	discord.SlashCommandCreate{
 		Name:        "stats",
 		Description: "Your listening stats",
-		Options: []discord.ApplicationCommandOption{periodOption(
-			choice("Last 30 days", "30d"),
-			choice("Today", "today"),
-			choice("This week", "week"),
-			choice("This month", "month"),
-			choice("This year", "year"),
-			choice("All time", "all_time"),
-		)},
+		Options: []discord.ApplicationCommandOption{
+			periodOption(
+				choice("Last 30 days", "30d"),
+				choice("Today", "today"),
+				choice("This week", "week"),
+				choice("This month", "month"),
+				choice("This year", "year"),
+				choice("All time", "all_time"),
+			),
+			shareOption("Post to the channel instead of only to you (default false)"),
+		},
 	},
 	discord.SlashCommandCreate{
 		Name:        "wrapped",

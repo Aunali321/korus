@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"time"
 
 	"github.com/disgoorg/disgo"
 	disgobot "github.com/disgoorg/disgo/bot"
@@ -16,6 +17,7 @@ import (
 	"github.com/disgoorg/disgo/gateway"
 	"github.com/disgoorg/disgo/handler"
 	"github.com/disgoorg/disgo/handler/middleware"
+	"github.com/disgoorg/disgo/rest"
 	"github.com/disgoorg/disgo/voice"
 	"github.com/disgoorg/godave/golibdave"
 	"github.com/disgoorg/snowflake/v2"
@@ -51,6 +53,9 @@ func displayName(e caller) string {
 	}
 	return e.User().EffectiveName()
 }
+
+// queueNoticeTTL is how long a "queued at #n" confirmation stays in the channel.
+const queueNoticeTTL = 10 * time.Second
 
 type Bot struct {
 	cfg      Config
@@ -126,8 +131,6 @@ func (b *Bot) routes() *handler.Mux {
 		r.SlashCommand("/login", b.slash(b.login))
 		r.SlashCommand("/logout", b.slash(b.logout))
 		r.SlashCommand("/whoami", b.slash(b.whoami))
-		r.SlashCommand("/lyrics", b.slash(b.lyrics))
-		r.SlashCommand("/stats", b.slash(b.stats))
 		r.SlashCommand("/wrapped", b.slash(b.wrapped))
 		r.SlashCommand("/playlists", b.slash(b.playlists))
 		r.SlashCommand("/playlist/view", b.slash(b.playlistView))
@@ -136,13 +139,24 @@ func (b *Bot) routes() *handler.Mux {
 		r.SlashCommand("/playlist/remove", b.slash(b.playlistRemove))
 	})
 
+	// Lyrics are about the song everyone is hearing, so they default to the
+	// channel. Stats are about one person, so they default to private.
+	router.Group(func(r handler.Router) {
+		r.Use(b.deferShared(true))
+		r.SlashCommand("/lyrics", b.slash(b.lyrics))
+	})
+	router.Group(func(r handler.Router) {
+		r.Use(b.deferShared(false))
+		r.SlashCommand("/stats", b.slash(b.stats))
+	})
+
 	router.Group(func(r handler.Router) {
 		r.Use(middleware.Defer(discord.InteractionTypeApplicationCommand, false, false))
 		r.SlashCommand("/search", b.slash(b.search))
 		r.SlashCommand("/album", b.slash(b.album))
 		r.SlashCommand("/artist", b.slash(b.artist))
-		r.SlashCommand("/play", b.slash(b.play))
-		r.SlashCommand("/radio", b.slash(b.radio))
+		r.SlashCommand("/play", b.slashQueue(b.play))
+		r.SlashCommand("/radio", b.slashQueue(b.radio))
 		r.SlashCommand("/pause", b.slash(b.pause))
 		r.SlashCommand("/resume", b.slash(b.resume))
 		r.SlashCommand("/skip", b.slash(b.skip))
@@ -175,8 +189,8 @@ func (b *Bot) routes() *handler.Mux {
 	// Queueing from a result list posts its own confirmation.
 	router.Group(func(r handler.Router) {
 		r.Use(middleware.Defer(discord.InteractionTypeComponent, false, false))
-		r.Component(ui.IDSearchPlay, b.component(b.searchPlaySelect))
-		r.Component(ui.IDAlbumPlay+"{album}", b.component(b.albumPlayButton))
+		r.Component(ui.IDSearchPlay, b.componentQueue(b.searchPlaySelect))
+		r.Component(ui.IDAlbumPlay+"{album}", b.componentQueue(b.albumPlayButton))
 	})
 
 	return router
@@ -193,6 +207,77 @@ func (b *Bot) slash(fn commandFunc) handler.SlashCommandHandler {
 		_, err = e.UpdateInteractionResponse(update)
 		return err
 	}
+}
+
+// deferShared defers a command privately unless its share option opts the reply
+// into the channel. Discord fixes visibility at defer time, so this has to run
+// before the handler.
+func (b *Bot) deferShared(shareByDefault bool) handler.Middleware {
+	return func(next handler.Handler) handler.Handler {
+		return func(e *handler.InteractionEvent) error {
+			share := shareByDefault
+			if command, ok := e.Interaction.(discord.ApplicationCommandInteraction); ok {
+				if choice, set := command.SlashCommandInteractionData().OptBool(optShare); set {
+					share = choice
+				}
+			}
+			var data discord.InteractionResponseData
+			if !share {
+				data = discord.MessageCreate{Flags: discord.MessageFlagEphemeral}
+			}
+			if err := e.Respond(discord.InteractionResponseTypeDeferredCreateMessage, data); err != nil {
+				return err
+			}
+			return next(e)
+		}
+	}
+}
+
+type queueFunc func(ctx context.Context, e *handler.CommandEvent, data discord.SlashCommandInteractionData) (discord.MessageUpdate, bool, error)
+
+// slashQueue is slash for commands that confirm a queue action. A confirmation
+// that nothing started playing is noise once it has been read, so it is dropped
+// shortly after.
+func (b *Bot) slashQueue(fn queueFunc) handler.SlashCommandHandler {
+	return func(data discord.SlashCommandInteractionData, e *handler.CommandEvent) error {
+		update, transient, err := fn(e.Ctx, e, data)
+		if err != nil {
+			update, transient = b.render(err), false
+		}
+		if _, err := e.UpdateInteractionResponse(update); err != nil {
+			return err
+		}
+		b.expire(e.DeleteInteractionResponse, transient)
+		return nil
+	}
+}
+
+func (b *Bot) componentQueue(fn func(ctx context.Context, e *handler.ComponentEvent) (discord.MessageUpdate, bool, error)) handler.ComponentHandler {
+	return func(e *handler.ComponentEvent) error {
+		update, transient, err := fn(e.Ctx, e)
+		if err != nil {
+			update, transient = b.render(err), false
+		}
+		if _, err := e.UpdateInteractionResponse(update); err != nil {
+			return err
+		}
+		b.expire(e.DeleteInteractionResponse, transient)
+		return nil
+	}
+}
+
+// expire removes a queue confirmation once it has served its purpose. The
+// message is cosmetic, so a failed delete is logged and forgotten.
+func (b *Bot) expire(delete func(...rest.RequestOpt) error, transient bool) {
+	if !transient {
+		return
+	}
+	go func() {
+		time.Sleep(queueNoticeTTL)
+		if err := delete(); err != nil {
+			b.log.Debug("cannot drop queue confirmation", "err", err)
+		}
+	}()
 }
 
 func (b *Bot) component(fn func(ctx context.Context, e *handler.ComponentEvent) (discord.MessageUpdate, error)) handler.ComponentHandler {

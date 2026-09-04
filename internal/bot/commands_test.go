@@ -48,6 +48,9 @@ func checkOptions(t *testing.T, options []discord.ApplicationCommandOption) {
 		case discord.ApplicationCommandOptionInt:
 			checkDescription(t, typed.Description)
 			required = typed.Required
+		case discord.ApplicationCommandOptionBool:
+			checkDescription(t, typed.Description)
+			required = typed.Required
 		default:
 			t.Errorf("option %q has an unhandled type", option.OptionName())
 			continue
@@ -77,5 +80,43 @@ func checkDescription(t *testing.T, description string) {
 	t.Helper()
 	if description == "" || len(description) > 100 {
 		t.Errorf("description %q must be 1 to 100 characters", description)
+	}
+}
+
+func findCommand(t *testing.T, name string) discord.SlashCommandCreate {
+	t.Helper()
+	for _, command := range commands {
+		if slash, ok := command.(discord.SlashCommandCreate); ok && slash.Name == name {
+			return slash
+		}
+	}
+	t.Fatalf("no %q command", name)
+	return discord.SlashCommandCreate{}
+}
+
+func option(t *testing.T, name string, options []discord.ApplicationCommandOption) discord.ApplicationCommandOption {
+	t.Helper()
+	for _, o := range options {
+		if o.OptionName() == name {
+			return o
+		}
+	}
+	t.Fatalf("no %q option", name)
+	return nil
+}
+
+// Visibility is chosen at defer time from this option, so both commands must
+// actually declare it, and lyrics must accept being called bare.
+func TestShareAndOptionalSong(t *testing.T) {
+	lyrics := findCommand(t, "lyrics")
+	song, ok := option(t, "song", lyrics.Options).(discord.ApplicationCommandOptionString)
+	if !ok || song.Required {
+		t.Error("lyrics song must be an optional string so it can fall back to the current track")
+	}
+	for _, name := range []string{"lyrics", "stats"} {
+		command := findCommand(t, name)
+		if _, ok := option(t, optShare, command.Options).(discord.ApplicationCommandOptionBool); !ok {
+			t.Errorf("%s share option must be a bool", name)
+		}
 	}
 }

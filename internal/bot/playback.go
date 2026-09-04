@@ -156,35 +156,37 @@ func (b *Bot) viewed(e caller) (*player.Player, error) {
 	return active, nil
 }
 
-func (b *Bot) play(ctx context.Context, e *handler.CommandEvent, data discord.SlashCommandInteractionData) (discord.MessageUpdate, error) {
+func (b *Bot) play(ctx context.Context, e *handler.CommandEvent, data discord.SlashCommandInteractionData) (discord.MessageUpdate, bool, error) {
 	current, err := b.session(ctx, e)
 	if err != nil {
-		return discord.MessageUpdate{}, err
+		return discord.MessageUpdate{}, false, err
 	}
 	song, err := resolveSong(ctx, current.source, data.String("query"))
 	if err != nil {
-		return discord.MessageUpdate{}, err
+		return discord.MessageUpdate{}, false, err
 	}
 	return b.queueOne(ctx, current, song)
 }
 
-func (b *Bot) queueOne(ctx context.Context, current session, song korus.Song) (discord.MessageUpdate, error) {
+// queueOne reports whether the reply is only a queue confirmation. A track that
+// started playing keeps its message, since that one carries the player controls.
+func (b *Bot) queueOne(ctx context.Context, current session, song korus.Song) (discord.MessageUpdate, bool, error) {
 	active, tracks, position, err := b.enqueue(ctx, current, []korus.Song{song})
 	if err != nil {
-		return discord.MessageUpdate{}, err
+		return discord.MessageUpdate{}, false, err
 	}
 	cover, ref := b.cover(ctx, current.source.Artwork, song.ID)
-	return ui.Attach(ui.Queued(tracks[0], position, active.Snapshot().Paused, ref), cover...), nil
+	return ui.Attach(ui.Queued(tracks[0], position, active.Snapshot().Paused, ref), cover...), position > 0, nil
 }
 
-func (b *Bot) radio(ctx context.Context, e *handler.CommandEvent, data discord.SlashCommandInteractionData) (discord.MessageUpdate, error) {
+func (b *Bot) radio(ctx context.Context, e *handler.CommandEvent, data discord.SlashCommandInteractionData) (discord.MessageUpdate, bool, error) {
 	current, err := b.session(ctx, e)
 	if err != nil {
-		return discord.MessageUpdate{}, err
+		return discord.MessageUpdate{}, false, err
 	}
 	seed, err := b.radioSeed(ctx, current, data)
 	if err != nil {
-		return discord.MessageUpdate{}, err
+		return discord.MessageUpdate{}, false, err
 	}
 	limit, ok := data.OptInt("limit")
 	if !ok {
@@ -192,16 +194,16 @@ func (b *Bot) radio(ctx context.Context, e *handler.CommandEvent, data discord.S
 	}
 	songs, err := current.source.Radio(ctx, seed.ID, limit)
 	if err != nil {
-		return discord.MessageUpdate{}, err
+		return discord.MessageUpdate{}, false, err
 	}
 	if len(songs) == 0 {
-		return discord.MessageUpdate{}, failf("Korus found nothing to play alongside %s.", seed.Title)
+		return discord.MessageUpdate{}, false, failf("Korus found nothing to play alongside %s.", seed.Title)
 	}
-	active, tracks, _, err := b.enqueue(ctx, current, songs)
+	active, tracks, position, err := b.enqueue(ctx, current, songs)
 	if err != nil {
-		return discord.MessageUpdate{}, err
+		return discord.MessageUpdate{}, false, err
 	}
-	return ui.QueuedBatch("Radio from "+seed.Title, tracks, active.Snapshot().Paused), nil
+	return ui.QueuedBatch("Radio from "+seed.Title, tracks, active.Snapshot().Paused), position > 0, nil
 }
 
 // radioSeed falls back to the caller's last play on this library.
@@ -347,42 +349,42 @@ func (b *Bot) nowPlayingButton(ctx context.Context, e *handler.ComponentEvent) (
 	return b.nowPlayingView(ctx, e)
 }
 
-func (b *Bot) searchPlaySelect(ctx context.Context, e *handler.ComponentEvent) (discord.MessageUpdate, error) {
+func (b *Bot) searchPlaySelect(ctx context.Context, e *handler.ComponentEvent) (discord.MessageUpdate, bool, error) {
 	values := e.StringSelectMenuInteractionData().Values
 	if len(values) == 0 {
-		return discord.MessageUpdate{}, userError("Nothing selected.")
+		return discord.MessageUpdate{}, false, userError("Nothing selected.")
 	}
 	id, err := strconv.ParseInt(values[0], 10, 64)
 	if err != nil {
-		return discord.MessageUpdate{}, userError("That result is no longer valid.")
+		return discord.MessageUpdate{}, false, userError("That result is no longer valid.")
 	}
 	current, err := b.session(ctx, e)
 	if err != nil {
-		return discord.MessageUpdate{}, err
+		return discord.MessageUpdate{}, false, err
 	}
 	song, err := current.source.Song(ctx, id)
 	if err != nil {
-		return discord.MessageUpdate{}, err
+		return discord.MessageUpdate{}, false, err
 	}
 	return b.queueOne(ctx, current, song)
 }
 
-func (b *Bot) albumPlayButton(ctx context.Context, e *handler.ComponentEvent) (discord.MessageUpdate, error) {
+func (b *Bot) albumPlayButton(ctx context.Context, e *handler.ComponentEvent) (discord.MessageUpdate, bool, error) {
 	id, err := strconv.ParseInt(e.Vars["album"], 10, 64)
 	if err != nil {
-		return discord.MessageUpdate{}, userError("That album is no longer valid.")
+		return discord.MessageUpdate{}, false, userError("That album is no longer valid.")
 	}
 	current, err := b.session(ctx, e)
 	if err != nil {
-		return discord.MessageUpdate{}, err
+		return discord.MessageUpdate{}, false, err
 	}
 	album, err := current.source.Album(ctx, id)
 	if err != nil {
-		return discord.MessageUpdate{}, err
+		return discord.MessageUpdate{}, false, err
 	}
-	active, tracks, _, err := b.enqueue(ctx, current, album.Songs)
+	active, tracks, position, err := b.enqueue(ctx, current, album.Songs)
 	if err != nil {
-		return discord.MessageUpdate{}, err
+		return discord.MessageUpdate{}, false, err
 	}
-	return ui.QueuedBatch(album.Title, tracks, active.Snapshot().Paused), nil
+	return ui.QueuedBatch(album.Title, tracks, active.Snapshot().Paused), position > 0, nil
 }
