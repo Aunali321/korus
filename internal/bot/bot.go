@@ -7,7 +7,6 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
-	"sync"
 	"time"
 
 	"github.com/disgoorg/disgo"
@@ -67,10 +66,6 @@ type Bot struct {
 	client   *disgobot.Client
 	players  *player.Manager
 	live     *live
-
-	// Queue confirmations waiting to be dropped, keyed by message.
-	expiryMu sync.Mutex
-	expiry   map[snowflake.ID]chan struct{}
 }
 
 func New(cfg Config, log *slog.Logger) (*Bot, error) {
@@ -159,8 +154,8 @@ func (b *Bot) routes() *handler.Mux {
 		r.SlashCommand("/search", b.slash(b.search))
 		r.SlashCommand("/album", b.slash(b.album))
 		r.SlashCommand("/artist", b.slash(b.artist))
-		r.SlashCommand("/play", b.slashQueue(b.play))
-		r.SlashCommand("/radio", b.slashQueue(b.radio))
+		r.SlashCommand("/play", b.slashNote(b.play))
+		r.SlashCommand("/radio", b.slashNote(b.radio))
 		r.SlashCommand("/pause", b.slashNote(b.pause))
 		r.SlashCommand("/resume", b.slashNote(b.resume))
 		r.SlashCommand("/skip", b.slashNote(b.skip))
@@ -198,8 +193,8 @@ func (b *Bot) routes() *handler.Mux {
 	// Queueing from a result list posts its own confirmation.
 	router.Group(func(r handler.Router) {
 		r.Use(middleware.Defer(discord.InteractionTypeComponent, false, false))
-		r.Component(ui.IDSearchPlay, b.componentQueue(b.searchPlaySelect))
-		r.Component(ui.IDAlbumPlay+"{album}", b.componentQueue(b.albumPlayButton))
+		r.Component(ui.IDSearchPlay, b.componentNote(b.searchPlaySelect))
+		r.Component(ui.IDAlbumPlay+"{album}", b.componentNote(b.albumPlayButton))
 	})
 
 	return router
@@ -242,33 +237,34 @@ func (b *Bot) deferShared(shareByDefault bool) handler.Middleware {
 	}
 }
 
-type queueFunc func(ctx context.Context, e *handler.CommandEvent, data discord.SlashCommandInteractionData) (discord.MessageUpdate, bool, error)
-
-// slashQueue is slash for commands that confirm a queue action. A confirmation
-// that nothing started playing is noise once it has been read, so it is dropped
-// shortly after.
-func (b *Bot) slashQueue(fn queueFunc) handler.SlashCommandHandler {
+// slashNote is slash for commands whose reply is only an acknowledgement. The
+// live panel is what stays on screen, so these do not linger.
+func (b *Bot) slashNote(fn commandFunc) handler.SlashCommandHandler {
 	return func(data discord.SlashCommandInteractionData, e *handler.CommandEvent) error {
-		update, transient, err := fn(e.Ctx, e, data)
+		update, err := fn(e.Ctx, e, data)
 		if err != nil {
-			update, transient = b.render(err), false
+			update = b.render(err)
 		}
-		message, err := e.UpdateInteractionResponse(update)
-		if err != nil {
+		if _, err := e.UpdateInteractionResponse(update); err != nil {
 			return err
 		}
-		b.expire(message.ID, e.DeleteInteractionResponse, transient)
+		b.expire(e.DeleteInteractionResponse)
 		return nil
 	}
 }
 
-// slashNote is slash for commands whose entire reply is an acknowledgement. It
-// has been read the moment it lands, so it does not linger.
-func (b *Bot) slashNote(fn commandFunc) handler.SlashCommandHandler {
-	return b.slashQueue(func(ctx context.Context, e *handler.CommandEvent, data discord.SlashCommandInteractionData) (discord.MessageUpdate, bool, error) {
-		update, err := fn(ctx, e, data)
-		return update, err == nil, err
-	})
+func (b *Bot) componentNote(fn func(ctx context.Context, e *handler.ComponentEvent) (discord.MessageUpdate, error)) handler.ComponentHandler {
+	return func(e *handler.ComponentEvent) error {
+		update, err := fn(e.Ctx, e)
+		if err != nil {
+			update = b.render(err)
+		}
+		if _, err := e.UpdateInteractionResponse(update); err != nil {
+			return err
+		}
+		b.expire(e.DeleteInteractionResponse)
+		return nil
+	}
 }
 
 // panelButton acts on the session and acknowledges. The panel redraws itself, so
@@ -283,64 +279,15 @@ func (b *Bot) panelButton(act func(e *handler.ComponentEvent) error) handler.Com
 	}
 }
 
-func (b *Bot) componentQueue(fn func(ctx context.Context, e *handler.ComponentEvent) (discord.MessageUpdate, bool, error)) handler.ComponentHandler {
-	return func(e *handler.ComponentEvent) error {
-		update, transient, err := fn(e.Ctx, e)
-		if err != nil {
-			update, transient = b.render(err), false
-		}
-		message, err := e.UpdateInteractionResponse(update)
-		if err != nil {
-			return err
-		}
-		b.expire(message.ID, e.DeleteInteractionResponse, transient)
-		return nil
-	}
-}
-
-// expire removes an acknowledgement once it has served its purpose. The message
-// is cosmetic, so a failed delete is logged and forgotten.
-func (b *Bot) expire(messageID snowflake.ID, remove func(...rest.RequestOpt) error, transient bool) {
-	if !transient {
-		return
-	}
-	cancel := make(chan struct{})
-	b.expiryMu.Lock()
-	if b.expiry == nil {
-		b.expiry = map[snowflake.ID]chan struct{}{}
-	}
-	b.expiry[messageID] = cancel
-	b.expiryMu.Unlock()
-
+// expire removes an acknowledgement once it has been read. The message is
+// cosmetic, so a failed delete is logged and forgotten.
+func (b *Bot) expire(remove func(...rest.RequestOpt) error) {
 	go func() {
-		defer func() {
-			b.expiryMu.Lock()
-			if b.expiry[messageID] == cancel {
-				delete(b.expiry, messageID)
-			}
-			b.expiryMu.Unlock()
-		}()
-
-		select {
-		case <-cancel:
-			return
-		case <-time.After(noticeTTL):
-		}
+		time.Sleep(noticeTTL)
 		if err := remove(); err != nil {
 			b.log.Debug("cannot drop acknowledgement", "err", err)
 		}
 	}()
-}
-
-func (b *Bot) component(fn func(ctx context.Context, e *handler.ComponentEvent) (discord.MessageUpdate, error)) handler.ComponentHandler {
-	return func(e *handler.ComponentEvent) error {
-		update, err := fn(e.Ctx, e)
-		if err != nil {
-			update = b.render(err)
-		}
-		_, err = e.UpdateInteractionResponse(update)
-		return err
-	}
 }
 
 // render turns an error into the message the user sees.
