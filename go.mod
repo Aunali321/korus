@@ -6,6 +6,7 @@ require (
 	github.com/aunali321/pi-go v0.0.0-20260724182950-35941c0e41c3
 	github.com/dhowden/tag v0.0.0-20240417053706-3d75831295e8
 	github.com/disgoorg/disgo v0.19.6
+	github.com/disgoorg/godave/golibdave v0.3.0
 	github.com/disgoorg/snowflake/v2 v2.0.3
 	github.com/fsnotify/fsnotify v1.7.0
 	github.com/go-playground/validator/v10 v10.28.0
@@ -25,7 +26,8 @@ require (
 	github.com/KyleBanks/depth v1.2.1 // indirect
 	github.com/PuerkitoBio/purell v1.1.1 // indirect
 	github.com/PuerkitoBio/urlesc v0.0.0-20170810143723-de5bf2ad4578 // indirect
-	github.com/disgoorg/godave v0.1.0 // indirect
+	github.com/disgoorg/godave v0.3.0 // indirect
+	github.com/disgoorg/godave/libdave v0.3.0 // indirect
 	github.com/disgoorg/json/v2 v2.0.0 // indirect
 	github.com/disgoorg/omit v1.0.0 // indirect
 	github.com/dustin/go-humanize v1.0.1 // indirect

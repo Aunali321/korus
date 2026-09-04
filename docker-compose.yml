@@ -24,12 +24,11 @@ services:
       - ENABLE_MUSICBRAINZ=false
       - ENABLE_LISTENBRAINZ=false
 
-  # Discord bot. Same image, different entrypoint. Drop this service if unused.
+  # Discord bot. Separate image: it links libdave, which is glibc-only.
   korus-bot:
-    image: ghcr.io/aunali321/korus:latest
+    image: ghcr.io/aunali321/korus-bot:latest
     container_name: korus-bot
     restart: unless-stopped
-    command: ./korus-bot
     depends_on:
       - korus
     volumes:
@@ -39,7 +38,6 @@ services:
       # Set to a server id for instant command updates while developing.
       - DISCORD_GUILD_ID=
       - BOT_DB_PATH=/data/bot.db
-      - FFMPEG_PATH=ffmpeg
 
 volumes:
   korus_data:

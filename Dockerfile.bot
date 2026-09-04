@@ -1,0 +1,39 @@
+# The bot links Discord's libdave for DAVE voice encryption. Discord ships it as
+# a glibc-only prebuilt needing GLIBC 2.38, so this image cannot share the
+# server's Alpine base and is built and published separately.
+ARG LIBDAVE_VERSION=v1.1.0
+
+FROM golang:1.26-trixie AS builder
+ARG LIBDAVE_VERSION
+RUN apt-get update && apt-get install -y --no-install-recommends \
+      git curl unzip ca-certificates pkg-config \
+ && rm -rf /var/lib/apt/lists/*
+
+# The installer's last step appends to a shell rc and needs SHELL set.
+RUN git clone --depth 1 https://github.com/disgoorg/godave /tmp/godave \
+ && cd /tmp/godave \
+ && SHELL=/bin/bash bash scripts/libdave_install.sh ${LIBDAVE_VERSION}
+ENV PKG_CONFIG_PATH=/root/.local/lib/pkgconfig
+
+WORKDIR /app
+COPY go.mod go.sum ./
+RUN go mod download
+COPY cmd ./cmd
+COPY internal ./internal
+RUN CGO_ENABLED=1 go build -ldflags="-s -w" -o korus-bot ./cmd/bot
+
+FROM gcr.io/distroless/base-debian13
+
+COPY --from=mwader/static-ffmpeg:8.1 /ffmpeg /usr/local/bin/ffmpeg
+COPY --from=builder /root/.local/lib/libdave.so /usr/local/lib/
+COPY --from=builder /usr/lib/x86_64-linux-gnu/libstdc++.so.6 /usr/lib/x86_64-linux-gnu/
+COPY --from=builder /usr/lib/x86_64-linux-gnu/libgcc_s.so.1 /usr/lib/x86_64-linux-gnu/
+
+WORKDIR /app
+COPY --from=builder /app/korus-bot .
+
+ENV LD_LIBRARY_PATH=/usr/local/lib
+ENV FFMPEG_PATH=/usr/local/bin/ffmpeg
+ENV BOT_DB_PATH=/data/bot.db
+
+ENTRYPOINT ["/app/korus-bot"]

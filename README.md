@@ -210,6 +210,16 @@ Korus's AI features run on a single LLM agent that reads your library and listen
 
 A second binary, `cmd/bot`, puts the library in a Discord server: browsing, stats, playlists and voice playback.
 
+Discord requires DAVE end-to-end encryption on voice connections, so the bot
+links [libdave](https://github.com/discord/libdave) through cgo. Install it once
+before building:
+
+```bash
+git clone https://github.com/disgoorg/godave && cd godave
+./scripts/libdave_install.sh v1.1.0
+export PKG_CONFIG_PATH="$HOME/.local/lib/pkgconfig:$PKG_CONFIG_PATH"
+```
+
 ```bash
 export DISCORD_TOKEN="your-bot-token"
 go run ./cmd/bot
@@ -222,7 +232,9 @@ go run ./cmd/bot
 | `BOT_DB_PATH` | `./bot.db` | SQLite database of account links |
 | `FFMPEG_PATH` | `ffmpeg` | Path to ffmpeg binary |
 
-The bot needs the `applications.commands` and `bot` scopes, and the Connect and Speak voice permissions. FFmpeg must be on `PATH`.
+The bot needs the `applications.commands` and `bot` scopes, and the View Channels, Send Messages, Attach Files, Connect and Speak permissions. FFmpeg must be on `PATH`.
+
+It ships as its own image, `ghcr.io/aunali321/korus-bot`, built from `Dockerfile.bot`. Discord publishes libdave as a glibc-only prebuilt needing GLIBC 2.38, so the bot cannot share the server's Alpine base.
 
 ### Accounts
 

@@ -16,6 +16,8 @@ import (
 	"github.com/disgoorg/disgo/gateway"
 	"github.com/disgoorg/disgo/handler"
 	"github.com/disgoorg/disgo/handler/middleware"
+	"github.com/disgoorg/disgo/voice"
+	"github.com/disgoorg/godave/golibdave"
 	"github.com/disgoorg/snowflake/v2"
 
 	"github.com/Aunali321/korus/internal/bot/korus"
@@ -75,6 +77,9 @@ func New(cfg Config, log *slog.Logger) (*Bot, error) {
 	client, err := disgo.New(cfg.Token,
 		disgobot.WithGatewayConfigOpts(gateway.WithIntents(gateway.IntentGuilds, gateway.IntentGuildVoiceStates)),
 		disgobot.WithCacheConfigOpts(cache.WithCaches(cache.FlagGuilds, cache.FlagChannels, cache.FlagVoiceStates)),
+		// Discord closes the voice gateway with 4017 unless DAVE is negotiated,
+		// so the noop session disgo defaults to cannot carry audio any more.
+		disgobot.WithVoiceManagerConfigOpts(voice.WithDaveSessionCreateFunc(golibdave.NewSession)),
 		disgobot.WithEventListeners(b.routes(),
 			disgobot.NewListenerFunc(b.onVoiceLeave),
 			disgobot.NewListenerFunc(b.onVoiceMove),

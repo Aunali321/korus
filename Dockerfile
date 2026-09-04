@@ -28,8 +28,7 @@ RUN go mod download
 COPY . .
 COPY --from=frontend-builder /app/dist ./web/dist
 
-RUN CGO_ENABLED=1 go build -ldflags="-s -w" -o korus ./cmd/server && \
-    CGO_ENABLED=1 go build -ldflags="-s -w" -o korus-bot ./cmd/bot
+RUN CGO_ENABLED=1 go build -ldflags="-s -w" -o korus ./cmd/server
 
 # Stage 3: Runtime
 FROM alpine:3.21
@@ -39,7 +38,6 @@ RUN apk add --no-cache ffmpeg ca-certificates tzdata
 WORKDIR /app
 
 COPY --from=backend-builder /app/korus .
-COPY --from=backend-builder /app/korus-bot .
 COPY --from=backend-builder /app/web/dist ./web/dist
 
 RUN mkdir -p /data /media
@@ -50,7 +48,6 @@ ENV MEDIA_ROOT=/media
 ENV FFMPEG_PATH=ffmpeg
 ENV FFPROBE_PATH=ffprobe
 ENV COVER_CACHE_PATH=/data/covers
-ENV BOT_DB_PATH=/data/bot.db
 
 EXPOSE 8080
 
