@@ -23,6 +23,7 @@ Self-hosted music streaming server with a web interface.
 - **MusicBrainz integration** - Enrich metadata from MusicBrainz
 - **ListenBrainz scrobbling** - Submit listens to ListenBrainz
 - **Multi-user** - User accounts with JWT authentication
+- **Discord bot** - Browse, queue and listen together in voice, with per-user account links
 
 ## Screenshots
 
@@ -204,6 +205,62 @@ Korus's AI features run on a single LLM agent that reads your library and listen
 
 ### Radio
 - `GET /api/radio/:id` - Get similar song recommendations
+
+## Discord bot
+
+A second binary, `cmd/bot`, puts the library in a Discord server: browsing, stats, playlists and voice playback.
+
+```bash
+export DISCORD_TOKEN="your-bot-token"
+go run ./cmd/bot
+```
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `DISCORD_TOKEN` | - | Required. Bot token |
+| `DISCORD_GUILD_ID` | - | Register commands to one server instead of globally, for instant updates while developing |
+| `BOT_DB_PATH` | `./bot.db` | SQLite database of account links |
+| `FFMPEG_PATH` | `ffmpeg` | Path to ffmpeg binary |
+
+The bot needs the `applications.commands` and `bot` scopes, and the Connect and Speak voice permissions. FFmpeg must be on `PATH`.
+
+### Accounts
+
+Each Discord user links their own Korus account with `/login`, so the bot is multi-tenant: `/stats`, `/wrapped`, `/playlists` and `/lyrics` always read the caller's account, and nobody can write to anyone else's.
+
+Playback is shared, so it works differently. The first person to `/play` in a server becomes the session host, and the whole queue streams from their library. Anyone in the same voice channel can browse and queue from it, which is what makes group listening work.
+
+Listening history follows the person who queued the track, not the host, and only when that person has an account on the same server. So queueing in someone else's session never lands in their stats, and a guest with no account on that server simply records nothing.
+
+Tokens refresh automatically and are written back to `bot.db`. A dead refresh token drops the link and asks the user to `/login` again.
+
+### Commands
+
+| Command | Description |
+|---------|-------------|
+| `/login url username password` | Link a Korus account |
+| `/logout` | Unlink, ending your playback session |
+| `/whoami` | Show the linked account |
+| `/search query` | Songs, albums, artists and playlists, with a menu to play a result |
+| `/album title` | Album detail and tracklist, with a button to queue it |
+| `/artist name` | Biography, albums and top tracks |
+| `/lyrics song` | Lyrics, falling back to the synced copy |
+| `/stats period` | Plays, listening time and top songs, artists and albums |
+| `/wrapped period` | Recap of a week, month, year or all time |
+| `/playlists` | List your playlists |
+| `/playlist view\|create\|add\|remove` | Manage a playlist |
+| `/play query` | Join your voice channel and play or queue a song |
+| `/radio seed limit` | Queue a station, seeded by a song or your last play |
+| `/pause` `/resume` `/skip` `/stop` | Playback control |
+| `/queue` `/nowplaying` | Live player views with buttons |
+
+Titles, albums, artists, playlists and playlist-scoped songs all autocomplete against the library the session is reading from.
+
+### Playback
+
+Audio comes from the authenticated `/api/download/{id}` endpoint, transcoded by FFmpeg to 128k Opus at 48kHz stereo and fed to Discord as 20ms frames. The access token travels in an HTTP header, never in a URL. The bot leaves when the queue drains, when it is disconnected, or when the last listener leaves the channel.
+
+Every message is built from Discord's Components V2 containers rather than embeds. Cover art is uploaded as an attachment instead of linked, so it still renders when Korus is only reachable on a private network.
 
 ## Tests
 
