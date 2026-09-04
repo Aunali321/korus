@@ -136,6 +136,9 @@ func (l *live) follow(view *liveView, render draw) {
 		shown    string
 		lastEdit time.Time
 		failures int
+		// Artwork is offered once, on the tick the track changes. That tick is
+		// often throttled, so it is held until an edit actually lands.
+		pending []*discord.File
 	)
 	for {
 		select {
@@ -154,13 +157,16 @@ func (l *live) follow(view *liveView, render draw) {
 		}
 
 		update, fingerprint, files := render(active, snapshot)
+		if len(files) > 0 {
+			pending = files
+		}
 		if fingerprint == shown || time.Since(lastEdit) < liveMinEdit {
 			continue
 		}
-		// Artwork is only re-sent when it changes; an update that leaves
-		// attachments alone keeps the one already on the message.
-		if len(files) > 0 {
-			update = ui.Attach(update, files...)
+		// An update that leaves attachments alone keeps the one already on the
+		// message, so artwork only rides along when it has changed.
+		if len(pending) > 0 {
+			update = ui.Attach(update, pending...)
 		}
 		if _, err := l.bot.client.Rest.UpdateMessage(view.channelID, view.messageID, update); err != nil {
 			if failures++; failures >= liveMaxErrors {
@@ -169,7 +175,7 @@ func (l *live) follow(view *liveView, render draw) {
 			}
 			continue
 		}
-		shown, lastEdit, failures = fingerprint, time.Now(), 0
+		shown, lastEdit, failures, pending = fingerprint, time.Now(), 0, nil
 	}
 }
 
