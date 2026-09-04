@@ -2,7 +2,7 @@
 
 <img src="web/static/logo.svg" alt="Korus Logo" width="64" height="64" />
 
-Self-hosted music streaming server with a web interface.
+Self-hosted music streaming server with a web interface and a Discord bot.
 
 ## Features
 
@@ -42,6 +42,16 @@ Self-hosted music streaming server with a web interface.
 | Stats | Settings |
 |-------|----------|
 | ![Stats](docs/screenshots/stats.png) | ![Settings](docs/screenshots/settings.png) |
+
+### Discord bot
+
+| Live player and captions | Autocomplete |
+|--------------------------|--------------|
+| ![Player](docs/screenshots/bot_player.png) | ![Autocomplete](docs/screenshots/bot_autocomplete.png) |
+
+| Stats | Wrapped |
+|-------|---------|
+| ![Bot stats](docs/screenshots/bot_stats.png) | ![Bot wrapped](docs/screenshots/bot_wrapped.png) |
 
 ## Tech Stack
 
@@ -210,9 +220,32 @@ Korus's AI features run on a single LLM agent that reads your library and listen
 
 A second binary, `cmd/bot`, puts the library in a Discord server: browsing, stats, playlists and voice playback.
 
-Discord requires DAVE end-to-end encryption on voice connections, so the bot
-links [libdave](https://github.com/discord/libdave) through cgo. Install it once
-before building:
+### Setup
+
+Create an application at [discord.com/developers/applications](https://discord.com/developers/applications). The Application ID on the General Information page is the `client_id` below; the Bot tab gives you the token.
+
+Leave all three privileged intents off. The bot asks only for Guilds and Guild Voice States, both unprivileged, so it never needs Message Content or Server Members.
+
+Invite it with the `bot` and `applications.commands` scopes. Without the second one it joins fine and no slash command ever appears.
+
+```
+https://discord.com/oauth2/authorize?client_id=YOUR_APP_ID&permissions=3181568&scope=bot+applications.commands
+```
+
+That permission integer is View Channels, Send Messages, Attach Files, Connect and Speak. Nothing else is needed: the UI is Components V2 rather than embeds, and cover art is uploaded rather than linked.
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `DISCORD_TOKEN` | - | Required. Bot token |
+| `DISCORD_GUILD_ID` | - | Register commands to one server instead of globally, for instant updates while developing |
+| `BOT_DB_PATH` | `./bot.db` | SQLite database of account links |
+| `FFMPEG_PATH` | `ffmpeg` | Path to ffmpeg binary |
+
+Set `DISCORD_GUILD_ID` while testing. Commands appear in that server immediately; global registration takes up to an hour to propagate.
+
+### Building
+
+Discord requires DAVE end-to-end encryption on voice connections, so the bot links [libdave](https://github.com/discord/libdave) through cgo. Install it once before building:
 
 ```bash
 git clone https://github.com/disgoorg/godave && cd godave
@@ -225,27 +258,25 @@ export DISCORD_TOKEN="your-bot-token"
 go run ./cmd/bot
 ```
 
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `DISCORD_TOKEN` | - | Required. Bot token |
-| `DISCORD_GUILD_ID` | - | Register commands to one server instead of globally, for instant updates while developing |
-| `BOT_DB_PATH` | `./bot.db` | SQLite database of account links |
-| `FFMPEG_PATH` | `ffmpeg` | Path to ffmpeg binary |
-
-The bot needs the `applications.commands` and `bot` scopes, and the View Channels, Send Messages, Attach Files, Connect and Speak permissions. FFmpeg must be on `PATH`.
-
-The player is one live message per server. `/play` puts it in the channel and it
-rewrites itself as the track, queue and progress change, so there is never more
-than one and it is never stale. `/nowplaying` brings it back down to the bottom.
-It is the only view with Pause, Skip and Stop on it, since it is the only one
-that stays correct. Queue confirmations and acknowledgements disappear after ten
-seconds.
-
-`/captions` follows the playing track line by line, rewriting one message as the
-lyrics advance. It reads the `lyrics_synced` LRC column, so it only works for
-tracks that have timed lyrics, and it picks up again on the next track that does.
+FFmpeg must be on `PATH`.
 
 It ships as its own image, `ghcr.io/aunali321/korus-bot`, built from `Dockerfile.bot`. Discord publishes libdave as a glibc-only prebuilt needing GLIBC 2.38, so the bot cannot share the server's Alpine base.
+
+### Usage
+
+Everyone links their own account once:
+
+```
+/login url:https://korus.example.com username:you password:secret
+```
+
+The bot is what reaches Korus, not the person typing, so the URL only has to be reachable from wherever the bot runs. A private server works fine.
+
+Then join a voice channel and `/play something`.
+
+The player is one live message per server. It rewrites itself as the track, queue and progress change, so there is never more than one and it is never stale. `/nowplaying` brings it back down to the bottom of the channel. It is the only view carrying Pause, Skip and Stop, because it is the only one that stays correct. Queue confirmations and other acknowledgements delete themselves after ten seconds.
+
+`/captions` follows the playing track line by line, rewriting one message as the lyrics advance. It reads the `lyrics_synced` LRC column, so it works only for tracks with timed lyrics, and picks up again on the next track that has them.
 
 ### Accounts
 
@@ -267,15 +298,17 @@ Tokens refresh automatically and are written back to `bot.db`. A dead refresh to
 | `/search query` | Songs, albums, artists and playlists, with a menu to play a result |
 | `/album title` | Album detail and tracklist, with a button to queue it |
 | `/artist name` | Biography, albums and top tracks |
-| `/lyrics song` | Lyrics, falling back to the synced copy |
-| `/stats period` | Plays, listening time and top songs, artists and albums |
+| `/lyrics [song]` | Lyrics, defaulting to the current track |
+| `/stats [period] [share]` | Plays, listening time and top songs, artists and albums. Private unless shared |
 | `/wrapped period` | Recap of a week, month, year or all time |
 | `/playlists` | List your playlists |
 | `/playlist view\|create\|add\|remove` | Manage a playlist |
 | `/play query` | Join your voice channel and play or queue a song |
 | `/radio seed limit` | Queue a station, seeded by a song or your last play |
 | `/pause` `/resume` `/skip` `/stop` | Playback control |
-| `/queue` `/nowplaying` | Live player views with buttons |
+| `/captions` | Follow the current track's lyrics line by line, or stop following |
+| `/queue` | Full queue listing |
+| `/nowplaying` | Bring the live player down to the bottom of the channel |
 
 Titles, albums, artists, playlists and playlist-scoped songs all autocomplete against the library the session is reading from.
 
