@@ -234,6 +234,10 @@ go run ./cmd/bot
 
 The bot needs the `applications.commands` and `bot` scopes, and the View Channels, Send Messages, Attach Files, Connect and Speak permissions. FFmpeg must be on `PATH`.
 
+`/captions` follows the playing track line by line, rewriting one message as the
+lyrics advance. It reads the `lyrics_synced` LRC column, so it only works for
+tracks that have timed lyrics, and it picks up again on the next track that does.
+
 It ships as its own image, `ghcr.io/aunali321/korus-bot`, built from `Dockerfile.bot`. Discord publishes libdave as a glibc-only prebuilt needing GLIBC 2.38, so the bot cannot share the server's Alpine base.
 
 ### Accounts

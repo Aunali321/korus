@@ -361,3 +361,45 @@ func date(value string) string {
 	}
 	return value
 }
+
+// captionContext is how many lines sit either side of the one being sung.
+const captionContext = 3
+
+// Captions renders the lyric line playing right now. Context lines are dimmed
+// so the current one is readable at a glance while the message rewrites itself.
+func Captions(song korus.Song, lines []korus.Line, index int) discord.MessageUpdate {
+	body := make([]string, 0, captionContext*2+2)
+	body = append(body, fmt.Sprintf("### %s\n-# %s", Escape(song.Title), Escape(song.ArtistNames())))
+
+	low := max(index-captionContext, 0)
+	high := min(index+captionContext+1, len(lines))
+	for i := low; i < high; i++ {
+		text := Escape(lines[i].Text)
+		if text == "" {
+			text = "♪"
+		}
+		if i == index {
+			body = append(body, "**"+text+"**")
+			continue
+		}
+		body = append(body, "-# "+text)
+	}
+	if index < 0 && high > 0 {
+		body = append(body, "-# ...")
+	}
+
+	return Reply(ColorContent,
+		discord.NewTextDisplay(strings.Join(body, "\n")),
+		discord.NewActionRow(discord.NewDangerButton("Stop captions", IDCaptionsStop)),
+	)
+}
+
+// CaptionsWaiting covers a track with no synced lyrics, so the message stays put
+// and picks the next one up instead of vanishing mid-session.
+func CaptionsWaiting(song korus.Song) discord.MessageUpdate {
+	return Reply(ColorContent,
+		discord.NewTextDisplay(fmt.Sprintf("### %s\n-# %s\n\n-# No synced lyrics for this track. Captions resume on the next one.",
+			Escape(song.Title), Escape(song.ArtistNames()))),
+		discord.NewActionRow(discord.NewDangerButton("Stop captions", IDCaptionsStop)),
+	)
+}

@@ -105,18 +105,25 @@ func option(t *testing.T, name string, options []discord.ApplicationCommandOptio
 	return nil
 }
 
-// Visibility is chosen at defer time from this option, so both commands must
-// actually declare it, and lyrics must accept being called bare.
-func TestShareAndOptionalSong(t *testing.T) {
+// Lyrics must accept being called bare so it can fall back to the current
+// track, and it is always public, so it carries no share option.
+func TestLyricsOptions(t *testing.T) {
 	lyrics := findCommand(t, "lyrics")
 	song, ok := option(t, "song", lyrics.Options).(discord.ApplicationCommandOptionString)
 	if !ok || song.Required {
-		t.Error("lyrics song must be an optional string so it can fall back to the current track")
+		t.Error("lyrics song must be an optional string")
 	}
-	for _, name := range []string{"lyrics", "stats"} {
-		command := findCommand(t, name)
-		if _, ok := option(t, optShare, command.Options).(discord.ApplicationCommandOptionBool); !ok {
-			t.Errorf("%s share option must be a bool", name)
+	for _, o := range lyrics.Options {
+		if o.OptionName() == optShare {
+			t.Error("lyrics is public only and must not offer share")
 		}
+	}
+}
+
+// Stats visibility is chosen at defer time from this option.
+func TestStatsShareOption(t *testing.T) {
+	stats := findCommand(t, "stats")
+	if _, ok := option(t, optShare, stats.Options).(discord.ApplicationCommandOptionBool); !ok {
+		t.Error("stats share option must be a bool")
 	}
 }

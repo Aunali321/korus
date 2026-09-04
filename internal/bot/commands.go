@@ -75,7 +75,6 @@ var commands = []discord.ApplicationCommandCreate{
 		Description: "Show the lyrics of a song, or of whatever is playing",
 		Options: []discord.ApplicationCommandOption{
 			autocompleteOption("song", "Song title, defaults to the current track", false),
-			shareOption("Post to the channel instead of only to you (default true)"),
 		},
 	},
 
@@ -93,6 +92,10 @@ var commands = []discord.ApplicationCommandCreate{
 			),
 			shareOption("Post to the channel instead of only to you (default false)"),
 		},
+	},
+	discord.SlashCommandCreate{
+		Name:        "captions",
+		Description: "Follow the current track's lyrics line by line, or stop following",
 	},
 	discord.SlashCommandCreate{
 		Name:        "wrapped",

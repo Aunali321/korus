@@ -47,6 +47,14 @@ func tracks(n int) []player.Track {
 	return out
 }
 
+func captionLines(n int) []korus.Line {
+	lines := make([]korus.Line, n)
+	for i := range lines {
+		lines[i] = korus.Line{At: time.Duration(i) * time.Second, Text: "a sung line of lyrics"}
+	}
+	return lines
+}
+
 func TestViewsFitDiscordLimits(t *testing.T) {
 	year := 2024
 	long := strings.Repeat("biography ", 400)
@@ -94,6 +102,10 @@ func TestViewsFitDiscordLimits(t *testing.T) {
 		}),
 		"queued":      Queued(player.Track{Song: song(1, "Track"), Requester: "listener"}, 3, false, CoverRef),
 		"queuedBatch": QueuedBatch("Radio from Track", tracks(150), false),
+		"captions":    Captions(song(1, "Track"), captionLines(400), 200),
+		// A single pathological line still has to fit inside the message cap.
+		"captionsLong":    Captions(song(1, "Track"), []korus.Line{{Text: long}}, 0),
+		"captionsWaiting": CaptionsWaiting(song(1, "Track")),
 	}
 
 	for name, view := range views {

@@ -28,6 +28,8 @@ const (
 	IDQueue      = "/player/queue"
 	IDSearchPlay = "/search/play"
 	IDAlbumPlay  = "/album/play/"
+
+	IDCaptionsStop = "/captions/stop"
 )
 
 // Components V2 allows 4000 characters of text per message across every text
@@ -204,4 +206,18 @@ func Controls(paused bool) discord.ActionRowComponent {
 		discord.NewSecondaryButton("Now playing", IDNowPlaying),
 		discord.NewDangerButton("Stop", IDStop),
 	)
+}
+
+// Create turns a rendered reply into a standalone message. Captions live in a
+// plain channel message, since interaction tokens expire after 15 minutes and a
+// listening session outlasts that.
+func Create(update discord.MessageUpdate) discord.MessageCreate {
+	create := discord.MessageCreate{}
+	if update.Components != nil {
+		create.Components = *update.Components
+	}
+	if update.Flags != nil {
+		create.Flags = *update.Flags
+	}
+	return create
 }

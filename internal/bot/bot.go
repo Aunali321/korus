@@ -64,6 +64,7 @@ type Bot struct {
 	accounts *accounts
 	client   *disgobot.Client
 	players  *player.Manager
+	captions *captions
 }
 
 func New(cfg Config, log *slog.Logger) (*Bot, error) {
@@ -97,6 +98,7 @@ func New(cfg Config, log *slog.Logger) (*Bot, error) {
 
 	b.client = client
 	b.players = player.NewManager(client, cfg.FFmpeg, log)
+	b.captions = newCaptions(b)
 	return b, nil
 }
 
@@ -116,6 +118,7 @@ func (b *Bot) Start(ctx context.Context) error {
 }
 
 func (b *Bot) Close(ctx context.Context) {
+	b.captions.StopAll()
 	b.players.StopAll()
 	b.client.Close(ctx)
 	b.store.Close()
@@ -139,12 +142,7 @@ func (b *Bot) routes() *handler.Mux {
 		r.SlashCommand("/playlist/remove", b.slash(b.playlistRemove))
 	})
 
-	// Lyrics are about the song everyone is hearing, so they default to the
-	// channel. Stats are about one person, so they default to private.
-	router.Group(func(r handler.Router) {
-		r.Use(b.deferShared(true))
-		r.SlashCommand("/lyrics", b.slash(b.lyrics))
-	})
+	// Stats are about one person, so they stay private unless shared.
 	router.Group(func(r handler.Router) {
 		r.Use(b.deferShared(false))
 		r.SlashCommand("/stats", b.slash(b.stats))
@@ -163,6 +161,8 @@ func (b *Bot) routes() *handler.Mux {
 		r.SlashCommand("/stop", b.slash(b.stop))
 		r.SlashCommand("/queue", b.slash(b.queue))
 		r.SlashCommand("/nowplaying", b.slash(b.nowPlaying))
+		r.SlashCommand("/lyrics", b.slash(b.lyrics))
+		r.SlashCommand("/captions", b.slash(b.captionsCommand))
 	})
 
 	router.Group(func(r handler.Router) {
@@ -184,6 +184,13 @@ func (b *Bot) routes() *handler.Mux {
 		r.Component(ui.IDStop, b.component(b.stopButton))
 		r.Component(ui.IDQueue, b.component(b.queueButton))
 		r.Component(ui.IDNowPlaying, b.component(b.nowPlayingButton))
+	})
+
+	router.Component(ui.IDCaptionsStop, func(e *handler.ComponentEvent) error {
+		if e.GuildID() != nil {
+			b.captions.Stop(*e.GuildID())
+		}
+		return e.DeferUpdateMessage()
 	})
 
 	// Queueing from a result list posts its own confirmation.
